@@ -45,6 +45,8 @@ async def _get_random_note(offset: int) -> RowMapping:
     stmt = sa.select([models.Notes,
                       models.Materials.c.title.label('material_title'),
                       models.Materials.c.authors.label('material_authors'),
+                      models.Materials.c.pages.label('material_pages'),
+                      models.Materials.c.tags.label('material_tags'),
                       sa.text("CASE WHEN statuses IS NULL THEN 'queue'"
                               "WHEN statuses.completed_at IS NULL THEN 'reading'"
                               "ELSE 'reading' END AS material_current_status"),
@@ -69,7 +71,7 @@ async def get_random_note() -> schemas.Note:
 
     return schemas.Note(
         **note,
-        notes_count=notes_count,
+        total_notes_count=notes_count,
         material_repeats_count=last_repeat.reminds_count,
         material_last_repeated_at=last_repeat.last_reminded_at
     )

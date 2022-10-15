@@ -13,8 +13,12 @@ class Note(CustomBaseModel):
     chapter: int
     page: int
 
+    total_notes_count: int
+
     material_title: str
     material_authors: str
+    material_pages: int
+    material_tags: str
     material_current_status: Literal['queue', 'reading', 'completed']
     material_repeats_count: int
     material_last_repeated_at: datetime.datetime
