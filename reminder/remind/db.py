@@ -1,3 +1,4 @@
+import random
 from uuid import UUID
 
 import sqlalchemy.sql as sa
@@ -16,8 +17,9 @@ async def _get_notes_count() -> int:
     async with database.session() as ses:
         return await ses.scalar(stmt)
 
-async def _get_random_note_offset() -> int:
-    pass
+
+def _get_random_note_offset(notes_count: int) -> int:
+    return random.randint(0, notes_count - 1)
 
 
 async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind:
