@@ -41,7 +41,34 @@ async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind:
 
 
 async def get_random_note() -> schemas.Note:
-    pass
+    notes_count = await _get_notes_count()
+    offset = _get_random_note_offset(notes_count)
+
+    stmt = sa.select([models.Notes,
+                      models.Materials.c.title.label('material_title'),
+                      models.Materials.c.authors.label('material_authors'),
+                      sa.text("CASE WHEN statuses IS NULL THEN 'queue'"
+                              "WHEN statuses.completed_at IS NULL THEN 'reading'"
+                              "ELSE 'reading' END AS 'material_current_status'"),
+                      ])\
+        .join(models.Materials,
+              models.Materials.c.material_id == models.Notes.c.material_id)\
+        .join(models.Statuses,
+              models.Statuses.c.material_id == models.Notes.c.material_id)\
+        .where(models.Notes.c.is_deleted == False)\
+        .limit(1).offset(offset)
+
+    async with database.session() as ses:
+        note = (await ses.execute(stmt)).mappings().one()
+
+    last_repeat = await _get_last_material_remind(material_id=note.material_id)
+
+    return schemas.Note(
+        **note,
+        notes_count=notes_count,
+        material_repeats_count=last_repeat.reminds_count,
+        material_last_repeated_at=last_repeat.last_reminded_at
+    )
 
 
 async def insert_notes_history(*,
