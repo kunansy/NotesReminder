@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from reminder.remind import schemas
+from reminder.remind.schemas import LastMaterialRemind
 
 
 async def _get_notes_count() -> int:
@@ -11,11 +12,11 @@ async def _get_random_note_offset() -> int:
     pass
 
 
-async def get_random_note() -> schemas.Note:
+async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind:
     pass
 
 
-async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind:
+async def get_random_note() -> schemas.Note:
     pass
 
 
