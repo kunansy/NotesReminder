@@ -14,6 +14,13 @@ API_VERSION = '0.1.0'
 if (version_file := Path('VERSION')).exists():
     API_VERSION = version_file.read_text().strip()
 
+with env.prefixed('TG_BOT_'):
+    TG_BOT_TOKEN = env('TOKEN')
+    TG_BOT_USER_IDS = [
+        int(user_id)
+        for user_id in env.list('USER_IDS')
+    ]
+
 with env.prefixed("DB_"):
     DB_HOST = env("HOST")
     DB_PORT = env.int("PORT")
