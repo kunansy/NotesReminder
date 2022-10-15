@@ -19,7 +19,6 @@ engine = create_async_engine(
 )
 
 
-
 @asynccontextmanager
 async def session(**kwargs) -> AsyncGenerator[AsyncSession, None]:
     new_session = AsyncSession(**kwargs, bind=engine)
