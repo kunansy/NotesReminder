@@ -398,7 +398,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "3b834651aab2a89655fe9b9ce36d0c82a41dde7025dde305612b0fb79afe0bc4"
+content-hash = "a2e362f2c08111555e529eb53f9b6381e3f95ead8cf0b312c3861e9bb0dca410"
 
 [metadata.files]
 aiogram = [
