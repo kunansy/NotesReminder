@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "notesreminder"
+version = "0.1.0"
+description = ""
+authors = ["kunansy <kolobov.kirill@list.ru>"]
+license = "GPL-3"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+environs = "~9.5.0"
+aiogram = "~2.22.2"
+asyncpg = "~0.26.0"
+SQLAlchemy = "~1.4.36"
+
+
+[tool.poetry.group.dev.dependencies]
+mypy = "~0.982"
+bumpversion = "~0.6.0"
+flake8 = "~5.0.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
