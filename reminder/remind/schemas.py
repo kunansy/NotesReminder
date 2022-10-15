@@ -20,8 +20,8 @@ class Note(CustomBaseModel):
     material_pages: int
     material_tags: str
     material_current_status: Literal['queue', 'reading', 'completed']
-    material_repeats_count: int
-    material_last_repeated_at: datetime.datetime
+    material_repeats_count: int = 0
+    material_last_repeated_at: datetime.datetime | None = None
 
     def format(self) -> str:
         pass
