@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  notes-reminder:
+    image: kunansy/notes_reminder:0.1.0
+    container_name: notes-reminder
+    env_file: .env
+    restart: always
+    depends_on:
+      - tracker-db
+    ports:
+       - "0.0.0.0:${API_PORT}:8000"
+    networks:
+      - readingtracker_tracker-net
+    healthcheck:
+      test: curl -f http://localhost:8000/readiness || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  readingtracker_tracker-net:
+    external: true
