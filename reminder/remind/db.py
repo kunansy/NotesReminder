@@ -68,13 +68,18 @@ async def get_random_note() -> schemas.Note:
     offset = _get_random_note_offset(notes_count)
 
     note = await _get_random_note(offset)
-    last_repeat = await _get_last_material_remind(material_id=note['material_id'])
+
+    last_repeat_dict = {}
+    if last_repeat := await _get_last_material_remind(material_id=note['material_id']):
+        last_repeat_dict = {
+            'material_repeats_count': last_repeat.reminds_count,
+            'material_last_repeated_at': last_repeat.last_reminded_at
+        }
 
     return schemas.Note(
         **note,
         total_notes_count=notes_count,
-        material_repeats_count=last_repeat.reminds_count,
-        material_last_repeated_at=last_repeat.last_reminded_at
+        **last_repeat_dict
     )
 
 
