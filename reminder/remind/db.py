@@ -23,7 +23,21 @@ def _get_random_note_offset(notes_count: int) -> int:
 
 
 async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind:
-    pass
+    count = sa.func.count(1).over(partition_by=models.Repeats.c.material_id)
+
+    stmt = sa.select([models.Repeats.c.repeated_at.label('date'),
+                      count.label('count')])\
+        .where(models.Repeats.c.material_id == str(material_id)) \
+        .order_by(models.Repeats.c.repeated_at.desc())\
+        .limit(1)
+
+    async with database.session() as ses:
+        last_remind = (await ses.execute(stmt)).mappings().one()
+
+    return LastMaterialRemind(
+        reminds_count=last_remind['count'],
+        last_reminded_at=last_remind['date']
+    )
 
 
 async def get_random_note() -> schemas.Note:
