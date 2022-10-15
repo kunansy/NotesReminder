@@ -23,6 +23,9 @@ class Note(CustomBaseModel):
     material_repeats_count: int
     material_last_repeated_at: datetime.datetime
 
+    def format(self) -> str:
+        pass
+
 
 class LastMaterialRemind(CustomBaseModel):
     reminds_count: int
