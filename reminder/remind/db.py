@@ -1,12 +1,20 @@
 from uuid import UUID
 
+import sqlalchemy.sql as sa
+
+from reminder.common import database
+from reminder.models import models
 from reminder.remind import schemas
 from reminder.remind.schemas import LastMaterialRemind
 
 
 async def _get_notes_count() -> int:
-    pass
+    stmt = sa.select(sa.func.count(1))\
+        .select_from(models.Notes)\
+        .where(models.Notes.c.is_deleted == False)
 
+    async with database.session() as ses:
+        return await ses.scalar(stmt)
 
 async def _get_random_note_offset() -> int:
     pass
