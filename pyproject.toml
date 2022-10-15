@@ -12,6 +12,9 @@ environs = "~9.5.0"
 aiogram = "~2.22.2"
 asyncpg = "~0.26.0"
 SQLAlchemy = "~1.4.36"
+orjson = "~3.8.0"
+types-orjson = "~3.6.2"
+pydantic = "~1.10.1"
 
 
 [tool.poetry.group.dev.dependencies]
