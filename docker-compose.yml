@@ -6,6 +6,7 @@ services:
     container_name: notes-reminder-bot
     env_file: .env
     restart: always
+    entrypoint: ["python3", "reminder/main.py", "--start"]
     depends_on:
       - tracker-db
     networks:
