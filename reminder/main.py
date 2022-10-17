@@ -50,7 +50,7 @@ def args_parser() -> argparse.Namespace:
         '--remind',
         action="store_true",
         default=False,
-        dest='start',
+        dest='remind',
         help="Send a new note to remind"
     )
 
