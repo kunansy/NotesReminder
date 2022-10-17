@@ -45,6 +45,9 @@ class Note(CustomBaseModel):
 
         return f"{res} ago"
 
+    def format_note_added_at(self) -> str:
+        return self.added_at.strftime("%Y-%m-%d")
+
     def format(self) -> str:
         pass
 
