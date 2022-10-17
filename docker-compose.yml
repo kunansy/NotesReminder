@@ -1,9 +1,9 @@
 version: '3'
 
 services:
-  notes-reminder:
+  notes-reminder-bot:
     image: kunansy/notes_reminder:0.1.0
-    container_name: notes-reminder
+    container_name: notes-reminder-bot
     env_file: .env
     restart: always
     depends_on:
