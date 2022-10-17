@@ -10,7 +10,7 @@ async def remind(*,
     note = await db.get_random_note()
     await db.insert_notes_history(note_id=note.note_id, user_id=user_id)
 
-    await send_msg(note, chat_id=user_id)
+    await send_msg(note.format(), chat_id=user_id)
 
 
 @dp.message_handler(commands=['remind'])
