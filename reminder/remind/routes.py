@@ -5,13 +5,18 @@ from reminder.common.logger import logger
 from reminder.remind import db
 
 
+async def remind(*,
+                 user_id: int) -> None:
+    note = await db.get_random_note()
+    await db.insert_notes_history(note_id=note.note_id, user_id=user_id)
+
+    await send_msg(note, chat_id=user_id)
+
+
 @dp.message_handler(commands=['remind'])
 @restrict_access
 async def remind_note(msg: types.Message) -> None:
     user_id = msg.from_user.id
     logger.debug("User id='%s' reminds a note", user_id)
 
-    note = await db.get_random_note()
-    await db.insert_notes_history(note_id=note.note_id, user_id=user_id)
-
-    await send_msg(note.format())
+    await remind(user_id=user_id)
