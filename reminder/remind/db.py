@@ -1,4 +1,6 @@
 import random
+from functools import wraps
+from typing import Callable
 from uuid import UUID
 
 import sqlalchemy.sql as sa
@@ -43,6 +45,29 @@ async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind | N
     return None
 
 
+def _get_unique_random_note(f: Callable) -> Callable:
+    cache: set[str] = set()
+
+    @wraps(f)
+    async def wrapped(*args, **kwargs):
+        nonlocal cache
+
+        note, counter = await f(*args, **kwargs), 0
+        while note.note_id in cache:
+            counter += 1
+            logger.debug("Search for unique note, iter=%s", counter)
+
+            note = await f(*args, **kwargs)
+
+        logger.debug("Note found for %s iters", counter)
+        cache.add(note.note_id)
+
+        return note
+
+    return wrapped
+
+
+@_get_unique_random_note
 async def _get_random_note(offset: int) -> RowMapping:
     stmt = sa.select([models.Notes,
                       models.Materials.c.title.label('material_title'),
