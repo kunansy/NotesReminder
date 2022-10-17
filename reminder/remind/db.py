@@ -79,8 +79,8 @@ async def get_random_note() -> schemas.Note:
 
     return schemas.Note(
         **note,
+        **last_repeat_dict,
         total_notes_count=notes_count,
-        **last_repeat_dict
     )
 
 
