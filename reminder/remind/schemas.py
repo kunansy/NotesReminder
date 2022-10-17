@@ -24,13 +24,14 @@ class Note(CustomBaseModel):
     material_last_repeated_at: datetime.datetime | None = None
 
     def _repeated_ago(self) -> int:
+        if not self.material_last_repeated_at:
+            return 0
+
         return (datetime.datetime.utcnow() - self.material_last_repeated_at).days
 
     def repeated_ago(self) -> str:
-        if not self.material_last_repeated_at:
+        if not (repeated_ago := self._repeated_ago()):
             return "-"
-
-        repeated_ago = self._repeated_ago()
         res = ""
 
         if years := repeated_ago // 365:
