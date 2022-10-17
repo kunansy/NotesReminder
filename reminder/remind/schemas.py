@@ -23,6 +23,28 @@ class Note(CustomBaseModel):
     material_repeats_count: int = 0
     material_last_repeated_at: datetime.datetime | None = None
 
+    def _repeated_ago(self) -> int:
+        return (datetime.datetime.utcnow() - self.material_last_repeated_at).days
+
+    def repeated_ago(self) -> str:
+        if not self.material_last_repeated_at:
+            return "-"
+
+        repeated_ago = self._repeated_ago()
+        res = ""
+
+        if years := repeated_ago // 365:
+            res = f"{years} years, "
+        if months := repeated_ago % 12 // 30:
+            res = f"{months} months, "
+        if days := repeated_ago % 365 % 30:
+            res = f"{days} days"
+
+        if res.endswith(' '):
+            res = f"{res[:2]}"
+
+        return f"{res} ago"
+
     def format(self) -> str:
         pass
 
