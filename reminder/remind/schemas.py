@@ -26,6 +26,14 @@ class Note(CustomBaseModel):
     def format(self) -> str:
         pass
 
+    def __repr__(self) -> str:
+        indent = '\t'
+        fields = '\n'.join(
+            f"{indent}{name}={value!r}"
+            for name, value in self.dict().items()
+        )
+        return f"{self.__class__.__name__}(\n{fields}\n)"
+
 
 class LastMaterialRemind(CustomBaseModel):
     reminds_count: int
