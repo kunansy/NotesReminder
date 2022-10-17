@@ -56,7 +56,7 @@ async def send_msg(msg: str,
 def restrict_access(func: Callable) -> Callable:
     @wraps(func)
     async def wrapped(msg: types.Message, *args, **kwargs):
-        if (user_id := msg.from_user.id) not in settings.TG_BOT_USER_IDS:
+        if (user_id := msg.from_user.id) != settings.TG_BOT_USER_ID:
             logger.warning("Access for user id='%s' declined", user_id)
             raise TelegramException(f"Access for user {user_id=} declined")
 

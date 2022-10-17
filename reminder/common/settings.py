@@ -16,10 +16,7 @@ if (version_file := Path('VERSION')).exists():
 
 with env.prefixed('TG_BOT_'):
     TG_BOT_TOKEN = env('TOKEN')
-    TG_BOT_USER_IDS = [
-        int(user_id)
-        for user_id in env.list('USER_IDS')
-    ]
+    TG_BOT_USER_ID = env.int('USER_ID')
 
 with env.prefixed("DB_"):
     DB_HOST = env("HOST")
