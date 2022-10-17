@@ -5,6 +5,7 @@ import sqlalchemy.sql as sa
 from sqlalchemy.engine import RowMapping
 
 from reminder.common import database
+from reminder.common.logger import logger
 from reminder.models import models
 from reminder.remind import schemas
 from reminder.remind.schemas import LastMaterialRemind
@@ -86,4 +87,17 @@ async def get_random_note() -> schemas.Note:
 async def insert_notes_history(*,
                                note_id: UUID,
                                user_id: int) -> None:
-    pass
+    logger.debug("Inserting repeat for note_id=%s", note_id)
+
+    values = {
+        "note_id": str(note_id),
+        "user_id": user_id,
+    }
+    stmt = models.NoteRepeatsHistory\
+        .insert().values(values)\
+        .returning(models.NoteRepeatsHistory.c.repeat_id)
+
+    async with database.session() as ses:
+        repeat_id = await ses.scalar(stmt)
+
+    logger.debug("Repeat_id=%s for note_id=%s inserted", repeat_id, note_id)
