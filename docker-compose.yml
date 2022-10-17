@@ -8,8 +8,6 @@ services:
     restart: always
     depends_on:
       - tracker-db
-    ports:
-       - "0.0.0.0:${API_PORT}:8000"
     networks:
       - readingtracker_tracker-net
     healthcheck:
