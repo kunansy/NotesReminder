@@ -49,7 +49,16 @@ class Note(CustomBaseModel):
         return self.added_at.strftime("%Y-%m-%d")
 
     def format(self) -> str:
-        pass
+        # TODO: convert html format to MD
+        return f"«{self.material_title}» – {self.material_authors}\n\n" \
+               f"{self.content}\n\n" \
+               f"Chapter: {self.chapter}\n" \
+               f"Page: {self.page} / {self.material_pages}\n" \
+               f"Material status: {self.material_current_status}\n" \
+               f"Added at: {self.format_note_added_at()}\n" \
+               f"Repeats count: {self.material_repeats_count}\n" \
+               f"Last repeated: {self.repeated_ago()}\n" \
+               f"Total notes count: {self.total_notes_count}"
 
     def __repr__(self) -> str:
         indent = '\t'
