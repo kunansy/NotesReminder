@@ -10,6 +10,8 @@ RUN apt-get update \
     && pip install poetry --no-cache-dir \
     && rm -rf /var/lib/apt/lists/*
 
+COPY --from=umputun/cronn:latest /srv/cronn /srv/cronn
+
 WORKDIR /app
 
 COPY poetry.lock pyproject.toml /app/
