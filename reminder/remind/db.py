@@ -68,7 +68,9 @@ def _get_unique_random_note(f: Callable) -> Callable:
 
 
 @_get_unique_random_note
-async def _get_random_note(offset: int) -> RowMapping:
+async def _get_random_note(notes_count: int) -> RowMapping:
+    offset = _get_random_note_offset(notes_count)
+
     stmt = sa.select([models.Notes,
                       models.Materials.c.title.label('material_title'),
                       models.Materials.c.authors.label('material_authors'),
@@ -91,9 +93,8 @@ async def _get_random_note(offset: int) -> RowMapping:
 
 async def get_random_note() -> schemas.Note:
     notes_count = await _get_notes_count()
-    offset = _get_random_note_offset(notes_count)
-
-    note = await _get_random_note(offset)
+    # we should generate offset of this func because of closure
+    note = await _get_random_note(notes_count)
 
     last_repeat_dict = {}
     if last_repeat := await _get_last_material_remind(material_id=note['material_id']):
