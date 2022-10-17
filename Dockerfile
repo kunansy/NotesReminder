@@ -2,6 +2,7 @@ FROM python:3.10-slim-buster as reading-tracker
 
 LABEL maintainer="<kolobov.kirill@list.ru>"
 ENV PYTHONUNBUFFERED 1
+ENV PYTHONPATH .
 
 RUN apt-get update \
     && apt-get upgrade -y \
