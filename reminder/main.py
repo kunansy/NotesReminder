@@ -61,7 +61,7 @@ def main() -> None:
     args = args_parser()
 
     if args.start:
-        executor.start_polling(dp)
+        executor.start_polling(dp, on_startup=on_startup)
     if args.remind:
         asyncio.run(remind_routes.remind(user_id=settings.TG_BOT_USER_ID))
 
