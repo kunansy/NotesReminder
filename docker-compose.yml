@@ -2,7 +2,7 @@ version: '3'
 
 services:
   notes-reminder-bot:
-    image: kunansy/notes_reminder:0.1.0
+    image: kunansy/notes_reminder:1.0.0
     container_name: notes-reminder-bot
     env_file: .env
     restart: always
@@ -18,7 +18,7 @@ services:
       retries: 3
 
   notes-reminder:
-    image: kunansy/notes_reminder:0.1.0
+    image: kunansy/notes_reminder:1.0.0
     container_name: notes-reminder
     env_file: .env
     restart: always
