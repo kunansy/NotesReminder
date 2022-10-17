@@ -51,7 +51,7 @@ async def _get_random_note(offset: int) -> RowMapping:
                       models.Materials.c.tags.label('material_tags'),
                       sa.text("CASE WHEN statuses IS NULL THEN 'queue'"
                               "WHEN statuses.completed_at IS NULL THEN 'reading'"
-                              "ELSE 'reading' END AS material_current_status"),
+                              "ELSE 'completed' END AS material_current_status"),
                       ]) \
         .join(models.Materials,
               models.Materials.c.material_id == models.Notes.c.material_id) \
