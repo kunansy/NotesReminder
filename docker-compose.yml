@@ -12,10 +12,7 @@ services:
     networks:
       - readingtracker_tracker-net
     healthcheck:
-      test: curl -f http://localhost:8000/readiness || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      test: "exit 0"
 
   notes-reminder:
     image: kunansy/notes_reminder:1.0.0
