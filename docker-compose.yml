@@ -7,8 +7,6 @@ services:
     env_file: .env
     restart: always
     entrypoint: ["python3", "reminder/main.py", "--start"]
-    depends_on:
-      - tracker-db
     networks:
       - readingtracker_tracker-net
     healthcheck:
@@ -22,7 +20,6 @@ services:
     entrypoint: ["/srv/cronn", "-c", "0 5 * * * python3 reminder/main.py --remind"]
     depends_on:
       - notes-reminder-bot
-      - tracker-db
     networks:
       - readingtracker_tracker-net
     healthcheck:
