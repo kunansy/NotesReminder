@@ -50,6 +50,10 @@ class Note(CustomBaseModel):
     material_repeats_count: int = 0
     material_last_repeated_at: datetime.datetime | None = None
 
+    @property
+    def content_html(self) -> str:
+        return demark(self.content)
+
     def _repeated_ago(self) -> int:
         if not self.material_last_repeated_at:
             return 0
@@ -77,9 +81,8 @@ class Note(CustomBaseModel):
         return self.added_at.strftime("%Y-%m-%d")
 
     def format(self) -> str:
-        # TODO: convert html format to MD
         return f"«{self.material_title}» – {self.material_authors}\n\n" \
-               f"{self.content}\n\n" \
+               f"{self.content_html}\n\n" \
                f"Chapter: {self.chapter}\n" \
                f"Page: {self.page} / {self.material_pages}\n" \
                f"Material status: {self.material_current_status}\n" \
