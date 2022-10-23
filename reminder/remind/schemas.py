@@ -1,8 +1,35 @@
 import datetime
 from typing import Literal
 from uuid import UUID
+import re
 
 from reminder.common.schemas import CustomBaseModel
+
+
+DEMARK_BOLD_PATTERN = re.compile('<span class="?font-weight-bold"?>(.*?)</span>')
+DEMARK_ITALIC_PATTERN = re.compile('<span class="?font-italic"?>(.*?)</span>')
+DEMARK_CODE_PATTERN = re.compile('<span class="?font-code"?>(.*?)</span>')
+
+
+def _demark_bold(string: str) -> str:
+    return DEMARK_BOLD_PATTERN.sub(r'<bold>\1</bold>', string)
+
+
+def _demark_italic(string: str) -> str:
+    return DEMARK_ITALIC_PATTERN.sub(r'<strong>\1</strong>', string)
+
+
+def _demark_code(string: str) -> str:
+    return DEMARK_CODE_PATTERN.sub(r'<code>\1</code>', string)
+
+
+def _dereplace_new_lines(string: str) -> str:
+    return re.sub(r'<br/?>', '\n', string)
+
+
+def demark(content: str) -> str:
+    return _dereplace_new_lines(
+        _demark_code(_demark_italic(_demark_bold(content))))
 
 
 class Note(CustomBaseModel):
