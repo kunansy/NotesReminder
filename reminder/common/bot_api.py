@@ -26,6 +26,7 @@ async def _send_msg(*,
         await bot.send_message(
             chat_id, msg,
             disable_web_page_preview=True,
+            parse_mode=types.ParseMode.HTML
         )
     except exceptions.RetryAfter as e:
         logger.error("[%s]: Flood limit is exceeded. Sleep %ss.",
