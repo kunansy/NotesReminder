@@ -49,15 +49,18 @@ def _get_unique_random_note(f: Callable) -> Callable:
     cache: set[str] = set()
 
     @wraps(f)
-    async def wrapped(*args, **kwargs):
+    async def wrapped(notes_count: int, *args, **kwargs):
         nonlocal cache
 
-        note, counter = await f(*args, **kwargs), 0
+        note, counter = await f(notes_count, *args, **kwargs), 0
         while note.note_id in cache:
+            if len(cache) == notes_count:
+                cache.clear()
+
             counter += 1
             logger.debug("Search for unique note, iter=%s", counter)
 
-            note = await f(*args, **kwargs)
+            note = await f(notes_count, *args, **kwargs)
 
         logger.debug("Note found for %s iters", counter)
         cache.add(note.note_id)
