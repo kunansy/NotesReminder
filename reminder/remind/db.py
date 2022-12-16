@@ -91,8 +91,9 @@ async def _get_random_note(notes_count: int) -> RowMapping:
 
 async def get_random_note() -> schemas.Note:
     notes_count = await _get_notes_count()
+    remind_statistics = await get_remind_statistics()
     # we should generate offset of this func because of closure
-    note = await _get_random_note(notes_count)
+    note = await _get_random_note(notes_count, remind_statistics)
 
     last_repeat_dict = {}
     if last_repeat := await _get_last_material_remind(material_id=note['material_id']):
