@@ -113,6 +113,20 @@ async def get_random_note() -> schemas.Note:
     )
 
 
+async def get_remind_statistics() -> dict[str, int]:
+    stmt = sa.select([models.Notes.c.note_id,
+                      sa.func.count(1).over(partition_by=models.NoteRepeatsHistory.c.note_id)])\
+        .join(models.NoteRepeatsHistory,
+              models.NoteRepeatsHistory.c.note_id == models.Notes.c.note_id)\
+        .where(models.Notes.c.is_deleted == False)
+
+    async with database.session() as ses:
+        return {
+            note_id: count
+            for (note_id, count) in (await ses.execute(stmt)).all()
+        }
+
+
 async def insert_notes_history(*,
                                note_id: UUID,
                                user_id: int) -> None:
