@@ -46,24 +46,18 @@ async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind | N
 
 
 def _get_unique_random_note(f: Callable) -> Callable:
-    cache: set[str] = set()
 
     @wraps(f)
-    async def wrapped(notes_count: int, *args, **kwargs):
-        nonlocal cache
+    async def wrapped(notes_count: int, remind_statistics: dict[str, int], *args, **kwargs):
 
         note, counter = await f(notes_count, *args, **kwargs), 0
-        while note.note_id in cache:
-            if len(cache) == notes_count:
-                cache.clear()
-
+        while remind_statistics.get(str(note.note_id), 0) >= min(remind_statistics.values()):
             counter += 1
             logger.debug("Search for unique note, iter=%s", counter)
 
             note = await f(notes_count, *args, **kwargs)
 
         logger.debug("Note found for %s iters", counter)
-        cache.add(note.note_id)
 
         return note
 
