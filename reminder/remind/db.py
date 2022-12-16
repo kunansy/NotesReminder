@@ -53,6 +53,7 @@ def _get_unique_random_note(f: Callable) -> Callable:
         note, counter = await f(notes_count, *args, **kwargs), 0
         while remind_statistics.get(str(note.note_id), 0) >= min(remind_statistics.values()):
             counter += 1
+            logger.debug("Note '%s' even repeated", note.note_id)
             logger.debug("Search for unique note, iter=%s", counter)
 
             note = await f(notes_count, *args, **kwargs)
