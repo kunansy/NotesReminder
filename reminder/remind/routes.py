@@ -8,9 +8,9 @@ from reminder.remind import db
 async def remind(*,
                  user_id: int) -> None:
     note = await db.get_random_note()
-    await db.insert_notes_history(note_id=note.note_id, user_id=user_id)
 
     await send_msg(note.format(), chat_id=user_id)
+    await db.insert_notes_history(note_id=note.note_id, user_id=user_id)
 
 
 @dp.message_handler(commands=['remind'])
