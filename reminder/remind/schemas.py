@@ -12,7 +12,7 @@ DEMARK_CODE_PATTERN = re.compile('<span class="?font-code"?>(.*?)</span>')
 
 
 def _demark_bold(string: str) -> str:
-    return DEMARK_BOLD_PATTERN.sub(r'<bold>\1</bold>', string)
+    return DEMARK_BOLD_PATTERN.sub(r'<b>\1</b>', string)
 
 
 def _demark_italic(string: str) -> str:
