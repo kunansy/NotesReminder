@@ -9,6 +9,8 @@ from reminder.common.schemas import CustomBaseModel
 DEMARK_BOLD_PATTERN = re.compile('<span class="?font-weight-bold"?>(.*?)</span>')
 DEMARK_ITALIC_PATTERN = re.compile('<span class="?font-italic"?>(.*?)</span>')
 DEMARK_CODE_PATTERN = re.compile('<span class="?font-code"?>(.*?)</span>')
+REMOVE_SUB_PATTERN = re.compile('<sub>(.*?)</sub>')
+REMOVE_SUP_PATTERN = re.compile('<sup>(.*?)</sup>')
 
 
 def _demark_bold(string: str) -> str:
@@ -23,13 +25,18 @@ def _demark_code(string: str) -> str:
     return DEMARK_CODE_PATTERN.sub(r'<code>\1</code>', string)
 
 
+def _remove_sup_sub(string: str) -> str:
+    replace = REMOVE_SUB_PATTERN.sub(r'_\1', string)
+    return REMOVE_SUP_PATTERN.sub(r'^\1', replace)
+
+
 def _dereplace_new_lines(string: str) -> str:
     return re.sub(r'<br/?>', '\n', string)
 
 
 def demark(content: str) -> str:
-    return _dereplace_new_lines(
-        _demark_code(_demark_italic(_demark_bold(content))))
+    return _remove_sup_sub(_dereplace_new_lines(
+        _demark_code(_demark_italic(_demark_bold(content)))))
 
 
 class Note(CustomBaseModel):
