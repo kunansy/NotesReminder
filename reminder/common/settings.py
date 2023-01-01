@@ -14,6 +14,8 @@ API_VERSION = '0.1.0'
 if (version_file := Path('VERSION')).exists():
     API_VERSION = version_file.read_text().strip()
 
+TRACKER_URL = env('TRACKER_URL', validate=lambda url: not url.endswith('/'))
+
 with env.prefixed('TG_BOT_'):
     TG_BOT_TOKEN = env('TOKEN')
     TG_BOT_USER_ID = env.int('USER_ID')
