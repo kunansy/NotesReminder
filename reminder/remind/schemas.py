@@ -3,6 +3,7 @@ from typing import Literal
 from uuid import UUID
 import re
 
+from reminder.common import settings
 from reminder.common.schemas import CustomBaseModel
 
 
@@ -96,7 +97,8 @@ class Note(CustomBaseModel):
                f"Added at: {self.format_note_added_at()}\n" \
                f"Repeats count: {self.material_repeats_count}\n" \
                f"Last repeated: {self.repeated_ago()}\n" \
-               f"Total notes count: {self.total_notes_count}"
+               f"Total notes count: {self.total_notes_count}\n" \
+               f"Tracker link: {settings.TRACKER_URL}/notes/update-view?note_id={self.note_id}"
 
     def __repr__(self) -> str:
         indent = '\t'
