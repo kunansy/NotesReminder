@@ -32,7 +32,7 @@ async def _send_msg(*,
         logger.error("[%s]: Flood limit is exceeded. Sleep %ss.",
                      chat_id, e.timeout)
         await asyncio.sleep(e.timeout)
-        return await send_msg(msg, chat_id=chat_id)
+        return await _send_msg(msg=msg, chat_id=chat_id)
     except exceptions.TelegramAPIError as e:
         logger.error("[%s]: Error '%s'", chat_id, repr(e))
         raise TelegramException(e) from e
