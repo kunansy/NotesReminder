@@ -12,6 +12,8 @@ DEMARK_ITALIC_PATTERN = re.compile('<span class="?font-italic"?>(.*?)</span>')
 DEMARK_CODE_PATTERN = re.compile('<span class="?font-code"?>(.*?)</span>')
 REMOVE_SUB_PATTERN = re.compile('<sub>(.*?)</sub>')
 REMOVE_SUP_PATTERN = re.compile('<sup>(.*?)</sup>')
+REMOVE_SUB_SPAN_PATTERN = re.compile('<span class="?sub"?>(.*?)</span>')
+REMOVE_SUP_SPAN_PATTERN = re.compile('<span class="?sup"?>(.*?)</span>')
 
 
 def _demark_bold(string: str) -> str:
@@ -28,6 +30,8 @@ def _demark_code(string: str) -> str:
 
 def _remove_sup_sub(string: str) -> str:
     replace = REMOVE_SUB_PATTERN.sub(r'_\1', string)
+    replace = REMOVE_SUB_SPAN_PATTERN.sub(r'_\1', replace)
+    replace = REMOVE_SUP_SPAN_PATTERN.sub(r'_\1', replace)
     return REMOVE_SUP_PATTERN.sub(r'^\1', replace)
 
 
