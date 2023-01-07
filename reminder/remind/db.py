@@ -6,7 +6,7 @@ from uuid import UUID
 import sqlalchemy.sql as sa
 from sqlalchemy.engine import RowMapping
 
-from reminder.common import database
+from reminder.common import database, settings
 from reminder.common.logger import logger
 from reminder.models import models
 from reminder.remind import schemas
@@ -52,6 +52,8 @@ def _get_unique_random_note(f: Callable) -> Callable:
 
         note, counter = await f(notes_count, *args, **kwargs), 0
         while remind_statistics.get(str(note.note_id), 0) >= min(remind_statistics.values()):
+            if counter >= settings.NOTES_ITER_LIMIT:
+                break
             counter += 1
             logger.debug("Note '%s' even repeated", note.note_id)
             logger.debug("Search for unique note, iter=%s", counter)
