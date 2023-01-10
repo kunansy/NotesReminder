@@ -7,7 +7,7 @@ from reminder.remind import db
 
 async def remind(*,
                  user_id: int) -> None:
-    note = await db.get_random_note()
+    note = await db.get_remind_note()
     logger.info("[%s] remind note %s", user_id, note.note_id)
 
     await send_msg(note.format(), chat_id=user_id)
