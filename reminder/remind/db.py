@@ -115,7 +115,8 @@ async def get_remind_statistics() -> dict[str, int]:
     stmt = sa.select([models.Notes.c.note_id,
                       sa.func.count(1).over(partition_by=models.NoteRepeatsHistory.c.note_id)])\
         .join(models.NoteRepeatsHistory,
-              models.NoteRepeatsHistory.c.note_id == models.Notes.c.note_id)\
+              models.NoteRepeatsHistory.c.note_id == models.Notes.c.note_id,
+              isouter=True)\
         .where(models.Notes.c.is_deleted == False)
 
     async with database.session() as ses:
