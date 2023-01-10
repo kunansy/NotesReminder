@@ -15,7 +15,6 @@ if (version_file := Path('VERSION')).exists():
     API_VERSION = version_file.read_text().strip()
 
 TRACKER_URL = env('TRACKER_URL', validate=lambda url: not url.endswith('/'))
-NOTES_ITER_LIMIT = env.int('NOTES_ITER_LIMIT', 15_000)
 
 with env.prefixed('TG_BOT_'):
     TG_BOT_TOKEN = env('TOKEN')
