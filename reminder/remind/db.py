@@ -126,6 +126,19 @@ async def get_remind_statistics() -> dict[str, int]:
         }
 
 
+def _get_remind_note_id(remind_stats: dict[str, int]) -> str:
+    if not remind_stats:
+        raise ValueError("Remind status could not be empty")
+
+    min_repeats_count = min(remind_stats.values())
+    sample = [
+        note_id
+        for note_id, repeats_count in remind_stats.items()
+        if repeats_count == min_repeats_count
+    ]
+    return random.choice(sample)
+
+
 async def insert_notes_history(*,
                                note_id: UUID,
                                user_id: int) -> None:
