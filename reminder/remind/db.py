@@ -1,12 +1,10 @@
 import random
-from functools import wraps
-from typing import Callable
 from uuid import UUID
 
 import sqlalchemy.sql as sa
 from sqlalchemy.engine import RowMapping
 
-from reminder.common import database, settings
+from reminder.common import database
 from reminder.common.logger import logger
 from reminder.models import models
 from reminder.remind import schemas
@@ -20,10 +18,6 @@ async def _get_notes_count() -> int:
 
     async with database.session() as ses:
         return await ses.scalar(stmt)
-
-
-def _get_random_note_offset(notes_count: int) -> int:
-    return random.randint(0, notes_count - 1)
 
 
 async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind | None:
@@ -43,28 +37,6 @@ async def _get_last_material_remind(material_id: UUID) -> LastMaterialRemind | N
             )
 
     return None
-
-
-def _get_unique_random_note(f: Callable) -> Callable:
-
-    @wraps(f)
-    async def wrapped(notes_count: int, remind_statistics: dict[str, int], *args, **kwargs):
-
-        note, counter = await f(notes_count, *args, **kwargs), 0
-        while remind_statistics.get(str(note.note_id), 0) >= min(remind_statistics.values()):
-            if counter >= settings.NOTES_ITER_LIMIT:
-                break
-            counter += 1
-            logger.debug("Note '%s' even repeated", note.note_id)
-            logger.debug("Search for unique note, iter=%s", counter)
-
-            note = await f(notes_count, *args, **kwargs)
-
-        logger.debug("Note found for %s iters", counter)
-
-        return note
-
-    return wrapped
 
 
 async def _get_remind_note(note_id: str) -> RowMapping:
