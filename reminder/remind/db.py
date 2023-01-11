@@ -82,10 +82,14 @@ async def get_remind_note() -> schemas.Note:
 
 
 async def get_remind_statistics() -> dict[str, int]:
+    remind_stats = sa.select([models.NoteRepeatsHistory.c.note_id,
+                              sa.func.count(1).over(partition_by=models.NoteRepeatsHistory.c.note_id).label('count')])\
+        .cte()
+
     stmt = sa.select([models.Notes.c.note_id,
-                      sa.func.count(1).over(partition_by=models.NoteRepeatsHistory.c.note_id)])\
-        .join(models.NoteRepeatsHistory,
-              models.NoteRepeatsHistory.c.note_id == models.Notes.c.note_id,
+                      sa.func.coalesce(remind_stats.c.count, 0)])\
+        .join(remind_stats,
+              remind_stats.c.note_id == models.Notes.c.note_id,
               isouter=True)\
         .where(models.Notes.c.is_deleted == False)
 
