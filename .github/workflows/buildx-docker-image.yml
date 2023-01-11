@@ -31,4 +31,4 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/notes_reminder:1.4.4
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/notes_reminder:1.4.5
