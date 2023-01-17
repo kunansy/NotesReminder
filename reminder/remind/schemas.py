@@ -80,9 +80,9 @@ class Note(CustomBaseModel):
         if years := repeated_ago // 365:
             res = f"{years} years, "
         if months := repeated_ago % 365 // 30:
-            res = f"{months} months, "
+            res = f"{res}{months} months, "
         if days := repeated_ago % 30:
-            res = f"{days} days"
+            res = f"{res}{days} days"
 
         if res.endswith(' '):
             res = f"{res[:2]}"
