@@ -12,11 +12,13 @@ RUN apt-get update \
 
 COPY --from=umputun/cronn:latest /srv/cronn /srv/cronn
 
-WORKDIR /app
-
-COPY poetry.lock pyproject.toml /app/
+COPY poetry.lock pyproject.toml entrypoint.sh /
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev -n
+    && poetry install --no-dev -n \
+    && rm poetry.lock pyproject.toml entrypoint.sh
+
+USER reminder
+WORKDIR /app
 
 COPY VERSION /app/VERSION
 COPY /reminder /app/reminder
