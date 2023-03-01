@@ -102,7 +102,7 @@ class Note(CustomBaseModel):
                f"Repeats count: {self.material_repeats_count}\n" \
                f"Last repeated: {self.repeated_ago()}\n" \
                f"Total notes count: {self.total_notes_count}\n" \
-               f"Tracker link: {settings.TRACKER_URL}/notes/update-view?note_id={self.note_id}"
+               f"Tracker link: {settings.TRACKER_URL}/notes/note?note_id={self.note_id}"
 
     def __repr__(self) -> str:
         indent = '\t'
