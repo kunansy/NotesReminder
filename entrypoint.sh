@@ -2,4 +2,4 @@
 
 useradd -ms /bin/bash reminder
 mkdir /app
-chown -R tracker /app
+chown -R reminder /app
