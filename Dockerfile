@@ -15,6 +15,7 @@ RUN apt-get update \
 COPY poetry.lock pyproject.toml entrypoint.sh /
 RUN poetry config virtualenvs.create false \
     && poetry install --no-dev -n \
+    && ./entrypoint.sh \
     && rm poetry.lock pyproject.toml entrypoint.sh
 
 USER reminder
