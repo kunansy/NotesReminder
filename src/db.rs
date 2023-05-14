@@ -18,7 +18,8 @@ pub mod db {
         title: String,
         authors: String,
         content: String,
-        added_at: chrono::NaiveDateTime
+        added_at: chrono::NaiveDateTime,
+        material_status: Option<String>,
     }
 
     pub struct RemindNote {
@@ -26,6 +27,7 @@ pub mod db {
         authors: String,
         content: String,
         added_at: chrono::NaiveDateTime,
+        material_status: Option<String>,
         notes_count: i64,
         material_repeats_count: Option<i64>,
         material_last_repeated_at: Option<chrono::NaiveDateTime>
@@ -44,6 +46,7 @@ pub mod db {
             authors: note.authors,
             content: note.content,
             added_at: note.added_at,
+            material_status: note.material_status,
             notes_count: notes_count?,
             material_repeats_count: None,
             material_last_repeated_at: None
@@ -160,11 +163,17 @@ pub mod db {
     }
 
     async fn get_remind_note(pool: &PgPool, note_id: &Uuid) -> Result<Note, sqlx::Error> {
+        // TODO: sqlx thinks than CASE might produce None
         sqlx::query_as!(
             Note,
             "
             SELECT
-                n.note_id, m.material_id, m.title, m.authors, n.content, n.added_at
+                n.note_id, m.material_id, m.title, m.authors, n.content, n.added_at,
+                CASE
+                    WHEN s IS NULL THEN 'queue'
+                    WHEN s.completed_at IS NULL THEN 'reading'
+                    ELSE 'completed'
+                END AS material_status
             FROM notes n
             JOIN materials m USING(material_id)
             JOIN statuses s USING(material_id)
