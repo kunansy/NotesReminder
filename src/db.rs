@@ -1,5 +1,6 @@
 pub mod db {
     use std::collections::HashMap;
+    use rand::Rng;
     use sqlx::postgres::PgPool;
 
     struct RemindInfo(i32, chrono::NaiveDateTime);
@@ -56,7 +57,22 @@ pub mod db {
         Ok(stat)
     }
 
-    fn get_remind_note_id(stats: HashMap<String, i32>) -> String {
-        "".to_string()
+    fn get_remind_note_id(stats: &HashMap<String, i64>) -> String {
+        if stats.len() == 0 {
+            panic!("Empty stats passed");
+        }
+
+        let min_f = stats.values().min().unwrap();
+        let min_notes = stats
+            .iter()
+            .filter(|(_, freq)| freq == &min_f)
+            .map(|(note_id, _)| note_id)
+            .collect::<Vec<&String>>();
+
+        let index = rand::thread_rng().gen_range(0..min_notes.len());
+        let &note_id = min_notes.get(index)
+            .expect("Could not get list element");
+
+        note_id.clone()
     }
 }
