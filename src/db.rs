@@ -24,6 +24,7 @@ pub mod db {
 
     #[derive(Debug)]
     pub struct RemindNote {
+        note_id: String,
         title: String,
         authors: String,
         content: String,
@@ -43,6 +44,7 @@ pub mod db {
         let note = get_remind_note(pool, note_id).await?;
 
         let mut res = RemindNote{
+            note_id: note_id.to_string(),
             title: note.title,
             authors: note.authors,
             content: note.content,
