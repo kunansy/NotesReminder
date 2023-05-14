@@ -16,11 +16,11 @@ pub mod db {
     }
 
     async fn get_notes_count(pool: &PgPool) -> Result<i64, sqlx::Error> {
-        let row = sqlx::query!("SELECT count(1) FROM notes WHERE not is_deleted;")
+        let stmt = sqlx::query!("SELECT count(1) FROM notes WHERE not is_deleted;")
             .fetch_one(pool)
             .await?;
 
-        match row.count {
+        match stmt.count {
             Some(count) => Ok(count),
             None => panic!("Count not get notes count")
         }
