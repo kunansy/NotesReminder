@@ -4,6 +4,7 @@ pub mod db {
 
     use rand::Rng;
     use sqlx::postgres::PgPool;
+    use tokio::join;
     use uuid::Uuid;
 
     struct RemindInfo {
@@ -20,8 +21,39 @@ pub mod db {
         added_at: chrono::NaiveDateTime
     }
 
-    pub async fn get_note(pool: &PgPool) -> Note {
-        Note {}
+    pub struct RemindNote {
+        title: String,
+        authors: String,
+        content: String,
+        added_at: chrono::NaiveDateTime,
+        notes_count: i64,
+        material_repeats_count: Option<i64>,
+        material_last_repeated_at: Option<chrono::NaiveDateTime>
+    }
+
+    pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
+
+        let (notes_count, stat) = join!(get_notes_count(pool), get_remind_statistics(pool));
+        let stat = stat?;
+        let note_id = get_remind_note_id(&stat);
+
+        let note = get_remind_note(pool, note_id).await?;
+
+        let mut res = RemindNote{
+            title: note.title,
+            authors: note.authors,
+            content: note.content,
+            added_at: note.added_at,
+            notes_count: notes_count?,
+            material_repeats_count: None,
+            material_last_repeated_at: None
+        };
+        if let Some(info) = get_material_repeat_info(pool, &note.material_id).await? {
+            res.material_repeats_count = Some(info.repeats_count);
+            res.material_last_repeated_at = Some(info.repeated_at);
+        }
+
+        Ok(res)
     }
 
     pub async fn insert_note_history(pool: &PgPool,
