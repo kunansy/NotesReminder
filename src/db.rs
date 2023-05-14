@@ -1,5 +1,6 @@
 pub mod db {
     use std::collections::HashMap;
+    use std::fmt::{Display, Formatter};
     use std::str::FromStr;
 
     use rand::Rng;
@@ -33,6 +34,33 @@ pub mod db {
         notes_count: i64,
         material_repeats_count: Option<i64>,
         material_last_repeated_at: Option<chrono::NaiveDateTime>
+    }
+
+    impl RemindNote {
+        pub fn content_html(&self) -> String {
+            demark::demark(&self.content)
+        }
+    }
+
+    impl Display for RemindNote {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            let repeats_count = self.material_repeats_count.unwrap_or(0);
+            let repeated_at = match self.material_last_repeated_at {
+                Some(v) => v.format("%Y-%m-%d").to_string(),
+                None => "-".to_string()
+            };
+            let material_status = match &self.material_status {
+                Some(v) => v,
+                None => "undefined"
+            };
+            let tracker_url = std::env::var("TRACKER_URL")
+                .unwrap_or("http://tracker.lan".to_string());
+
+            write!(f, "«{}» – {}\n\n{:?}\nMaterial status: {}\nAdded at: {}\nRepeats count: {}\n\
+            Last repeated: {}\nTotal notes count: {}\nOpen: {}/notes/note?note_id={}",
+                   self.title, self.authors, self.content_html(), material_status, self.added_at,
+                   repeats_count, repeated_at, self.notes_count, tracker_url, self.note_id)
+        }
     }
 
     pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
