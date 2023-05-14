@@ -22,6 +22,7 @@ pub mod db {
         material_status: Option<String>,
     }
 
+    #[derive(Debug)]
     pub struct RemindNote {
         title: String,
         authors: String,
