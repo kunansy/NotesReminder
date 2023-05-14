@@ -12,3 +12,4 @@ futures = "0.3"
 dotenv = "0.15"
 rand = "0.8"
 uuid  = { version = "1.3", features = ["v4"] }
+regex = "1.8"

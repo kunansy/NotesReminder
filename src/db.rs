@@ -185,4 +185,50 @@ pub mod db {
             .fetch_one(pool)
             .await
     }
+
+    mod demark {
+        use regex::{Captures, Regex};
+
+        pub fn demark(content: &str) -> String {
+            remove_sub_sup(&dereplace_new_lines(&demark_code(
+                &demark_italic(&demark_bold(content))))).to_string()
+        }
+
+        fn demark_bold(content: &str) -> String {
+            let demark_bold_pattern = Regex::new(r#"<span class="?font-weight-bold"?>(.*?)</span>"#).unwrap();
+            demark_bold_pattern.replace_all(content, |r: &Captures| {
+                format!("<b>{}</b>", &r[1])
+            }).to_string()
+        }
+
+        fn demark_italic(content: &str) -> String {
+            let demark_italic_pattern = Regex::new(r#"<span class="?font-italic"?>(.*?)</span>"#).unwrap();
+            demark_italic_pattern.replace_all(content, |r: &Captures| {
+                format!("<i>{}</i>", &r[1])
+            }).to_string()
+        }
+
+        fn demark_code(content: &str) -> String {
+            let demark_code_pattern = Regex::new(r#"<span class="?font-code"?>(.*?)</span>"#).unwrap();
+            demark_code_pattern.replace_all(content, |r: &Captures| {
+                format!("<code>{}</code>", &r[1])
+            }).to_string()
+        }
+
+        fn remove_sub_sup(content: &str) -> String {
+            let remove_sub_sup = Regex::new(r"<su[bp]>(.*?)</su[pb]>").unwrap();
+            let remove_span_sub_sup = Regex::new(r#"<span class="?su[bp]"?>(.*?)</span>"#).unwrap();
+
+            let content = remove_sub_sup.replace_all(content, |r: &Captures| {
+                format!("_{}", &r[1])
+            });
+            remove_span_sub_sup.replace_all(&content, |r: &Captures| {
+                format!("_{}", &r[1])
+            }).to_string()
+        }
+
+        fn dereplace_new_lines(content: &str) -> String {
+            content.replace(r"<br/?>", "\n")
+        }
+    }
 }
