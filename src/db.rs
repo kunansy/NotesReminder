@@ -20,7 +20,6 @@ pub mod db {
     pub async fn insert_note_history(pool: &PgPool,
                                      note_id: &String,
                                      user_id: i64) -> Result<(), sqlx::Error>{
-        let repeat_id = create_uuid();
         let note_id = Uuid::from_str(note_id)
             .expect("Invalid note_id");
 
@@ -30,7 +29,7 @@ pub mod db {
                 note_repeats_history (repeat_id, note_id, user_id)
             VALUES ($1, $2, $3)
             ",
-            repeat_id, note_id, user_id
+            create_uuid(), note_id, user_id
         )
             .fetch_all(pool)
             .await?;
