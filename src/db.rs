@@ -99,14 +99,15 @@ pub mod db {
                                      user_id: i64) -> Result<(), sqlx::Error>{
         let note_id = Uuid::from_str(note_id)
             .expect("Invalid note_id");
+        let repeated_at = chrono::offset::Utc::now().naive_utc();
 
         sqlx::query!(
             "
             INSERT INTO
-                note_repeats_history (repeat_id, note_id, user_id)
-            VALUES ($1, $2, $3)
+                note_repeats_history (repeat_id, note_id, user_id, repeated_at)
+            VALUES ($1, $2, $3, $4)
             ",
-            create_uuid(), note_id, user_id
+            create_uuid(), note_id, user_id, repeated_at
         )
             .fetch_all(pool)
             .await?;
