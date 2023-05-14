@@ -6,7 +6,11 @@ pub mod db {
     use sqlx::postgres::PgPool;
     use uuid::Uuid;
 
-    struct RemindInfo(i32, chrono::NaiveDateTime);
+    struct RemindInfo {
+        repeats_count: i64,
+        repeated_at: chrono::NaiveDateTime
+    }
+
     pub struct Note { }
 
     pub async fn get_note(pool: &PgPool) -> Note {
@@ -50,8 +54,27 @@ pub mod db {
     }
 
     async fn get_material_repeat_info(pool: &PgPool,
-                                      material_id: &String) -> RemindInfo {
-        RemindInfo(1, chrono::NaiveDateTime)
+                                      material_id: &String) -> Result<RemindInfo, sqlx::Error> {
+        let material_id = Uuid::from_str(material_id)
+            .expect("Invalid material_id");
+
+        let info = sqlx::query!(
+            "
+            SELECT repeated_at, COUNT(1) OVER (PARTITION BY material_id)
+            FROM repeats
+            WHERE material_id = $1
+            ORDER BY repeated_at DESC
+            LIMIT 1;
+            ",
+            material_id
+        )
+            .fetch_one(pool)
+            .await?;
+
+        Ok(RemindInfo {
+            repeats_count: info.count.unwrap(),
+            repeated_at: info.repeated_at
+        })
     }
 
     async fn get_remind_statistics(pool: &PgPool) -> Result<HashMap<String, i64>, sqlx::Error> {
