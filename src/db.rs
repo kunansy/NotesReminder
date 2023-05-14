@@ -11,7 +11,14 @@ pub mod db {
         repeated_at: chrono::NaiveDateTime
     }
 
-    pub struct Note { }
+    struct Note {
+        note_id: Uuid,
+        material_id: Uuid,
+        title: String,
+        authors: String,
+        content: String,
+        added_at: chrono::NaiveDateTime
+    }
 
     pub async fn get_note(pool: &PgPool) -> Note {
         Note {}
@@ -118,5 +125,22 @@ pub mod db {
             .expect("Could not get list element");
 
         note_id.clone()
+    }
+
+    async fn get_remind_note(pool: &PgPool, note_id: &Uuid) -> Result<Note, sqlx::Error> {
+        sqlx::query_as!(
+            Note,
+            "
+            SELECT
+                n.note_id, m.material_id, m.title, m.authors, n.content, n.added_at
+            FROM notes n
+            JOIN materials m USING(material_id)
+            JOIN statuses s USING(material_id)
+            WHERE n.note_id = $1 AND NOT n.is_deleted;
+            ",
+            note_id
+        )
+            .fetch_one(pool)
+            .await
     }
 }
