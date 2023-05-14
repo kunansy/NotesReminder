@@ -1,7 +1,10 @@
 pub mod db {
     use std::collections::HashMap;
+    use std::str::FromStr;
+
     use rand::Rng;
     use sqlx::postgres::PgPool;
+    use uuid::Uuid;
 
     struct RemindInfo(i32, chrono::NaiveDateTime);
     pub struct Note { }
@@ -12,8 +15,27 @@ pub mod db {
 
     pub async fn insert_note_history(pool: &PgPool,
                                      note_id: &String,
-                                     user_id: i32) {
+                                     user_id: i64) -> Result<(), sqlx::Error>{
+        let repeat_id = create_uuid();
+        let note_id = Uuid::from_str(note_id)
+            .expect("Invalid note_id");
 
+        sqlx::query!(
+            "
+            INSERT INTO
+                note_repeats_history (repeat_id, note_id, user_id)
+            VALUES ($1, $2, $3)
+            ",
+            repeat_id, note_id, user_id
+        )
+            .fetch_all(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    fn create_uuid() -> Uuid {
+        Uuid::new_v4()
     }
 
     async fn get_notes_count(pool: &PgPool) -> Result<i64, sqlx::Error> {
