@@ -15,8 +15,15 @@ pub mod db {
 
     }
 
-    async fn get_notes_count(pool: &PgPoolOptions) -> i32 {
-        42
+    async fn get_notes_count(pool: &PgPool) -> Result<i64, sqlx::Error> {
+        let row = sqlx::query!("SELECT count(1) FROM notes WHERE not is_deleted;")
+            .fetch_one(pool)
+            .await?;
+
+        match row.count {
+            Some(count) => Ok(count),
+            None => panic!("Count not get notes count")
+        }
     }
 
     async fn get_material_repeat_info(pool: &PgPool,
