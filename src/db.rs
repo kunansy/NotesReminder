@@ -71,13 +71,16 @@ pub mod db {
             ",
             material_id
         )
-            .fetch_one(pool)
+            .fetch_optional(pool)
             .await?;
 
-        Ok(RemindInfo {
-            repeats_count: info.count.unwrap(),
-            repeated_at: info.repeated_at
-        })
+        match info {
+            Some(info) => Ok(Some(RemindInfo{
+                repeats_count: info.count.unwrap(),
+                repeated_at: info.repeated_at
+            })),
+            None => Ok(None)
+        }
     }
 
     async fn get_remind_statistics(pool: &PgPool) -> Result<HashMap<Uuid, i64>, sqlx::Error> {
