@@ -60,10 +60,7 @@ pub mod db {
     }
 
     async fn get_material_repeat_info(pool: &PgPool,
-                                      material_id: &String) -> Result<RemindInfo, sqlx::Error> {
-        let material_id = Uuid::from_str(material_id)
-            .expect("Invalid material_id");
-
+                                      material_id: &Uuid) -> Result<Option<RemindInfo>, sqlx::Error> {
         let info = sqlx::query!(
             "
             SELECT repeated_at, COUNT(1) OVER (PARTITION BY material_id)
@@ -83,7 +80,7 @@ pub mod db {
         })
     }
 
-    async fn get_remind_statistics(pool: &PgPool) -> Result<HashMap<String, i64>, sqlx::Error> {
+    async fn get_remind_statistics(pool: &PgPool) -> Result<HashMap<Uuid, i64>, sqlx::Error> {
         let stat = sqlx::query!(
             "
             WITH stats AS (
@@ -102,13 +99,13 @@ pub mod db {
             .fetch_all(pool)
             .await?
             .iter()
-            .map(|row| {(row.note_id.to_string(), row.count.unwrap())})
-            .collect::<HashMap<String, i64>>();
+            .map(|row| {(row.note_id, row.count.unwrap())})
+            .collect::<HashMap<Uuid, i64>>();
 
         Ok(stat)
     }
 
-    fn get_remind_note_id(stats: &HashMap<String, i64>) -> String {
+    fn get_remind_note_id(stats: &HashMap<Uuid, i64>) -> &Uuid {
         if stats.len() == 0 {
             panic!("Empty stats passed");
         }
@@ -118,13 +115,13 @@ pub mod db {
             .iter()
             .filter(|(_, freq)| freq == &min_f)
             .map(|(note_id, _)| note_id)
-            .collect::<Vec<&String>>();
+            .collect::<Vec<&Uuid>>();
 
         let index = rand::thread_rng().gen_range(0..min_notes.len());
         let &note_id = min_notes.get(index)
             .expect("Could not get list element");
 
-        note_id.clone()
+        note_id
     }
 
     async fn get_remind_note(pool: &PgPool, note_id: &Uuid) -> Result<Note, sqlx::Error> {
