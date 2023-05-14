@@ -40,6 +40,10 @@ pub mod db {
         pub fn content_html(&self) -> String {
             demark::demark(&self.content)
         }
+
+        pub fn note_id(&self) -> &String {
+            &self.note_id
+        }
     }
 
     impl Display for RemindNote {
