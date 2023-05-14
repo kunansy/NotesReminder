@@ -1,4 +1,4 @@
-# ReadingTracker
+# NotesReminder
 ![Tests status](https://github.com/kunansy/NotesReminder/actions/workflows/linters.yml/badge.svg)
 ![Build Status](https://github.com/kunansy/NotesReminder/actions/workflows/buildx-docker-image.yml/badge.svg)
 ![Stable Version](https://img.shields.io/github/v/tag/kunansy/NotesReminder)
