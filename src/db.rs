@@ -26,12 +26,12 @@ pub mod db {
     #[derive(Debug)]
     pub struct RemindNote {
         note_id: String,
-        title: String,
-        authors: String,
         content: String,
         added_at: chrono::NaiveDateTime,
-        material_status: Option<String>,
         notes_count: i64,
+        material_title: String,
+        material_authors: String,
+        material_status: Option<String>,
         material_repeats_count: Option<i64>,
         material_last_repeated_at: Option<chrono::NaiveDateTime>
     }
@@ -62,7 +62,7 @@ pub mod db {
 
             write!(f, "«{}» – {}\n\n{:?}\nMaterial status: {}\nAdded at: {}\nRepeats count: {}\n\
             Last repeated: {}\nTotal notes count: {}\nOpen: {}/notes/note?note_id={}",
-                   self.title, self.authors, self.content_html(), material_status, self.added_at,
+                   self.material_title, self.material_authors, self.content_html(), material_status, self.added_at,
                    repeats_count, repeated_at, self.notes_count, tracker_url, self.note_id)
         }
     }
@@ -77,8 +77,8 @@ pub mod db {
 
         let mut res = RemindNote{
             note_id: note_id.to_string(),
-            title: note.title,
-            authors: note.authors,
+            material_title: note.title,
+            material_authors: note.authors,
             content: note.content,
             added_at: note.added_at,
             material_status: note.material_status,
