@@ -14,6 +14,8 @@ async fn main() -> Result<(), String> {
 
     // upload .env to env
     dotenv().ok();
+    env_logger::init();
+
     let url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL not found");
     let timeout = std::env::var("DATABASE_TIMEOUT")
