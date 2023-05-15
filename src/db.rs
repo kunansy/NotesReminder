@@ -70,7 +70,6 @@ pub mod db {
     }
 
     pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
-
         let (notes_count, stat) = join!(get_notes_count(pool), get_remind_statistics(pool));
         let stat = stat?;
         let note_id = get_remind_note_id(&stat);
