@@ -31,7 +31,7 @@ async fn main() -> Result<(), String> {
         .idle_timeout(timeout)
         .acquire_timeout(timeout)
         .connect(&url).await
-        .map_err(|e| e.to_string())?;
+        .expect("Could not connect to the database");
 
     let bot = Bot::from_env()
         .parse_mode(types::ParseMode::Html);
