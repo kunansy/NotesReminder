@@ -70,6 +70,8 @@ async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
     log::info!("Note got: '{}'", note.note_id());
 
     log::info!("Sending message to the bot");
+    // TODO: process API, timeout errors
+    // TODO: allow access only for the user
     bot.send_message(ChatId(chat_id), &note.to_string()).await
         .expect("Error sending note");
     log::info!("Message sent");
