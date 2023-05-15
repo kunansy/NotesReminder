@@ -14,7 +14,6 @@ pub mod db {
     }
 
     struct Note {
-        note_id: Uuid,
         material_id: Uuid,
         title: String,
         authors: String,
@@ -207,7 +206,7 @@ pub mod db {
             Note,
             "
             SELECT
-                n.note_id, m.material_id, m.title, m.authors, n.content, n.added_at,
+                m.material_id, m.title, m.authors, n.content, n.added_at,
                 CASE
                     WHEN s IS NULL THEN 'queue'
                     WHEN s.completed_at IS NULL THEN 'reading'
