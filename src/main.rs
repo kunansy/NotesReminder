@@ -7,7 +7,7 @@ use teloxide::prelude::*;
 mod db;
 
 #[tokio::main]
-async fn main() -> Result<(), sqlx::Error>{
+async fn main() -> Result<(), String> {
     let mode = std::env::args()
         .nth(1)
         .expect("Could not get CLI args");
@@ -28,7 +28,8 @@ async fn main() -> Result<(), sqlx::Error>{
         .max_connections(5)
         .idle_timeout(timeout)
         .acquire_timeout(timeout)
-        .connect(&url).await?;
+        .connect(&url).await
+        .map_err(|e| e.to_string())?;
 
     let bot = Bot::from_env();
 
