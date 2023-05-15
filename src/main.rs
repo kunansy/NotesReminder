@@ -15,7 +15,8 @@ async fn main() -> Result<(), sqlx::Error>{
     let url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL not found");
     let timeout = std::env::var("DATABASE_TIMEOUT")
-        .unwrap_or("10".to_string()).parse().unwrap();
+        .unwrap_or("10".to_string())
+        .parse().expect("DATABASE_TIMEOUT should be int");
     let timeout = time::Duration::from_secs(timeout);
 
     let pool = PgPoolOptions::new()
