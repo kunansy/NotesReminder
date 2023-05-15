@@ -55,6 +55,7 @@ pub mod db {
             };
             let material_status = match &self.material_status {
                 Some(v) => v,
+                // it should be unreachable
                 None => "undefined"
             };
             let tracker_url = std::env::var("TRACKER_URL")
