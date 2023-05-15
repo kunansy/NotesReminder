@@ -1,25 +1,31 @@
-FROM python:3.11-slim-buster
+FROM rust:1.69-alpine3.17 as builder
 
-LABEL maintainer="<kolobov.kirill@list.ru>"
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONPATH .
+RUN set -e  \
+    && apk upgrade \
+    && apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf libpq-dev
 
-COPY --from=umputun/cronn:latest /srv/cronn /srv/cronn
+WORKDIR build
 
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install gcc -y \
-    && pip install poetry --no-cache-dir \
-    && rm -rf /var/lib/apt/lists/*
+COPY Cargo.toml Cargo.lock sqlx-data.json /build/
+COPY src /build/src
 
-COPY poetry.lock pyproject.toml entrypoint.sh /
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev -n \
-    && ./entrypoint.sh \
-    && rm poetry.lock pyproject.toml entrypoint.sh
+# TODO: vendor dependencies
+RUN cargo build --release -j $(nproc) --bins
 
-USER reminder
+FROM alpine:3.17
+
+LABEL maintainer="Kirill <k@kunansy.ru>"
+
+RUN set -e &&  \
+    apk add libc6-compat
+
 WORKDIR /app
 
-COPY VERSION /app/VERSION
-COPY /reminder /app/reminder
+COPY --from=umputun/cronn:latest /srv/cronn /srv/cronn
+COPY --from=builder /build/target/release/app /app/app
+
+COPY entrypoint.sh /app
+RUN /app/entrypoint.sh \
+    && rm entrypoint.sh
+
+USER reminder
