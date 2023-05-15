@@ -30,7 +30,11 @@ async fn main() -> Result<(), sqlx::Error>{
         .acquire_timeout(timeout)
         .connect(&url).await?;
 
+    let bot = Bot::from_env();
+
     if mode == "--remind" {
+        send_note(bot, chat_id, &pool).await;
+    }
         let note = db::db::get_note(&pool).await?;
         // send note
         println!("{}", note);
