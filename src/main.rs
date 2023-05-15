@@ -1,6 +1,8 @@
 use std::time;
 use dotenv::dotenv;
+use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use teloxide::prelude::*;
 
 mod db;
 
@@ -36,4 +38,15 @@ async fn main() -> Result<(), sqlx::Error>{
     }
 
     Ok(())
+}
+
+async fn send_note(bot: Bot, chat_id: i64, pool: &PgPool) {
+    let note = db::db::get_note(&pool).await
+        .expect("Error getting note");
+
+    bot.send_message(ChatId(chat_id), &note.to_string()).await
+        .expect("Error sending note");
+
+    db::db::insert_note_history(&pool, note.note_id(), chat_id)
+        .await.expect("Error inserting note history");
 }
