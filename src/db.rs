@@ -122,18 +122,25 @@ pub mod db {
     }
 
     async fn get_notes_count(pool: &PgPool) -> Result<i64, sqlx::Error> {
+        log::debug!("Getting notes count");
+
         let stmt = sqlx::query!("SELECT count(1) FROM notes WHERE not is_deleted;")
             .fetch_one(pool)
             .await?;
 
         match stmt.count {
-            Some(count) => Ok(count),
+            Some(count) => {
+                log::debug!("{} notes found", count);
+                Ok(count)
+            },
             None => panic!("Count not get notes count")
         }
     }
 
     async fn get_material_repeat_info(pool: &PgPool,
                                       material_id: &Uuid) -> Result<Option<RemindInfo>, sqlx::Error> {
+        log::debug!("Getting repeat info for material: {}", material_id);
+
         let info = sqlx::query!(
             "
             SELECT repeated_at, COUNT(1) OVER (PARTITION BY material_id)
@@ -148,15 +155,22 @@ pub mod db {
             .await?;
 
         match info {
-            Some(info) => Ok(Some(RemindInfo{
-                repeats_count: info.count.unwrap(),
-                repeated_at: info.repeated_at
-            })),
-            None => Ok(None)
+            Some(info) => {
+                log::debug!("Repeat info got");
+                Ok(Some(RemindInfo{
+                    repeats_count: info.count.unwrap(),
+                    repeated_at: info.repeated_at
+                }))
+            },
+            None => {
+                log::debug!("No repeat info found");
+                Ok(None)
+            }
         }
     }
 
     async fn get_remind_statistics(pool: &PgPool) -> Result<HashMap<Uuid, i64>, sqlx::Error> {
+        log::debug!("Getting remind statistics");
         let stat = sqlx::query!(
             "
             WITH stats AS (
@@ -178,21 +192,26 @@ pub mod db {
             .map(|row| {(row.note_id, row.count.unwrap())})
             .collect::<HashMap<Uuid, i64>>();
 
+        log::debug!("Remind statistics got");
         Ok(stat)
     }
 
     fn get_remind_note_id(stats: &HashMap<Uuid, i64>) -> &Uuid {
+        log::debug!("Getting note id to remind");
         if stats.len() == 0 {
             panic!("Empty stats passed");
         }
 
         let min_f = stats.values().min().unwrap();
+        log::debug!("Min frequency is: {}", min_f);
+
         let min_notes = stats
             .iter()
             .filter(|(_, freq)| freq == &min_f)
             .map(|(note_id, _)| note_id)
             .collect::<Vec<&Uuid>>();
 
+        log::debug!("Total {} notes with it, getting the random one", min_notes.len());
         let index = rand::thread_rng().gen_range(0..min_notes.len());
         let &note_id = min_notes.get(index)
             .expect("Could not get list element");
