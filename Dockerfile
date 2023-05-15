@@ -10,7 +10,7 @@ COPY Cargo.toml Cargo.lock sqlx-data.json /build/
 COPY src /build/src
 
 # TODO: vendor dependencies
-RUN cargo build --release --bins
+RUN cargo build --release --bins -vv
 
 FROM alpine:3.17
 
