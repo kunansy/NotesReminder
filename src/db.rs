@@ -263,7 +263,9 @@ pub mod db {
         }
 
         fn dereplace_new_lines(content: &str) -> String {
-            content.replace(r"<br/?>", "\n")
+            content.replace("<br/>", "\n")
+                .replace("\r", "")
+                .replace("<br>", "\n")
         }
     }
 }
