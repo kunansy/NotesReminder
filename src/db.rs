@@ -61,9 +61,11 @@ pub mod db {
             let tracker_url = std::env::var("TRACKER_URL")
                 .unwrap_or("http://tracker.lan".to_string());
 
-            write!(f, "«{}» – {}\n\n{}\nMaterial status: {}\nAdded at: {}\nRepeats count: {}\n\
+            let added_at = self.added_at.format("%Y-%m-%d %H:%M:%S").to_string();
+
+            write!(f, "«{}» – {}\n\n{}\nMaterial status: {}\nAdded at (UTC): {}\nRepeats count: {}\n\
             Last repeated: {}\nTotal notes count: {}\nOpen: {}/notes/note?note_id={}",
-                   self.material_title, self.material_authors, self.content_html(), material_status, self.added_at,
+                   self.material_title, self.material_authors, self.content_html(), material_status, added_at,
                    repeats_count, repeated_at, self.notes_count, tracker_url, self.note_id)
         }
     }
