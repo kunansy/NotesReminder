@@ -60,7 +60,7 @@ pub mod db {
             let tracker_url = std::env::var("TRACKER_URL")
                 .unwrap_or("http://tracker.lan".to_string());
 
-            write!(f, "«{}» – {}\n\n{:?}\nMaterial status: {}\nAdded at: {}\nRepeats count: {}\n\
+            write!(f, "«{}» – {}\n\n{}\nMaterial status: {}\nAdded at: {}\nRepeats count: {}\n\
             Last repeated: {}\nTotal notes count: {}\nOpen: {}/notes/note?note_id={}",
                    self.material_title, self.material_authors, self.content_html(), material_status, self.added_at,
                    repeats_count, repeated_at, self.notes_count, tracker_url, self.note_id)
@@ -251,7 +251,7 @@ pub mod db {
         }
 
         fn remove_sub_sup(content: &str) -> String {
-            let remove_sub_sup = Regex::new(r"<su[bp]>(.*?)</su[pb]>").unwrap();
+            let remove_sub_sup = Regex::new(r"<su[bp]>(.*?)</su[bp]>").unwrap();
             let remove_span_sub_sup = Regex::new(r#"<span class="?su[bp]"?>(.*?)</span>"#).unwrap();
 
             let content = remove_sub_sup.replace_all(content, |r: &Captures| {
