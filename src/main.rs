@@ -17,6 +17,9 @@ async fn main() -> Result<(), sqlx::Error>{
     let timeout = std::env::var("DATABASE_TIMEOUT")
         .unwrap_or("10".to_string())
         .parse().expect("DATABASE_TIMEOUT should be int");
+    let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
+        .expect("TG_BOT_USER_ID not found")
+        .parse().expect("User od should be int");
     let timeout = time::Duration::from_secs(timeout);
 
     let pool = PgPoolOptions::new()
