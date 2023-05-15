@@ -43,12 +43,12 @@ async fn main() -> Result<(), String> {
     } else if mode == "--start" {
         log::info!("Start the bot");
 
-        teloxide::repl(bot, move |bot: Bot, msg: Message| {
+        teloxide::repl(bot.clone(), move |msg: Message| {
             let ChatId(id) = msg.chat.id;
             if chat_id != id {
                 log::warn!("Access denied for user: '{}'", id);
             }
-
+            let bot = bot.clone();
             let pool = pool.clone();
 
             async move {
