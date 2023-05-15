@@ -2,7 +2,7 @@ use std::time;
 use dotenv::dotenv;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
-use teloxide::prelude::*;
+use teloxide::{prelude::*, types};
 
 mod db;
 
@@ -31,7 +31,8 @@ async fn main() -> Result<(), String> {
         .connect(&url).await
         .map_err(|e| e.to_string())?;
 
-    let bot = Bot::from_env();
+    let bot = Bot::from_env()
+        .parse_mode(types::ParseMode::Html);
 
     if mode == "--remind" {
         send_note(bot, chat_id, &pool).await;
@@ -56,7 +57,7 @@ async fn main() -> Result<(), String> {
     Ok(())
 }
 
-async fn send_note(bot: Bot, chat_id: i64, pool: &PgPool) {
+async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
     let note = db::db::get_note(&pool).await
         .expect("Error getting note");
 
