@@ -1,5 +1,4 @@
 #!/bin/sh
 
-useradd -ms /bin/bash reminder
-mkdir /app
+adduser reminder
 chown -R reminder /app

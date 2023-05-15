@@ -2,41 +2,28 @@ name: Tests
 
 on:
   push:
-    branches: [master]
+    branches: ['*']
   pull_request:
-    branches: [master]
+    branches: ['*']
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Python3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install Poetry
+    - name: Set up Rust
       run: |
-        pip install pipx
-        pipx install poetry
+        rustup update
 
-    - name: Validate the pyproject.toml
+    - name: Toolchain info
       run: |
-        poetry check
+        cargo --version --verbose
+        rustc --version
 
-    - name: Verify poetry.lock consistency
+    - name: Lint
       run: |
-        poetry lock --check
+        cargo check
 
-    - name: Install dependencies
+    - name: Build
       run: |
-        poetry install --no-interaction --no-root
-
-    - name: Check code by flake8
-      run: |
-        poetry run flake8
-
-    - name: Check code by mypy
-      run: |
-        poetry run mypy .
+        cargo build --bins --release -j $(nproc)

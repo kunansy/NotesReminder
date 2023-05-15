@@ -2,22 +2,22 @@ version: '3'
 
 services:
   notes-reminder-bot:
-    image: kunansy/notes_reminder:1.5.0
+    image: kunansy/notes_reminder:2.0.0
     container_name: notes-reminder-bot
     env_file: .env
     restart: always
-    entrypoint: ["python3", "reminder/main.py", "--start"]
+    entrypoint: ["/app/app", "--start"]
     networks:
       - readingtracker_tracker-net
     healthcheck:
       test: "exit 0"
 
   notes-reminder:
-    image: kunansy/notes_reminder:1.5.0
+    image: kunansy/notes_reminder:2.0.0
     container_name: notes-reminder
     env_file: .env
     restart: always
-    entrypoint: ["/srv/cronn", "-c", "@every ${REPEAT}m python3 reminder/main.py --remind"]
+    entrypoint: ["/srv/cronn", "-c", "@every ${REPEAT}m /app/app --remind"]
     depends_on:
       - notes-reminder-bot
     networks:
