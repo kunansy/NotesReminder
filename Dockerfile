@@ -1,8 +1,8 @@
 FROM rust:1.69-alpine3.17 as builder
 
-RUN set -e  \
-    && apk upgrade \
-    && apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf libpq-dev
+RUN set -e \
+    && apk update \
+    && apk add --no-cache pkgconfig openssl-dev libc-dev ca-certificates
 
 WORKDIR build
 
@@ -10,14 +10,15 @@ COPY Cargo.toml Cargo.lock sqlx-data.json /build/
 COPY src /build/src
 
 # TODO: vendor dependencies
-RUN cargo build --release --bins -vv
+RUN cargo build --release --bins -vv -j $(nproc) 
 
 FROM alpine:3.17
 
 LABEL maintainer="Kirill <k@kunansy.ru>"
 
-RUN set -e &&  \
-    apk add libc6-compat
+RUN set -e \
+    && apk update \
+    && apk add --no-cache libc6-compat openssl ca-certificates
 
 WORKDIR /app
 
