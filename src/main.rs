@@ -35,11 +35,22 @@ async fn main() -> Result<(), String> {
 
     if mode == "--remind" {
         send_note(bot, chat_id, &pool).await;
-    }
-        let note = db::db::get_note(&pool).await?;
-        // send note
-        println!("{}", note);
-        db::db::insert_note_history(&pool, note.note_id(), 1).await?;
+    } else if mode == "--start" {
+        teloxide::repl(bot, move |bot: Bot, msg: Message| {
+            let ChatId(id) = msg.chat.id;
+            if chat_id != id {
+                eprintln!("Access denied for user: '{}'", id);
+            }
+
+            let pool = pool.clone();
+
+            async move {
+                send_note(bot, chat_id, &pool).await;
+                Ok(())
+            }
+        }).await;
+    } else {
+        panic!("Invalid mode passed: {}", mode);
     }
 
     Ok(())
