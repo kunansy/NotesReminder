@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sqlx = { version = "0.6", features = [ "runtime-async-std-native-tls", "postgres", "macros", "uuid", "chrono", "json" ] }
+sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls", "postgres", "uuid", "chrono" ] }
 tokio = { version = "1.28", features = ["full"] }
 serde_json = "1"
 chrono = "0.4"
