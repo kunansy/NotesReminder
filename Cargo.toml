@@ -17,3 +17,7 @@ regex = "1.8"
 teloxide = "0.12"
 log = "0.4"
 env_logger = "0.10.0"
+
+[[bin]]
+name = "app"
+path = "src/main.rs"
