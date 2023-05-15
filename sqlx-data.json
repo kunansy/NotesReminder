@@ -1,0 +1,136 @@
+{
+  "db": "PostgreSQL",
+  "4bd8435b019364b6a9b487e5d75bd6c2bb195b07a836151083057385f1d2c21f": {
+    "describe": {
+      "columns": [
+        {
+          "name": "note_id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "count",
+          "ordinal": 1,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n            WITH stats AS (\n                SELECT note_id, count(1)\n                FROM note_repeats_history\n                GROUP BY note_id\n            )\n            SELECT\n                n.note_id AS note_id,\n                COALESCE(s.count, 0) AS count\n            FROM notes n\n            LEFT JOIN stats s USING(note_id)\n            WHERE NOT n.is_deleted;\n            "
+  },
+  "836b758f91e06b85dcff825546a728da6a237075fe83c5da805c65ebe9cae7e7": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT count(1) FROM notes WHERE not is_deleted;"
+  },
+  "9f151fbb30536884cd9aea24b5245ca82c3bd546c53bc8786452144e78444b9a": {
+    "describe": {
+      "columns": [
+        {
+          "name": "repeated_at",
+          "ordinal": 0,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "count",
+          "ordinal": 1,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n            SELECT repeated_at, COUNT(1) OVER (PARTITION BY material_id)\n            FROM repeats\n            WHERE material_id = $1\n            ORDER BY repeated_at DESC\n            LIMIT 1;\n            "
+  },
+  "a73a26507d0261d3d79c24aa6ff152d78d8a97c3eff6fc7a8499bbded1f61a3a": {
+    "describe": {
+      "columns": [
+        {
+          "name": "material_id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "title",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "authors",
+          "ordinal": 2,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "content",
+          "ordinal": 3,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "added_at",
+          "ordinal": 4,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "material_status",
+          "ordinal": 5,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n            SELECT\n                m.material_id, m.title, m.authors, n.content, n.added_at,\n                CASE\n                    WHEN s IS NULL THEN 'queue'\n                    WHEN s.completed_at IS NULL THEN 'reading'\n                    ELSE 'completed'\n                END AS material_status\n            FROM notes n\n            JOIN materials m USING(material_id)\n            JOIN statuses s USING(material_id)\n            WHERE n.note_id = $1 AND NOT n.is_deleted;\n            "
+  },
+  "abd085ab3860145aab41f91f26ae2b6678a110eb25960e6c0ddaa82d79abc614": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Int8",
+          "Timestamp"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO\n                note_repeats_history (repeat_id, note_id, user_id, repeated_at)\n            VALUES ($1, $2, $3, $4)\n            "
+  }
+}
