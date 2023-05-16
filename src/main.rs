@@ -1,4 +1,4 @@
-use std::time;
+use std::{fs, time};
 use dotenv::dotenv;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -12,8 +12,7 @@ async fn main() -> Result<(), String> {
         .nth(1)
         .expect("Could not get CLI args");
 
-    // upload .env to env
-    dotenv().ok();
+    load_env();
     env_logger::init();
 
     let cfg = Settings::parse();
@@ -96,5 +95,29 @@ impl Settings {
 
         log::debug!("Settings parsed");
         Self { db_uri, db_timeout, chat_id }
+    }
+}
+
+/// Load .env file to env.
+///
+/// # Errors
+///
+/// Warn if it could not read file, don't panic.
+fn load_env() {
+    let env = match fs::read_to_string(".env") {
+        Ok(content) => content,
+        Err(e) => {
+            log::warn!("Error reading .env file: {}", e);
+            return;
+        }
+    };
+
+    for line in env.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let (name, value) = line.split_once("=").unwrap();
+        // there might be spaces around the '=', so trim the strings
+        std::env::set_var(name.trim(), value.trim());
     }
 }
