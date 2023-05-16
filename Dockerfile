@@ -1,8 +1,8 @@
-FROM rust:1.69-alpine3.17 as builder
+FROM rust:1.69-slim-buster as builder
 
-RUN set -e \
-    && apk update \
-    && apk add --no-cache pkgconfig openssl-dev libc-dev ca-certificates
+RUN apt-get update  \
+    && apt-get upgrade -y  \
+    && apt-get install -y libssl-dev libc-dev pkg-config
 
 WORKDIR build
 
@@ -10,15 +10,14 @@ COPY Cargo.toml Cargo.lock sqlx-data.json /build/
 COPY src /build/src
 
 # TODO: vendor dependencies
-RUN cargo build --release --bins -vv -j $(nproc) 
+RUN cargo build --release --bins -vv -j $(nproc)
 
-FROM alpine:3.17
+FROM rust:1.69-slim-buster
 
 LABEL maintainer="Kirill <k@kunansy.ru>"
 
-RUN set -e \
-    && apk update \
-    && apk add --no-cache libc6-compat openssl ca-certificates
+RUN apt-get update  \
+    && apt-get upgrade -y
 
 WORKDIR /app
 
