@@ -60,7 +60,13 @@ pub mod db {
             let tracker_url = std::env::var("TRACKER_URL")
                 .unwrap_or("http://tracker.lan".to_string());
 
-            let added_at = self.added_at.format("%Y-%m-%d %H:%M:%S").to_string();
+            // don't write time when it not set
+            let dt = self.added_at;
+            let added_at = if dt.hour() + dt.minute() + dt.second() == 0 {
+                dt.format("%Y-%m-%d").to_string()
+            } else {
+                dt.format("%Y-%m-%d %H:%M:%S").to_string()
+            };
             let link = format!("<a href=\"{}/notes/note?note_id={}\">Open</a>",
                                tracker_url, self.note_id);
 
