@@ -23,7 +23,7 @@ async fn main() -> Result<(), String> {
         .connect(&cfg.db_uri).await
         .expect("Could not connect to the database");
 
-    let bot = Bot::from_env()
+    let bot = Bot::new(cfg.bot_token)
         .parse_mode(types::ParseMode::Html);
 
     if mode == "--remind" {
@@ -75,7 +75,8 @@ async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
 struct Settings {
     db_uri: String,
     db_timeout: time::Duration,
-    chat_id: i64
+    chat_id: i64,
+    bot_token: String
 }
 
 impl Settings {
@@ -87,13 +88,15 @@ impl Settings {
         let timeout = std::env::var("DATABASE_TIMEOUT")
             .unwrap_or("10".to_string())
             .parse().expect("DATABASE_TIMEOUT should be int");
+        let bot_token = std::env::var("TG_BOT_TOKEN")
+            .expect("TG_BOT_TOKEN not found");
         let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
             .expect("TG_BOT_USER_ID not found")
             .parse().expect("User id should be int");
         let db_timeout = time::Duration::from_secs(timeout);
 
         log::debug!("Settings parsed");
-        Self { db_uri, db_timeout, chat_id }
+        Self { db_uri, db_timeout, bot_token, chat_id }
     }
 }
 
