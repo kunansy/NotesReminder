@@ -44,6 +44,39 @@ pub mod db {
         pub fn note_id(&self) -> &String {
             &self.note_id
         }
+
+        pub fn repeated_ago(&self) -> String {
+            match self.material_last_repeated_at {
+                Some(dt) => {
+                    let dur = Utc::now().naive_utc() - dt;
+                    let dur = dur.num_days() + 1;
+
+                    let mut s = String::new();
+                    if dur / 365 != 0 {
+                        let v = (dur / 365) as i32;
+                        s.push_str(&format!("{} years", v));
+                    }
+                    if dur % 365 / 30 != 0 {
+                        let v = (dur % 365 / 30) as i32;
+                        if !s.is_empty() {
+                            s.push_str(", ");
+                        }
+                        s.push_str(&format!("{} months", v));
+                    }
+                    if dur % 30 != 0 {
+                        let v = (dur % 30) as i32;
+                        if !s.is_empty() {
+                            s.push_str(", ");
+                        }
+                        s.push_str(&format!("{} days", v));
+                    }
+                    s.push_str(" ago");
+
+                    s
+                },
+                None => "-".to_string()
+            }
+        }
     }
 
     impl Display for RemindNote {
