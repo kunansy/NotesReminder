@@ -1,5 +1,4 @@
 use std::{fs, time};
-use dotenv::dotenv;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use teloxide::{prelude::*, types};
