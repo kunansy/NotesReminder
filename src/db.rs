@@ -104,10 +104,16 @@ pub mod db {
             let link = format!("<a href=\"{}/notes/note?note_id={}\">Open</a>",
                                tracker_url, self.note_id);
 
-            write!(f, "«{}» – {}\n\n{}\n\nMaterial status: {}\nAdded at (UTC): {}\nRepeats count: {}\n\
-            Last repeated: {}\nTotal notes count: {}\n{}",
+            let last_material_repeat_info = format!("{}", {
+                if self.material_last_repeated_at != None {
+                    format!("Repeats count: {}\nLast repeated: {}, {}\n",
+                            repeats_count, repeated_at, self.repeated_ago())
+                } else {"".to_string()}
+            });
+
+            write!(f, "«{}» – {}\n\n{}\n\nMaterial status: {}\nAdded at (UTC): {}\n{}Total notes count: {}\n{}",
                    self.material_title, self.material_authors, self.content_html(), material_status, added_at,
-                   repeats_count, repeated_at, self.notes_count, link)
+                   last_material_repeat_info, self.notes_count, link)
         }
     }
 
