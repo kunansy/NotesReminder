@@ -2,6 +2,7 @@ pub mod db {
     use std::collections::HashMap;
     use std::fmt::{Display, Formatter};
     use std::str::FromStr;
+    use chrono::prelude::*;
 
     use rand::Rng;
     use sqlx::postgres::PgPool;
@@ -10,7 +11,7 @@ pub mod db {
 
     struct RemindInfo {
         repeats_count: i64,
-        repeated_at: chrono::NaiveDateTime
+        repeated_at: NaiveDateTime
     }
 
     struct Note {
@@ -18,7 +19,7 @@ pub mod db {
         title: String,
         authors: String,
         content: String,
-        added_at: chrono::NaiveDateTime,
+        added_at: NaiveDateTime,
         material_status: Option<String>,
     }
 
@@ -26,13 +27,13 @@ pub mod db {
     pub struct RemindNote {
         note_id: String,
         content: String,
-        added_at: chrono::NaiveDateTime,
+        added_at: NaiveDateTime,
         notes_count: i64,
         material_title: String,
         material_authors: String,
         material_status: Option<String>,
         material_repeats_count: Option<i64>,
-        material_last_repeated_at: Option<chrono::NaiveDateTime>
+        material_last_repeated_at: Option<NaiveDateTime>
     }
 
     impl RemindNote {
@@ -108,7 +109,7 @@ pub mod db {
                                      user_id: i64) -> Result<(), sqlx::Error>{
         let note_id = Uuid::from_str(note_id)
             .expect("Invalid note_id");
-        let repeated_at = chrono::offset::Utc::now().naive_utc();
+        let repeated_at = Utc::now().naive_utc();
 
         sqlx::query!(
             "
