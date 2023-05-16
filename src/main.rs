@@ -16,21 +16,13 @@ async fn main() -> Result<(), String> {
     dotenv().ok();
     env_logger::init();
 
-    let url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL not found");
-    let timeout = std::env::var("DATABASE_TIMEOUT")
-        .unwrap_or("10".to_string())
-        .parse().expect("DATABASE_TIMEOUT should be int");
-    let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
-        .expect("TG_BOT_USER_ID not found")
-        .parse().expect("User id should be int");
-    let timeout = time::Duration::from_secs(timeout);
+    let cfg = Settings::parse();
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .idle_timeout(timeout)
-        .acquire_timeout(timeout)
-        .connect(&url).await
+        .idle_timeout(cfg.db_timeout)
+        .acquire_timeout(cfg.db_timeout)
+        .connect(&cfg.db_uri).await
         .expect("Could not connect to the database");
 
     let bot = Bot::from_env()
@@ -38,21 +30,21 @@ async fn main() -> Result<(), String> {
 
     if mode == "--remind" {
         log::info!("Remind a note");
-        send_note(bot, chat_id, &pool).await;
+        send_note(bot, cfg.chat_id, &pool).await;
         log::info!("Note reminded");
     } else if mode == "--start" {
         log::info!("Start the bot");
 
         teloxide::repl(bot.clone(), move |msg: Message| {
             let ChatId(id) = msg.chat.id;
-            if chat_id != id {
+            if cfg.chat_id != id {
                 log::warn!("Access denied for user: '{}'", id);
             }
             let bot = bot.clone();
             let pool = pool.clone();
 
             async move {
-                send_note(bot, chat_id, &pool).await;
+                send_note(bot, cfg.chat_id, &pool).await;
                 Ok(())
             }
         }).await;
@@ -80,4 +72,29 @@ async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
     db::db::insert_note_history(&pool, note.note_id(), chat_id)
         .await.expect("Error inserting note history");
     log::info!("History inserted");
+}
+
+struct Settings {
+    db_uri: String,
+    db_timeout: time::Duration,
+    chat_id: i64
+}
+
+impl Settings {
+    fn parse() -> Self {
+        log::debug!("Parse settings");
+
+        let db_uri = std::env::var("DATABASE_URL")
+            .expect("DATABASE_URL not found");
+        let timeout = std::env::var("DATABASE_TIMEOUT")
+            .unwrap_or("10".to_string())
+            .parse().expect("DATABASE_TIMEOUT should be int");
+        let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
+            .expect("TG_BOT_USER_ID not found")
+            .parse().expect("User id should be int");
+        let db_timeout = time::Duration::from_secs(timeout);
+
+        log::debug!("Settings parsed");
+        Self { db_uri, db_timeout, chat_id }
+    }
 }
