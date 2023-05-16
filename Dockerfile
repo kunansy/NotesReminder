@@ -12,12 +12,13 @@ COPY src /build/src
 # TODO: vendor dependencies
 RUN cargo build --release --bins -vv -j $(nproc)
 
-FROM rust:1.69-slim-buster
+FROM ubuntu:20.04
 
 LABEL maintainer="Kirill <k@kunansy.ru>"
 
 RUN apt-get update  \
-    && apt-get upgrade -y
+    && apt-get upgrade -y  \
+    && apt-get install -y libssl-dev ca-certificates \
 
 WORKDIR /app
 
