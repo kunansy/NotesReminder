@@ -17,12 +17,6 @@ teloxide = "0.12"
 log = "0.4"
 env_logger = "0.10.0"
 
-[source.crates-io]
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "vendor"
-
 [[bin]]
 name = "app"
 path = "src/main.rs"
