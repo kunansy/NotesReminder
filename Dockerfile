@@ -9,6 +9,7 @@ WORKDIR build
 COPY Cargo.toml Cargo.lock sqlx-data.json /build/
 COPY src /build/src
 COPY vendor /build/vendor
+COPY .cargo/config.toml .cargo/config.toml
 
 # TODO: vendor dependencies
 RUN cargo build --release --offline --bins -vv -j $(nproc)
