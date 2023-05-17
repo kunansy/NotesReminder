@@ -8,9 +8,10 @@ WORKDIR build
 
 COPY Cargo.toml Cargo.lock sqlx-data.json /build/
 COPY src /build/src
+COPY vendor /build/vendor
 
 # TODO: vendor dependencies
-RUN cargo build --release --bins -vv -j $(nproc)
+RUN cargo build --release --offline --bins -vv -j $(nproc)
 
 FROM ubuntu:20.04
 
