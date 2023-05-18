@@ -19,7 +19,9 @@ LABEL maintainer="Kirill <k@kunansy.ru>"
 
 RUN apt-get update  \
     && apt-get upgrade -y  \
-    && apt-get install -y libssl-dev ca-certificates
+    && apt-get install -y libssl-dev ca-certificates \
+    && apt-get clean && apt-get autoclean \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
