@@ -1,7 +1,7 @@
 use std::{fs, time};
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
-use teloxide::{prelude::*, types};
+use teloxide::{prelude::*, RequestError, types};
 
 mod db;
 
@@ -39,26 +39,7 @@ async fn main() -> Result<(), String> {
             let pool = pool.clone();
 
             async move {
-                if cfg.chat_id != id {
-                    log::warn!("Access denied for user: '{}'", id);
-                    return Ok(());
-                }
-                match msg.text() {
-                    Some("/start") => {
-                        log::info!("[{}]: User starts the bot", id);
-                        bot.send_message(ChatId(cfg.chat_id), "/remind to remind the note").await
-                            .expect("Error sending note");
-                    },
-                    Some("/remind") => {
-                        log::info!("[{}]: User reminds a note", id);
-                        send_note(bot, cfg.chat_id, &pool).await;
-                    },
-                    _ => {
-                       bot.send_message(ChatId(cfg.chat_id), "Command not found").await
-                           .expect("Error sending note");
-                    }
-                }
-                Ok(())
+                answer(&bot, &msg, &pool, cfg.chat_id).await
             }
         }).await;
     } else {
@@ -84,6 +65,31 @@ async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
     db::db::insert_note_history(&pool, note.note_id(), chat_id)
         .await.expect("Error inserting note history");
     log::info!("History inserted");
+}
+
+async fn answer(bot: &impl Requester, msg: &Message, pool: &PgPool, chat_id: i64) -> Result<(), RequestError> {
+    let ChatId(id) = msg.chat.id;
+    if chat_id != id {
+        log::warn!("Access denied for user: '{}'", id);
+        return Ok(());
+    }
+
+    match msg.text() {
+        Some("/start") => {
+            log::info!("[{}]: User starts the bot", chat_id);
+            bot.send_message(ChatId(chat_id), "/remind to remind the note").await
+                .expect("Error sending note");
+        },
+        Some("/remind") => {
+            log::info!("[{}]: User reminds a note", chat_id);
+            send_note(bot, chat_id, &pool).await;
+        },
+        _ => {
+           bot.send_message(ChatId(chat_id), "Command not found").await
+               .expect("Error sending note");
+        }
+    }
+    Ok(())
 }
 
 struct Settings {
