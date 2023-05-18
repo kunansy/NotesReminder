@@ -11,7 +11,6 @@ COPY src /build/src
 COPY vendor /build/vendor
 COPY .cargo/config.toml .cargo/config.toml
 
-# TODO: vendor dependencies
 RUN cargo build --release --offline --bins -vv -j $(nproc)
 
 FROM ubuntu:20.04
