@@ -34,7 +34,6 @@ async fn main() -> Result<(), String> {
         log::info!("Start the bot");
 
         teloxide::repl(bot.clone(), move |msg: Message| {
-            let ChatId(id) = msg.chat.id;
             let bot = bot.clone();
             let pool = pool.clone();
 
