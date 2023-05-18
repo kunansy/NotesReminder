@@ -35,13 +35,14 @@ async fn main() -> Result<(), String> {
 
         teloxide::repl(bot.clone(), move |msg: Message| {
             let ChatId(id) = msg.chat.id;
-            if cfg.chat_id != id {
-                log::warn!("Access denied for user: '{}'", id);
-            }
             let bot = bot.clone();
             let pool = pool.clone();
 
             async move {
+                if cfg.chat_id != id {
+                    log::warn!("Access denied for user: '{}'", id);
+                    return Ok(());
+                }
                 send_note(bot, cfg.chat_id, &pool).await;
                 Ok(())
             }
