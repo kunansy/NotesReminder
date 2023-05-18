@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use teloxide::{prelude::*, RequestError, types};
 
-mod db;
+use notes_reminder::db;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -50,7 +50,7 @@ async fn main() -> Result<(), String> {
 
 async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
     log::info!("Getting a note");
-    let note = db::db::get_note(&pool).await
+    let note = db::get_note(&pool).await
         .expect("Error getting note");
     log::info!("Note got: '{}'", note.note_id());
 
@@ -61,7 +61,7 @@ async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
     log::info!("Message sent");
 
     log::info!("Inserting repeat history");
-    db::db::insert_note_history(&pool, note.note_id(), chat_id)
+    db::insert_note_history(&pool, note.note_id(), chat_id)
         .await.expect("Error inserting note history");
     log::info!("History inserted");
 }
