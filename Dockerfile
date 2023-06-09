@@ -15,6 +15,8 @@ RUN cargo build --release --offline --bins -vv -j $(nproc)
 
 FROM ubuntu:20.04
 
+ENV RUST_BACKTRACE full
+
 LABEL maintainer="Kirill <k@kunansy.ru>"
 
 RUN apt-get update  \
