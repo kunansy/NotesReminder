@@ -25,9 +25,7 @@ async fn main() -> Result<(), String> {
         .parse_mode(types::ParseMode::Html);
 
     if mode == "--remind" {
-        log::info!("Remind a note");
         send_note(bot, cfg.chat_id, &pool).await;
-        log::info!("Note reminded");
     } else if mode == "--start" {
         log::info!("Start the bot");
 
