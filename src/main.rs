@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::time;
 
 use chrono::Local;
 use env_logger::Builder;
@@ -46,6 +47,9 @@ async fn main() -> Result<(), String> {
 }
 
 async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
+    let start = time::Instant::now();
+    log::info!("Remind a note");
+
     log::info!("Getting a note");
     let note = db::get_note(&pool).await
         .expect("Error getting note");
@@ -61,6 +65,9 @@ async fn send_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
     db::insert_note_history(&pool, note.note_id(), chat_id)
         .await.expect("Error inserting note history");
     log::info!("History inserted");
+
+    let exec_time = start.elapsed();
+    log::info!("Note reminded for {:?}", exec_time);
 }
 
 async fn answer(bot: &impl Requester, msg: &Message, pool: &PgPool, chat_id: i64) -> Result<(), RequestError> {
