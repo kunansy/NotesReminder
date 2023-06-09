@@ -1,3 +1,7 @@
+use std::io::Write;
+
+use chrono::Local;
+use env_logger::Builder;
 use sqlx::PgPool;
 use teloxide::{prelude::*, RequestError, types};
 
@@ -10,7 +14,7 @@ async fn main() -> Result<(), String> {
         .expect("Could not get CLI args");
 
     settings::load_env();
-    env_logger::init();
+    init_logger();
 
     let cfg = settings::Settings::parse();
     let pool = db::init_pool(&cfg.db_uri, cfg.db_timeout).await
@@ -82,4 +86,20 @@ async fn answer(bot: &impl Requester, msg: &Message, pool: &PgPool, chat_id: i64
         }
     }
     Ok(())
+}
+
+fn init_logger() {
+    Builder::new()
+        .format(|buf, record| {
+            writeln!(buf,
+                     "{}\t[{}] [{}:{}]\t{}",
+                     record.level(),
+                     Local::now().format("%Y-%m-%d %H:%M:%S.%f"),
+                     record.target(),
+                     record.line().unwrap_or(1),
+                     record.args()
+            )
+        })
+        .parse_default_env()
+        .init();
 }
