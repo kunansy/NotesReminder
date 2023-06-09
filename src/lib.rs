@@ -1,10 +1,11 @@
 pub mod db {
     use std::collections::HashMap;
     use std::fmt::{Display, Formatter};
+    use std::time;
     use chrono::prelude::*;
 
     use rand::Rng;
-    use sqlx::postgres::PgPool;
+    use sqlx::postgres::{PgPool, PgPoolOptions};
     use tokio::join;
     use uuid::Uuid;
 
@@ -288,6 +289,14 @@ pub mod db {
         )
             .fetch_one(pool)
             .await
+    }
+
+    pub async fn init_pool(uri: &str, timeout: time::Duration) -> Result<PgPool, sqlx::Error> {
+        PgPoolOptions::new()
+            .max_connections(5)
+            .idle_timeout(timeout)
+            .acquire_timeout(timeout)
+            .connect(uri).await
     }
 
     mod demark {

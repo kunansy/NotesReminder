@@ -1,5 +1,4 @@
 use sqlx::PgPool;
-use sqlx::postgres::PgPoolOptions;
 use teloxide::{prelude::*, RequestError, types};
 
 use notes_reminder::{db, settings};
@@ -14,12 +13,7 @@ async fn main() -> Result<(), String> {
     env_logger::init();
 
     let cfg = settings::Settings::parse();
-
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .idle_timeout(cfg.db_timeout)
-        .acquire_timeout(cfg.db_timeout)
-        .connect(&cfg.db_uri).await
+    let pool = db::init_pool(&cfg.db_uri, cfg.db_timeout).await
         .expect("Could not connect to the database");
 
     let bot = Bot::new(cfg.bot_token)
