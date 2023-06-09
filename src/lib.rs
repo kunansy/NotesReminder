@@ -48,8 +48,10 @@ pub mod db {
         pub fn repeated_ago(&self) -> String {
             match self.material_last_repeated_at {
                 Some(dt) => {
-                    let dur = Utc::now().naive_utc() - dt;
-                    let dur = dur.num_days() + 1;
+                    let dur = {
+                        let dur = Utc::now().naive_utc() - dt;
+                        dur.num_days() + 1
+                    };
 
                     let mut s = String::new();
                     if dur / 365 != 0 {
@@ -95,11 +97,13 @@ pub mod db {
                 .unwrap_or("http://tracker.lan".to_string());
 
             // don't write time when it not set
-            let dt = self.added_at;
-            let added_at = if dt.hour() + dt.minute() + dt.second() == 0 {
-                dt.format("%Y-%m-%d").to_string()
-            } else {
-                dt.format("%Y-%m-%d %H:%M:%S").to_string()
+            let added_at = {
+                let dt = self.added_at;
+                if dt.hour() + dt.minute() + dt.second() == 0 {
+                    dt.format("%Y-%m-%d").to_string()
+                } else {
+                    dt.format("%Y-%m-%d %H:%M:%S").to_string()
+                }
             };
             let link = format!("<a href=\"{}/notes/note?note_id={}\">Open</a>",
                                tracker_url, self.note_id);
@@ -234,7 +238,7 @@ pub mod db {
             .fetch_all(pool)
             .await?
             .iter()
-            .map(|row| {(row.note_id, row.count.unwrap())})
+            .map(|row| {(row.note_id, row.count.unwrap_or(0))})
             .collect::<HashMap<Uuid, i64>>();
 
         log::debug!("Remind statistics got");
