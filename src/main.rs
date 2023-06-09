@@ -1,9 +1,8 @@
-use std::{fs, time};
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use teloxide::{prelude::*, RequestError, types};
 
-use notes_reminder::db;
+use notes_reminder::{db, settings};
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -11,10 +10,10 @@ async fn main() -> Result<(), String> {
         .nth(1)
         .expect("Could not get CLI args");
 
-    load_env();
+    settings::load_env();
     env_logger::init();
 
-    let cfg = Settings::parse();
+    let cfg = settings::Settings::parse();
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -89,56 +88,4 @@ async fn answer(bot: &impl Requester, msg: &Message, pool: &PgPool, chat_id: i64
         }
     }
     Ok(())
-}
-
-struct Settings {
-    db_uri: String,
-    db_timeout: time::Duration,
-    chat_id: i64,
-    bot_token: String
-}
-
-impl Settings {
-    fn parse() -> Self {
-        log::debug!("Parse settings");
-
-        let db_uri = std::env::var("DATABASE_URL")
-            .expect("DATABASE_URL not found");
-        let timeout = std::env::var("DATABASE_TIMEOUT")
-            .unwrap_or("10".to_string())
-            .parse().expect("DATABASE_TIMEOUT should be int");
-        let bot_token = std::env::var("TG_BOT_TOKEN")
-            .expect("TG_BOT_TOKEN not found");
-        let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
-            .expect("TG_BOT_USER_ID not found")
-            .parse().expect("User id should be int");
-        let db_timeout = time::Duration::from_secs(timeout);
-
-        log::debug!("Settings parsed");
-        Self { db_uri, db_timeout, bot_token, chat_id }
-    }
-}
-
-/// Load .env file to env.
-///
-/// # Errors
-///
-/// Warn if it could not read file, don't panic.
-fn load_env() {
-    let env = match fs::read_to_string(".env") {
-        Ok(content) => content,
-        Err(e) => {
-            log::warn!("Error reading .env file: {}", e);
-            return;
-        }
-    };
-
-    for line in env.lines() {
-        if line.is_empty() {
-            continue;
-        }
-        let (name, value) = line.split_once("=").unwrap();
-        // there might be spaces around the '=', so trim the strings
-        std::env::set_var(name.trim(), value.trim());
-    }
 }

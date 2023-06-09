@@ -339,3 +339,59 @@ pub mod db {
         }
     }
 }
+
+pub mod settings {
+    use std::{fs, time};
+
+    pub struct Settings {
+        pub db_uri: String,
+        pub db_timeout: time::Duration,
+        pub chat_id: i64,
+        pub bot_token: String
+    }
+
+    impl Settings {
+        pub fn parse() -> Self {
+            log::debug!("Parse settings");
+
+            let db_uri = std::env::var("DATABASE_URL")
+                .expect("DATABASE_URL not found");
+            let timeout = std::env::var("DATABASE_TIMEOUT")
+                .unwrap_or("10".to_string())
+                .parse().expect("DATABASE_TIMEOUT should be int");
+            let bot_token = std::env::var("TG_BOT_TOKEN")
+                .expect("TG_BOT_TOKEN not found");
+            let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
+                .expect("TG_BOT_USER_ID not found")
+                .parse().expect("User id should be int");
+            let db_timeout = time::Duration::from_secs(timeout);
+
+            log::debug!("Settings parsed");
+            Self { db_uri, db_timeout, bot_token, chat_id }
+        }
+    }
+
+    /// Load .env file to env.
+    ///
+    /// # Errors
+    ///
+    /// Warn if it could not read file, don't panic.
+    pub fn load_env() {
+        let env = match fs::read_to_string(".env") {
+            Ok(content) => content,
+            Err(e) => {
+                log::warn!("Error reading .env file: {}", e);
+                return;
+            }
+        };
+
+        for line in env.lines() {
+            if line.is_empty() {
+                continue;
+            }
+            let (name, value) = line.split_once("=").unwrap();
+            // there might be spaces around the '=', so trim the strings
+            std::env::set_var(name.trim(), value.trim());
+        }
+    }
+}
