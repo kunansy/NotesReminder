@@ -25,7 +25,7 @@ pub mod db {
 
     #[derive(Debug)]
     pub struct RemindNote {
-        note_id: String,
+        note_id: Uuid,
         content: String,
         added_at: NaiveDateTime,
         notes_count: i64,
@@ -41,7 +41,7 @@ pub mod db {
             demark::demark(&self.content)
         }
 
-        pub fn note_id(&self) -> &String {
+        pub fn note_id(&self) -> &Uuid {
             &self.note_id
         }
 
@@ -125,7 +125,7 @@ pub mod db {
         let note = get_remind_note(pool, note_id).await?;
 
         let mut res = RemindNote{
-            note_id: note_id.to_string(),
+            note_id: *note_id,
             material_title: note.title,
             material_authors: note.authors,
             content: note.content,
@@ -144,10 +144,8 @@ pub mod db {
     }
 
     pub async fn insert_note_history(pool: &PgPool,
-                                     note_id: &String,
+                                     note_id: &Uuid,
                                      user_id: i64) -> Result<(), sqlx::Error>{
-        let note_id = Uuid::from_str(note_id)
-            .expect("Invalid note_id");
         let repeated_at = Utc::now().naive_utc();
 
         sqlx::query!(
