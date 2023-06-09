@@ -1,7 +1,6 @@
 pub mod db {
     use std::collections::HashMap;
     use std::fmt::{Display, Formatter};
-    use std::str::FromStr;
     use chrono::prelude::*;
 
     use rand::Rng;
