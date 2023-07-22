@@ -16,8 +16,8 @@ pub mod db {
 
     struct Note {
         material_id: Option<Uuid>,
-        title: String,
-        authors: String,
+        title: Option<String>,
+        authors: Option<String>,
         content: String,
         added_at: NaiveDateTime,
         material_status: String,
@@ -29,8 +29,8 @@ pub mod db {
         content: String,
         added_at: NaiveDateTime,
         notes_count: i64,
-        material_title: String,
-        material_authors: String,
+        material_title: Option<String>,
+        material_authors: Option<String>,
         material_status: String,
         material_repeats_count: Option<i64>,
         material_last_repeated_at: Option<NaiveDateTime>
