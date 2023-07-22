@@ -1175,7 +1175,6 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "env_logger",
- "futures",
  "log",
  "rand",
  "regex",
