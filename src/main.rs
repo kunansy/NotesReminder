@@ -25,7 +25,7 @@ async fn main() -> Result<(), String> {
         .parse_mode(types::ParseMode::Html);
 
     if mode == "--remind" {
-        remind_note(bot, cfg.chat_id, &pool).await;
+        remind_note(&bot, cfg.chat_id, &pool).await;
     } else if mode == "--start" {
         log::info!("Start the bot");
 
@@ -44,7 +44,9 @@ async fn main() -> Result<(), String> {
     Ok(())
 }
 
-async fn remind_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
+async fn remind_note<T>(bot: &T, chat_id: i64, pool: &PgPool)
+    where T: Requester
+{
     let start = time::Instant::now();
     log::info!("Remind a note");
 
