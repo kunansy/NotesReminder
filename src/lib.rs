@@ -95,9 +95,9 @@ pub mod db {
             let added_at = {
                 let dt = self.added_at;
                 if dt.hour() + dt.minute() + dt.second() == 0 {
-                    dt.format("%Y-%m-%d").to_string()
+                    dt.format("%Y-%m-%d")
                 } else {
-                    dt.format("%Y-%m-%d %H:%M:%S").to_string()
+                    dt.format("%Y-%m-%d %H:%M:%S")
                 }
             };
             let link = format!("<a href=\"{}/notes/note?note_id={}\">Open</a>",
