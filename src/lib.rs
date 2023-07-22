@@ -20,7 +20,7 @@ pub mod db {
         authors: String,
         content: String,
         added_at: NaiveDateTime,
-        material_status: Option<String>,
+        material_status: String,
     }
 
     #[derive(Debug)]
@@ -31,7 +31,7 @@ pub mod db {
         notes_count: i64,
         material_title: String,
         material_authors: String,
-        material_status: Option<String>,
+        material_status: String,
         material_repeats_count: Option<i64>,
         material_last_repeated_at: Option<NaiveDateTime>
     }
@@ -88,11 +88,6 @@ pub mod db {
                 Some(v) => v.format("%Y-%m-%d").to_string(),
                 None => "-".to_string()
             };
-            let material_status = match &self.material_status {
-                Some(v) => v,
-                // it should be unreachable
-                None => "undefined"
-            };
             let tracker_url = std::env::var("TRACKER_URL")
                 .unwrap_or("http://tracker.lan".to_string());
 
@@ -116,7 +111,7 @@ pub mod db {
             });
 
             write!(f, "«{}» – {}\n\n{}\n\nMaterial status: {}\nAdded at (UTC): {}\n{}Total notes count: {}\n{}",
-                   self.material_title, self.material_authors, self.content_html(), material_status, added_at,
+                   self.material_title, self.material_authors, self.content_html(), &self.material_status, added_at,
                    last_material_repeat_info, self.notes_count, link)
         }
     }
@@ -286,7 +281,7 @@ pub mod db {
                     WHEN s IS NULL THEN 'queue'
                     WHEN s.completed_at IS NULL THEN 'reading'
                     ELSE 'completed'
-                END AS material_status
+                END AS "material_status!"
             FROM notes n
             LEFT JOIN materials m USING(material_id)
             LEFT JOIN statuses s USING(material_id)
