@@ -37,6 +37,20 @@ pub mod db {
     }
 
     impl RemindNote {
+        pub fn material_title(&self) -> &str {
+            match &self.material_title {
+                Some(v) => v,
+                None => &""
+            }
+        }
+
+        pub fn material_authors(&self) -> &str {
+            match &self.material_authors {
+                Some(v) => v,
+                None => &""
+            }
+        }
+
         pub fn content_html(&self) -> String {
             demark::demark(&self.content)
         }
