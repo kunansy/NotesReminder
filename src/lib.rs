@@ -292,8 +292,8 @@ pub mod db {
             SELECT
                 -- this alias tells sqlx that material_id is nullable
                 m.material_id AS "material_id?",
-                m.title,
-                m.authors,
+                m.title AS "title?",
+                m.authors AS "authors?",
                 n.content,
                 n.added_at,
                 CASE
