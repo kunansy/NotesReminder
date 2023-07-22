@@ -18,7 +18,7 @@ RUN cargo build --release --offline --target ${TARGET} --jobs $(nproc) -vv
 
 FROM ubuntu:20.04
 
-ARG TARGET
+ARG TARGET=x86_64-unknown-linux-gnu
 ENV RUST_BACKTRACE full
 
 LABEL maintainer="Kirill <k@kunansy.ru>"
