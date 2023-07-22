@@ -54,18 +54,18 @@ pub mod db {
                     };
 
                     let mut s = String::new();
-                    if dur / 365 != 0 {
-                        let v = (dur / 365) as i32;
+                    if &dur / 365 != 0 {
+                        let v = (&dur / 365) as i32;
                         s.push_str(&format!("{} years", v));
                     }
-                    if dur % 365 / 30 != 0 {
-                        let v = (dur % 365 / 30) as i32;
+                    if &dur % 365 / 30 != 0 {
+                        let v = (&dur % 365 / 30) as i32;
                         if !s.is_empty() {
                             s.push_str(", ");
                         }
                         s.push_str(&format!("{} months", v));
                     }
-                    if dur % 30 != 0 {
+                    if &dur % 30 != 0 {
                         let v = (dur % 30) as i32;
                         if !s.is_empty() {
                             s.push_str(", ");
