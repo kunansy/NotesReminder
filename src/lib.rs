@@ -151,7 +151,7 @@ pub mod db {
             "
             INSERT INTO
                 note_repeats_history (repeat_id, note_id, user_id, repeated_at)
-            VALUES ($1, $2, $3, $4)
+            VALUES ($1::uuid, $2::uuid, $3::bigint, $4::timestamp)
             ",
             create_uuid(), note_id, user_id, repeated_at
         )
