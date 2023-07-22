@@ -268,7 +268,6 @@ pub mod db {
     }
 
     async fn get_remind_note(pool: &PgPool, note_id: &Uuid) -> Result<Note, sqlx::Error> {
-        // TODO: sqlx thinks than CASE might produce None
         sqlx::query_as!(Note, r#"
             SELECT
                 -- this alias tells sqlx that material_id is nullable
