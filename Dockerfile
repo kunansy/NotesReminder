@@ -1,5 +1,7 @@
 FROM rust:1.71-slim-buster as builder
 
+ARG TARGET=x86_64-unknown-linux-gnu
+
 RUN apt-get update  \
     && apt-get upgrade -y  \
     && apt-get install -y libssl-dev libc-dev pkg-config
@@ -11,7 +13,7 @@ COPY src ./src
 COPY vendor ./vendor
 COPY .cargo/config.toml .cargo/config.toml
 
-RUN cargo build --release --offline --bins -vv -j $(nproc)
+RUN cargo build --release --offline --target ${TARGET} --jobs $(nproc) -vv
 
 FROM ubuntu:20.04
 
