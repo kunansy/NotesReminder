@@ -1,34 +1,38 @@
-FROM rust:1.69-slim-buster as builder
+FROM rust:1.71-slim-buster as builder
+
+ARG TARGET=x86_64-unknown-linux-gnu
 
 RUN apt-get update  \
     && apt-get upgrade -y  \
-    && apt-get install -y libssl-dev libc-dev pkg-config
+    && apt-get install -y libc-dev pkg-config  \
+    && rustup target add ${TARGET}
 
 WORKDIR build
 
-COPY Cargo.toml Cargo.lock sqlx-data.json /build/
-COPY src /build/src
-COPY vendor /build/vendor
+COPY Cargo.toml Cargo.lock sqlx-data.json ./
+COPY src ./src
+COPY vendor ./vendor
 COPY .cargo/config.toml .cargo/config.toml
 
-RUN cargo build --release --offline --bins -vv -j $(nproc)
+RUN cargo build --release --offline --target ${TARGET} --jobs $(nproc) -vv
 
 FROM ubuntu:20.04
 
+ARG TARGET
 ENV RUST_BACKTRACE full
 
 LABEL maintainer="Kirill <k@kunansy.ru>"
 
 RUN apt-get update  \
     && apt-get upgrade -y  \
-    && apt-get install -y libssl-dev ca-certificates \
+    && apt-get install -y ca-certificates \
     && apt-get clean && apt-get autoclean \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY --from=umputun/cronn:latest /srv/cronn /srv/cronn
-COPY --from=builder /build/target/release/app /app/app
+COPY --from=builder /build/target/${TARGET}/release/app /app/app
 
 COPY entrypoint.sh /app
 RUN /app/entrypoint.sh \

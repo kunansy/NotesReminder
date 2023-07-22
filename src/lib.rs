@@ -15,12 +15,12 @@ pub mod db {
     }
 
     struct Note {
-        material_id: Uuid,
+        material_id: Option<Uuid>,
         title: String,
         authors: String,
         content: String,
         added_at: NaiveDateTime,
-        material_status: Option<String>,
+        material_status: String,
     }
 
     #[derive(Debug)]
@@ -31,7 +31,7 @@ pub mod db {
         notes_count: i64,
         material_title: String,
         material_authors: String,
-        material_status: Option<String>,
+        material_status: String,
         material_repeats_count: Option<i64>,
         material_last_repeated_at: Option<NaiveDateTime>
     }
@@ -88,11 +88,6 @@ pub mod db {
                 Some(v) => v.format("%Y-%m-%d").to_string(),
                 None => "-".to_string()
             };
-            let material_status = match &self.material_status {
-                Some(v) => v,
-                // it should be unreachable
-                None => "undefined"
-            };
             let tracker_url = std::env::var("TRACKER_URL")
                 .unwrap_or("http://tracker.lan".to_string());
 
@@ -100,9 +95,9 @@ pub mod db {
             let added_at = {
                 let dt = self.added_at;
                 if dt.hour() + dt.minute() + dt.second() == 0 {
-                    dt.format("%Y-%m-%d").to_string()
+                    dt.format("%Y-%m-%d")
                 } else {
-                    dt.format("%Y-%m-%d %H:%M:%S").to_string()
+                    dt.format("%Y-%m-%d %H:%M:%S")
                 }
             };
             let link = format!("<a href=\"{}/notes/note?note_id={}\">Open</a>",
@@ -116,7 +111,7 @@ pub mod db {
             });
 
             write!(f, "«{}» – {}\n\n{}\n\nMaterial status: {}\nAdded at (UTC): {}\n{}Total notes count: {}\n{}",
-                   self.material_title, self.material_authors, self.content_html(), material_status, added_at,
+                   self.material_title, self.material_authors, self.content_html(), &self.material_status, added_at,
                    last_material_repeat_info, self.notes_count, link)
         }
     }
@@ -156,7 +151,7 @@ pub mod db {
             "
             INSERT INTO
                 note_repeats_history (repeat_id, note_id, user_id, repeated_at)
-            VALUES ($1, $2, $3, $4)
+            VALUES ($1::uuid, $2::uuid, $3::bigint, $4::timestamp)
             ",
             create_uuid(), note_id, user_id, repeated_at
         )
@@ -187,7 +182,11 @@ pub mod db {
     }
 
     async fn get_material_repeat_info(pool: &PgPool,
-                                      material_id: &Uuid) -> Result<Option<RemindInfo>, sqlx::Error> {
+                                      material_id: &Option<Uuid>) -> Result<Option<RemindInfo>, sqlx::Error> {
+        let material_id = match material_id {
+            Some(v) => v,
+            None => return Ok(None)
+        };
         log::debug!("Getting repeat info for material: {}", material_id);
 
         let info = sqlx::query!(
@@ -269,22 +268,23 @@ pub mod db {
     }
 
     async fn get_remind_note(pool: &PgPool, note_id: &Uuid) -> Result<Note, sqlx::Error> {
-        // TODO: sqlx thinks than CASE might produce None
-        sqlx::query_as!(
-            Note,
-            "
+        sqlx::query_as!(Note, r#"
             SELECT
-                m.material_id, m.title, m.authors, n.content, n.added_at,
+                -- this alias tells sqlx that material_id is nullable
+                m.material_id AS "material_id?",
+                m.title,
+                m.authors,
+                n.content,
+                n.added_at,
                 CASE
                     WHEN s IS NULL THEN 'queue'
                     WHEN s.completed_at IS NULL THEN 'reading'
                     ELSE 'completed'
-                END AS material_status
+                END AS "material_status!"
             FROM notes n
-            JOIN materials m USING(material_id)
-            JOIN statuses s USING(material_id)
-            WHERE n.note_id = $1 AND NOT n.is_deleted;
-            ",
+            LEFT JOIN materials m USING(material_id)
+            LEFT JOIN statuses s USING(material_id)
+            WHERE n.note_id = $1::uuid AND NOT n.is_deleted;"#,
             note_id
         )
             .fetch_one(pool)

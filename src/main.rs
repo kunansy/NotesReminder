@@ -68,7 +68,9 @@ async fn remind_note(bot: impl Requester, chat_id: i64, pool: &PgPool) {
     log::info!("Note reminded for {:?}", exec_time);
 }
 
-async fn answer(bot: &impl Requester, msg: &Message, pool: &PgPool, chat_id: i64) -> Result<(), RequestError> {
+async fn answer<T>(bot: &T, msg: &Message, pool: &PgPool, chat_id: i64) -> Result<(), RequestError>
+    where T: Requester
+{
     let ChatId(id) = msg.chat.id;
     if chat_id != id {
         log::warn!("Access denied for user: '{}'", id);
