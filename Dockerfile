@@ -4,7 +4,7 @@ ARG TARGET=x86_64-unknown-linux-gnu
 
 RUN apt-get update  \
     && apt-get upgrade -y  \
-    && apt-get install -y libssl-dev libc-dev pkg-config  \
+    && apt-get install -y libc-dev pkg-config  \
     && rustup target add ${TARGET}
 
 WORKDIR build
@@ -25,7 +25,7 @@ LABEL maintainer="Kirill <k@kunansy.ru>"
 
 RUN apt-get update  \
     && apt-get upgrade -y  \
-    && apt-get install -y libssl-dev ca-certificates \
+    && apt-get install -y ca-certificates \
     && apt-get clean && apt-get autoclean \
     && rm -rf /var/lib/apt/lists/*
 
