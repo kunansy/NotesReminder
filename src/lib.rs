@@ -15,7 +15,7 @@ pub mod db {
     }
 
     struct Note {
-        material_id: Uuid,
+        material_id: Option<Uuid>,
         title: String,
         authors: String,
         content: String,
@@ -187,7 +187,11 @@ pub mod db {
     }
 
     async fn get_material_repeat_info(pool: &PgPool,
-                                      material_id: &Uuid) -> Result<Option<RemindInfo>, sqlx::Error> {
+                                      material_id: &Option<Uuid>) -> Result<Option<RemindInfo>, sqlx::Error> {
+        let material_id = match material_id {
+            Some(v) => v,
+            None => return Ok(None)
+        };
         log::debug!("Getting repeat info for material: {}", material_id);
 
         let info = sqlx::query!(
@@ -272,19 +276,20 @@ pub mod db {
         // TODO: sqlx thinks than CASE might produce None
         sqlx::query_as!(
             Note,
-            "
+            r#"
             SELECT
-                m.material_id, m.title, m.authors, n.content, n.added_at,
+            -- this alias tells sqlx that material_id is nullable
+                m.material_id AS "material_id?", m.title, m.authors, n.content, n.added_at,
                 CASE
                     WHEN s IS NULL THEN 'queue'
                     WHEN s.completed_at IS NULL THEN 'reading'
                     ELSE 'completed'
                 END AS material_status
             FROM notes n
-            JOIN materials m USING(material_id)
-            JOIN statuses s USING(material_id)
+            LEFT JOIN materials m USING(material_id)
+            LEFT JOIN statuses s USING(material_id)
             WHERE n.note_id = $1 AND NOT n.is_deleted;
-            ",
+            "#,
             note_id
         )
             .fetch_one(pool)
