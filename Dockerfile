@@ -18,6 +18,7 @@ RUN cargo build --release --offline --target ${TARGET} --jobs $(nproc) -vv
 
 FROM ubuntu:20.04
 
+ARG TARGET
 ENV RUST_BACKTRACE full
 
 LABEL maintainer="Kirill <k@kunansy.ru>"
@@ -31,7 +32,7 @@ RUN apt-get update  \
 WORKDIR /app
 
 COPY --from=umputun/cronn:latest /srv/cronn /srv/cronn
-COPY --from=builder /build/target/release/app /app/app
+COPY --from=builder /build/target/${TARGET}/release/app /app/app
 
 COPY entrypoint.sh /app
 RUN /app/entrypoint.sh \
