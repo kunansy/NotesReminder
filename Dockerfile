@@ -6,9 +6,9 @@ RUN apt-get update  \
 
 WORKDIR build
 
-COPY Cargo.toml Cargo.lock sqlx-data.json /build/
-COPY src /build/src
-COPY vendor /build/vendor
+COPY Cargo.toml Cargo.lock sqlx-data.json ./
+COPY src ./src
+COPY vendor ./vendor
 COPY .cargo/config.toml .cargo/config.toml
 
 RUN cargo build --release --offline --bins -vv -j $(nproc)
