@@ -295,6 +295,8 @@ pub mod db {
                 n.content,
                 n.added_at,
                 CASE
+                    -- in this case the note have no material
+                    WHEN m IS NULL THEN 'completed'
                     WHEN s IS NULL THEN 'queue'
                     WHEN s.completed_at IS NULL THEN 'reading'
                     ELSE 'completed'
