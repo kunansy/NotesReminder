@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.57.0"
 name = "os_str_bytes"
-version = "6.5.0"
+version = "6.5.1"
 authors = ["dylni"]
 exclude = [
     ".*",
@@ -67,7 +67,7 @@ version = "3.0"
 optional = true
 
 [dev-dependencies.fastrand]
-version = "1.8"
+version = "2.0"
 
 [features]
 checked_conversions = []
