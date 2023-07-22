@@ -274,12 +274,14 @@ pub mod db {
 
     async fn get_remind_note(pool: &PgPool, note_id: &Uuid) -> Result<Note, sqlx::Error> {
         // TODO: sqlx thinks than CASE might produce None
-        sqlx::query_as!(
-            Note,
-            r#"
+        sqlx::query_as!(Note, r#"
             SELECT
-            -- this alias tells sqlx that material_id is nullable
-                m.material_id AS "material_id?", m.title, m.authors, n.content, n.added_at,
+                -- this alias tells sqlx that material_id is nullable
+                m.material_id AS "material_id?",
+                m.title,
+                m.authors,
+                n.content,
+                n.added_at,
                 CASE
                     WHEN s IS NULL THEN 'queue'
                     WHEN s.completed_at IS NULL THEN 'reading'
@@ -288,8 +290,7 @@ pub mod db {
             FROM notes n
             LEFT JOIN materials m USING(material_id)
             LEFT JOIN statuses s USING(material_id)
-            WHERE n.note_id = $1 AND NOT n.is_deleted;
-            "#,
+            WHERE n.note_id = $1::uuid AND NOT n.is_deleted;"#,
             note_id
         )
             .fetch_one(pool)
