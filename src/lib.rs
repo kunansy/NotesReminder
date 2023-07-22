@@ -213,7 +213,7 @@ pub mod db {
             "
             SELECT repeated_at, COUNT(1) OVER (PARTITION BY material_id)
             FROM repeats
-            WHERE material_id = $1
+            WHERE material_id = $1::uuid
             ORDER BY repeated_at DESC
             LIMIT 1;
             ",
