@@ -123,9 +123,15 @@ pub mod db {
                             repeats_count, repeated_at, self.repeated_ago())
                 } else {"".to_string()}
             });
+            let material_info = format!("{}", {
+                if self.material_title != None {
+                    format!("«{}» – {}\n\n",
+                            self.material_title(), self.material_authors())
+                } else {"Without material\n\n".to_string()}
+            });
 
-            write!(f, "«{}» – {}\n\n{}\n\nMaterial status: {}\nAdded at (UTC): {}\n{}Total notes count: {}\n{}",
-                   self.material_title, self.material_authors, self.content_html(), &self.material_status, added_at,
+            write!(f, "{}{}\n\nMaterial status: {}\nAdded at (UTC): {}\n{}Total notes count: {}\n{}",
+                   material_info, self.content_html(), &self.material_status, added_at,
                    last_material_repeat_info, self.notes_count, link)
         }
     }
