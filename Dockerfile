@@ -4,7 +4,8 @@ ARG TARGET=x86_64-unknown-linux-gnu
 
 RUN apt-get update  \
     && apt-get upgrade -y  \
-    && apt-get install -y libssl-dev libc-dev pkg-config
+    && apt-get install -y libssl-dev libc-dev pkg-config  \
+    && rustup target add ${TARGET}
 
 WORKDIR build
 
