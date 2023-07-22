@@ -217,8 +217,7 @@ pub mod db {
             ORDER BY repeated_at DESC
             LIMIT 1;
             ",
-            material_id
-        )
+            material_id)
             .fetch_optional(pool)
             .await?;
 
@@ -252,8 +251,7 @@ pub mod db {
             FROM notes n
             LEFT JOIN stats s USING(note_id)
             WHERE NOT n.is_deleted;
-            "
-        )
+            ")
             .fetch_all(pool)
             .await?
             .iter()
@@ -305,8 +303,7 @@ pub mod db {
             LEFT JOIN materials m USING(material_id)
             LEFT JOIN statuses s USING(material_id)
             WHERE n.note_id = $1::uuid AND NOT n.is_deleted;"#,
-            note_id
-        )
+            note_id)
             .fetch_one(pool)
             .await
     }
