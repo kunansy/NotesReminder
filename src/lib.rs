@@ -414,7 +414,8 @@ pub mod settings {
         pub db_uri: String,
         pub db_timeout: time::Duration,
         pub chat_id: i64,
-        pub bot_token: String
+        pub bot_token: String,
+        pub tracker_url: String
     }
 
     impl Settings {
@@ -428,13 +429,15 @@ pub mod settings {
                 .parse().expect("DATABASE_TIMEOUT should be int");
             let bot_token = std::env::var("TG_BOT_TOKEN")
                 .expect("TG_BOT_TOKEN not found");
+            let tracker_url = std::env::var("TRACKER_URL")
+                .expect("TRACKER_URL not found");
             let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
                 .expect("TG_BOT_USER_ID not found")
                 .parse().expect("User id should be int");
             let db_timeout = time::Duration::from_secs(timeout);
 
             log::debug!("Settings parsed");
-            Self { db_uri, db_timeout, bot_token, chat_id }
+            Self { db_uri, db_timeout, bot_token, chat_id, tracker_url }
         }
     }
 
