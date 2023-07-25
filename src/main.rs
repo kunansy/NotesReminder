@@ -30,11 +30,12 @@ async fn main() -> Result<(), String> {
         log::info!("Start the bot");
 
         teloxide::repl(bot.clone(), move |msg: Message| {
+            let cfg = Settings::parse();
             let bot = bot.clone();
             let pool = pool.clone();
 
             async move {
-                answer(&bot, &msg, &pool, cfg.chat_id).await
+                answer(&bot, &msg, &pool, &cfg).await
             }
         }).await;
     } else {
@@ -70,27 +71,30 @@ async fn remind_note<T>(bot: &T, chat_id: i64, pool: &PgPool)
     log::info!("Note reminded for {:?}", exec_time);
 }
 
-async fn answer<T>(bot: &T, msg: &Message, pool: &PgPool, chat_id: i64) -> Result<(), RequestError>
+async fn answer<T>(bot: &T,
+                   msg: &Message,
+                   pool: &PgPool,
+                   cfg: &Settings) -> Result<(), RequestError>
     where T: Requester
 {
     let ChatId(id) = msg.chat.id;
-    if chat_id != id {
+    if cfg.chat_id != id {
         log::warn!("Access denied for user: '{}'", id);
         return Ok(());
     }
 
     match msg.text() {
         Some("/start") => {
-            log::info!("[{}]: User starts the bot", chat_id);
-            bot.send_message(ChatId(chat_id), "/remind to remind the note").await
+            log::info!("[{}]: User starts the bot", cfg.chat_id);
+            bot.send_message(ChatId(cfg.chat_id), "/remind to remind the note").await
                 .expect("Error sending note");
         },
         Some("/remind") => {
-            log::info!("[{}]: User reminds a note", chat_id);
-            remind_note(bot, chat_id, &pool).await;
+            log::info!("[{}]: User reminds a note", cfg.chat_id);
+            remind_note(bot, cfg.chat_id, &pool).await;
         },
         _ => {
-           bot.send_message(ChatId(chat_id), "Command not found").await
+           bot.send_message(ChatId(cfg.chat_id), "Command not found").await
                .expect("Error sending note");
         }
     }
