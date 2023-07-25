@@ -430,6 +430,10 @@ pub mod settings {
             let bot_token = std::env::var("TG_BOT_TOKEN")
                 .expect("TG_BOT_TOKEN not found");
             let tracker_url = std::env::var("TRACKER_URL")
+                .map_or(None, |v| {
+                    assert!(!v.ends_with('/'), "TRACKER_URL could not ends with '/'");
+                    Some(v)
+                })
                 .expect("TRACKER_URL not found");
             let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
                 .expect("TG_BOT_USER_ID not found")
