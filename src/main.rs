@@ -92,6 +92,10 @@ async fn answer<T>(bot: &T,
             log::info!("[{}]: User reminds a note", cfg.chat_id);
             remind_note(bot, cfg.chat_id, &pool).await;
         },
+        Some("/repeat") => {
+            log::info!("Remind to repeat");
+            remind_repeat(bot, cfg.chat_id, &cfg.tracker_url).await?;
+        },
         _ => {
            bot.send_message(ChatId(cfg.chat_id), "Command not found").await?;
         }
