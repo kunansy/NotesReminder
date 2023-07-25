@@ -368,6 +368,7 @@ pub mod db {
 }
 
 pub mod tracker_api {
+    use hyper::{Client, body::Buf, http::uri};
     use serde::Deserialize;
 
     #[allow(dead_code)]
@@ -384,6 +385,25 @@ pub mod tracker_api {
         last_repeated_at: Option<String>,
         priority_days: i32,
         pub priority_months: i32
+    }
+
+    pub async fn get_repeat_queue() -> Result<Vec<RepeatItem>, String> {
+        log::debug!("Getting repeat queue");
+        let client = Client::new();
+
+        let url = "http://tracker.lan/materials/repeat-queue".parse()
+            .map_err(|e: uri::InvalidUri| e.to_string())?;
+
+        let resp = client.get(url)
+            .await.map_err(|e| e.to_string())?;
+        let body = hyper::body::aggregate(resp)
+            .await.map_err(|e| e.to_string())?;
+
+        let json: Vec<RepeatItem> = serde_json::from_reader(body.reader())
+            .map_err(|e| e.to_string())?;
+
+        log::debug!("{} queue items found", &json.len());
+        Ok(json)
     }
 }
 
