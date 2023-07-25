@@ -38,6 +38,10 @@ async fn main() -> Result<(), String> {
                 answer(&bot, &msg, &pool, &cfg).await
             }
         }).await;
+
+    } else if mode == "--repeat" {
+        remind_repeat(&bot, cfg.chat_id, &cfg.tracker_url)
+            .await.map_err(|e| e.to_string())?;
     } else {
         panic!("Invalid mode passed: {}", mode);
     }
