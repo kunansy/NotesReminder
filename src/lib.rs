@@ -387,11 +387,11 @@ pub mod tracker_api {
         pub priority_months: i32
     }
 
-    pub async fn get_repeat_queue() -> Result<Vec<RepeatItem>, String> {
+    pub async fn get_repeat_queue(tracker_url: &str) -> Result<Vec<RepeatItem>, String> {
         log::debug!("Getting repeat queue");
         let client = Client::new();
 
-        let url = "http://tracker.lan/materials/repeat-queue".parse()
+        let url = format!("{}/materials/repeat-queue", tracker_url).parse()
             .map_err(|e: uri::InvalidUri| e.to_string())?;
 
         let resp = client.get(url)
