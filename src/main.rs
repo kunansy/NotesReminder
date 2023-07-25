@@ -4,9 +4,9 @@ use std::time;
 use chrono::Local;
 use env_logger::Builder;
 use sqlx::PgPool;
-use teloxide::{prelude::*, RequestError, types};
+use teloxide::{prelude::*, types};
 
-use notes_reminder::{db, settings::{load_env, Settings}};
+use notes_reminder::{db, settings::{load_env, Settings}, tracker_api};
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -96,6 +96,29 @@ async fn answer<T>(bot: &T,
            bot.send_message(ChatId(cfg.chat_id), "Command not found").await?;
         }
     }
+    Ok(())
+}
+
+async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str) -> Result<(), T::Err>
+    where T: Requester
+{
+    let repeat_q = tracker_api::get_repeat_queue()
+        .await.expect("Could not get repeat queue");
+
+    if repeat_q.is_empty() {
+        log::info!("There's nothing to remind, terminating");
+        return Ok(());
+    }
+
+    let msg = format!("You have {} materials to repeat, including {} outlined. Max priority is {}.\n\n\
+                             It's time to <a href=\"{}/materials/repeat-view\">repeat</a>!",
+                      repeat_q.len(),
+                      repeat_q.iter().filter(|&r| r.is_outlined).count(),
+                      repeat_q.iter().map(|r| r.priority_months).max().unwrap_or(0),
+                      tracker_url);
+
+    bot.send_message(ChatId(chat_id), msg).await?;
+
     Ok(())
 }
 
