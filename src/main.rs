@@ -74,7 +74,7 @@ async fn remind_note<T>(bot: &T, chat_id: i64, pool: &PgPool)
 async fn answer<T>(bot: &T,
                    msg: &Message,
                    pool: &PgPool,
-                   cfg: &Settings) -> Result<(), RequestError>
+                   cfg: &Settings) -> Result<(), T::Err>
     where T: Requester
 {
     let ChatId(id) = msg.chat.id;
@@ -86,16 +86,14 @@ async fn answer<T>(bot: &T,
     match msg.text() {
         Some("/start") => {
             log::info!("[{}]: User starts the bot", cfg.chat_id);
-            bot.send_message(ChatId(cfg.chat_id), "/remind to remind the note").await
-                .expect("Error sending note");
+            bot.send_message(ChatId(cfg.chat_id), "/remind to remind the note").await?;
         },
         Some("/remind") => {
             log::info!("[{}]: User reminds a note", cfg.chat_id);
             remind_note(bot, cfg.chat_id, &pool).await;
         },
         _ => {
-           bot.send_message(ChatId(cfg.chat_id), "Command not found").await
-               .expect("Error sending note");
+           bot.send_message(ChatId(cfg.chat_id), "Command not found").await?;
         }
     }
     Ok(())
