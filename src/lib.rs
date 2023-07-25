@@ -367,6 +367,46 @@ pub mod db {
     }
 }
 
+pub mod tracker_api {
+    use hyper::{Client, body::Buf, http::uri};
+    use serde::Deserialize;
+
+    #[allow(dead_code)]
+    #[derive(Deserialize, Debug)]
+    pub struct RepeatItem {
+        material_id: String,
+        title: String,
+        pages: i32,
+        material_type: serde_json::Value,
+        pub is_outlined: bool,
+        notes_count: i32,
+        repeats_count: i32,
+        completed_at: String,
+        last_repeated_at: Option<String>,
+        priority_days: i32,
+        pub priority_months: i32
+    }
+
+    pub async fn get_repeat_queue(tracker_url: &str) -> Result<Vec<RepeatItem>, String> {
+        log::debug!("Getting repeat queue");
+        let client = Client::new();
+
+        let url = format!("{}/materials/repeat-queue", tracker_url).parse()
+            .map_err(|e: uri::InvalidUri| e.to_string())?;
+
+        let resp = client.get(url)
+            .await.map_err(|e| e.to_string())?;
+        let body = hyper::body::aggregate(resp)
+            .await.map_err(|e| e.to_string())?;
+
+        let json: Vec<RepeatItem> = serde_json::from_reader(body.reader())
+            .map_err(|e| e.to_string())?;
+
+        log::debug!("{} queue items found", &json.len());
+        Ok(json)
+    }
+}
+
 pub mod settings {
     use std::{fs, time};
 
@@ -374,7 +414,8 @@ pub mod settings {
         pub db_uri: String,
         pub db_timeout: time::Duration,
         pub chat_id: i64,
-        pub bot_token: String
+        pub bot_token: String,
+        pub tracker_url: String
     }
 
     impl Settings {
@@ -388,13 +429,19 @@ pub mod settings {
                 .parse().expect("DATABASE_TIMEOUT should be int");
             let bot_token = std::env::var("TG_BOT_TOKEN")
                 .expect("TG_BOT_TOKEN not found");
+            let tracker_url = std::env::var("TRACKER_URL")
+                .map_or(None, |v| {
+                    assert!(!v.ends_with('/'), "TRACKER_URL could not ends with '/'");
+                    Some(v)
+                })
+                .expect("TRACKER_URL not found");
             let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
                 .expect("TG_BOT_USER_ID not found")
                 .parse().expect("User id should be int");
             let db_timeout = time::Duration::from_secs(timeout);
 
             log::debug!("Settings parsed");
-            Self { db_uri, db_timeout, bot_token, chat_id }
+            Self { db_uri, db_timeout, bot_token, chat_id, tracker_url }
         }
     }
 

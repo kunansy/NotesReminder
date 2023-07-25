@@ -1175,9 +1175,11 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "env_logger",
+ "hyper",
  "log",
  "rand",
  "regex",
+ "serde",
  "serde_json",
  "sqlx",
  "sqlx-cli",

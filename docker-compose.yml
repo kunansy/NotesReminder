@@ -25,6 +25,19 @@ services:
     healthcheck:
       test: "exit 0"
 
+  repeat-reminder:
+    image: kunansy/notes_reminder:2.0.8
+    container_name: repeat-reminder
+    env_file: .env
+    restart: always
+    entrypoint: ["/srv/cronn", "-c", "0 ${WEEKEND_REPEAT_HOUR} * * 6-7 /app/app --repeat"]
+    depends_on:
+      - notes-reminder-bot
+    networks:
+      - readingtracker_tracker-net
+    healthcheck:
+      test: "exit 0"
+
 networks:
   readingtracker_tracker-net:
     external: true
