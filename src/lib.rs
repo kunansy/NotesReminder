@@ -367,6 +367,26 @@ pub mod db {
     }
 }
 
+pub mod tracker_api {
+    use serde::Deserialize;
+
+    #[allow(dead_code)]
+    #[derive(Deserialize, Debug)]
+    pub struct RepeatItem {
+        material_id: String,
+        title: String,
+        pages: i32,
+        material_type: serde_json::Value,
+        pub is_outlined: bool,
+        notes_count: i32,
+        repeats_count: i32,
+        completed_at: String,
+        last_repeated_at: Option<String>,
+        priority_days: i32,
+        pub priority_months: i32
+    }
+}
+
 pub mod settings {
     use std::{fs, time};
 
