@@ -6,7 +6,7 @@ use env_logger::Builder;
 use sqlx::PgPool;
 use teloxide::{prelude::*, RequestError, types};
 
-use notes_reminder::{db, settings};
+use notes_reminder::{db, settings::{load_env, Settings}};
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -14,10 +14,10 @@ async fn main() -> Result<(), String> {
         .nth(1)
         .expect("Could not get CLI args");
 
-    settings::load_env();
+    load_env();
     init_logger();
 
-    let cfg = settings::Settings::parse();
+    let cfg = Settings::parse();
     let pool = db::init_pool(&cfg.db_uri, cfg.db_timeout).await
         .expect("Could not connect to the database");
 
