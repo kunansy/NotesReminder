@@ -102,8 +102,6 @@ pub mod db {
                 Some(v) => v.format("%Y-%m-%d").to_string(),
                 None => "-".to_string()
             };
-            let tracker_url = std::env::var("TRACKER_URL")
-                .unwrap_or("http://tracker.lan".to_string());
 
             // don't write time when it not set
             let added_at = {
@@ -114,8 +112,12 @@ pub mod db {
                     dt.format("%Y-%m-%d %H:%M:%S")
                 }
             };
-            let link = format!("<a href=\"{}/notes/note?note_id={}\">Open</a>",
-                               tracker_url, self.note_id);
+            let link = match std::env::var("TRACKER_WEB_URL") {
+                Ok(v) => {
+                    format!("<a href=\"{}/notes/note?note_id={}\">Open</a>", v, self.note_id)
+                },
+                Err(_) => String::new()
+            };
 
             let last_material_repeat_info = format!("{}", {
                 if self.material_last_repeated_at != None {
