@@ -240,8 +240,7 @@ pub mod db {
 
     async fn get_remind_statistics(pool: &PgPool) -> Result<HashMap<Uuid, i64>, sqlx::Error> {
         log::debug!("Getting remind statistics");
-        let stat = sqlx::query!(
-            "
+        let stat = sqlx::query!(r#"
             WITH stats AS (
                 SELECT note_id, count(1)
                 FROM note_repeats_history
@@ -249,15 +248,15 @@ pub mod db {
             )
             SELECT
                 n.note_id AS note_id,
-                COALESCE(s.count, 0) AS count
+                COALESCE(s.count, 0) AS "count!"
             FROM notes n
             LEFT JOIN stats s USING(note_id)
             WHERE NOT n.is_deleted;
-            ")
+            "#)
             .fetch_all(pool)
             .await?
             .iter()
-            .map(|row| {(row.note_id, row.count.unwrap_or(0))})
+            .map(|row| {(row.note_id, row.count)})
             .collect::<HashMap<Uuid, i64>>();
 
         log::debug!("Remind statistics got");
