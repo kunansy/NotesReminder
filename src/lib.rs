@@ -141,12 +141,12 @@ pub mod db {
     pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
         let (notes_count, stat) = join!(get_notes_count(pool), get_remind_statistics(pool));
         let stat = stat?;
-        let note_id = get_remind_note_id(&stat);
+        let note_id = get_remind_note_id(stat);
 
-        let note = get_remind_note(pool, note_id).await?;
+        let note = get_remind_note(pool, &note_id).await?;
 
         let mut res = RemindNote{
-            note_id: *note_id,
+            note_id,
             material_title: note.title,
             material_authors: note.authors,
             content: note.content,
@@ -264,20 +264,20 @@ pub mod db {
         Ok(stat)
     }
 
-    fn get_remind_note_id(stats: &HashMap<Uuid, i64>) -> &Uuid {
+    fn get_remind_note_id(stats: HashMap<Uuid, i64>) -> Uuid {
         log::debug!("Getting note id to remind");
         if stats.len() == 0 {
             panic!("Empty stats passed");
         }
 
-        let min_f = stats.values().min().unwrap();
+        let min_f = stats.values().min().unwrap().clone();
         log::debug!("Min frequency is: {}", min_f);
 
         let min_notes = stats
-            .iter()
-            .filter(|(_, freq)| freq == &min_f)
+            .into_iter()
+            .filter(|(_, freq)| *freq == min_f)
             .map(|(note_id, _)| note_id)
-            .collect::<Vec<&Uuid>>();
+            .collect::<Vec<Uuid>>();
 
         log::debug!("Total {} notes with it, getting the random one", min_notes.len());
         let index = rand::thread_rng().gen_range(0..min_notes.len());
