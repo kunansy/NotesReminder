@@ -40,7 +40,7 @@ async fn main() -> Result<(), String> {
         }).await;
 
     } else if mode == "--repeat" {
-        remind_repeat(&bot, cfg.chat_id, &cfg.tracker_web_url)
+        remind_repeat(&bot, cfg.chat_id, &cfg.tracker_url, &cfg.tracker_web_url)
             .await.map_err(|e| e.to_string())?;
     } else {
         panic!("Invalid mode passed: {}", mode);
@@ -98,7 +98,7 @@ async fn answer<T>(bot: &T,
         },
         Some("/repeat") => {
             log::info!("Remind to repeat");
-            remind_repeat(bot, cfg.chat_id, &cfg.tracker_web_url).await?;
+            remind_repeat(bot, cfg.chat_id, &cfg.tracker_url, &cfg.tracker_web_url).await?;
         },
         _ => {
            bot.send_message(ChatId(cfg.chat_id), "Command not found").await?;
@@ -107,7 +107,7 @@ async fn answer<T>(bot: &T,
     Ok(())
 }
 
-async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str) -> Result<(), T::Err>
+async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str, tracker_web_url: &str) -> Result<(), T::Err>
     where T: Requester
 {
     let repeat_q = tracker_api::get_repeat_queue(tracker_url)
@@ -123,7 +123,7 @@ async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str) -> Result<()
                       repeat_q.len(),
                       repeat_q.iter().filter(|&r| r.is_outlined).count(),
                       repeat_q.iter().map(|r| r.priority_months).max().unwrap_or(0),
-                      tracker_url);
+                      tracker_web_url);
 
     bot.send_message(ChatId(chat_id), msg).await?;
 
