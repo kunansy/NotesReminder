@@ -40,7 +40,7 @@ async fn main() -> Result<(), String> {
         }).await;
 
     } else if mode == "--repeat" {
-        remind_repeat(&bot, cfg.chat_id, &cfg.tracker_url)
+        remind_repeat(&bot, cfg.chat_id, &cfg.tracker_web_url)
             .await.map_err(|e| e.to_string())?;
     } else {
         panic!("Invalid mode passed: {}", mode);
@@ -98,7 +98,7 @@ async fn answer<T>(bot: &T,
         },
         Some("/repeat") => {
             log::info!("Remind to repeat");
-            remind_repeat(bot, cfg.chat_id, &cfg.tracker_url).await?;
+            remind_repeat(bot, cfg.chat_id, &cfg.tracker_web_url).await?;
         },
         _ => {
            bot.send_message(ChatId(cfg.chat_id), "Command not found").await?;
