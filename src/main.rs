@@ -4,7 +4,7 @@ use std::time;
 use chrono::Local;
 use env_logger::Builder;
 use sqlx::PgPool;
-use teloxide::{prelude::*, types};
+use teloxide::{prelude::*, types, types::{InlineKeyboardButton, InlineKeyboardMarkup}};
 
 use notes_reminder::{db, settings::{load_env, Settings}, tracker_api};
 
@@ -21,11 +21,11 @@ async fn main() -> Result<(), String> {
     let pool = db::init_pool(&cfg.db_uri, cfg.db_timeout).await
         .expect("Could not connect to the database");
 
-    let bot = Bot::new(cfg.bot_token)
+    let bot = Bot::new(cfg.bot_token.clone())
         .parse_mode(types::ParseMode::Html);
 
     if mode == "--remind" {
-        remind_note(&bot, cfg.chat_id, &pool).await;
+        remind_note(&bot, &cfg, &pool).await;
     } else if mode == "--start" {
         log::info!("Start the bot");
 
@@ -49,7 +49,7 @@ async fn main() -> Result<(), String> {
     Ok(())
 }
 
-async fn remind_note<T>(bot: &T, chat_id: i64, pool: &PgPool)
+async fn remind_note<T>(bot: &T, cfg: &Settings, pool: &PgPool)
     where T: Requester
 {
     let start = time::Instant::now();
@@ -61,13 +61,20 @@ async fn remind_note<T>(bot: &T, chat_id: i64, pool: &PgPool)
     log::info!("Note got: '{}'", note.note_id());
 
     log::info!("Sending message to the bot");
+
+    let url = note.get_url(&cfg.tracker_web_url).parse().unwrap();
+    let open_button = InlineKeyboardButton::url("Open".to_string(), url);
+    let keyboard = InlineKeyboardMarkup::default().append_row(vec![open_button]);
+
     // TODO: process API, timeout errors
-    bot.send_message(ChatId(chat_id), &note.to_string()).await
+    bot.send_message(ChatId(cfg.chat_id), &note.to_string())
+        .reply_markup(keyboard)
+        .await
         .expect("Error sending note");
     log::info!("Message sent");
 
     log::info!("Inserting repeat history");
-    db::insert_note_history(&pool, note.note_id(), chat_id)
+    db::insert_note_history(&pool, note.note_id(), cfg.chat_id)
         .await.expect("Error inserting note history");
     log::info!("History inserted");
 
@@ -94,7 +101,7 @@ async fn answer<T>(bot: &T,
         },
         Some("/remind") => {
             log::info!("[{}]: User reminds a note", cfg.chat_id);
-            remind_note(bot, cfg.chat_id, &pool).await;
+            remind_note(bot, &cfg, &pool).await;
         },
         Some("/repeat") => {
             log::info!("Remind to repeat");
