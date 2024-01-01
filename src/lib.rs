@@ -93,6 +93,10 @@ pub mod db {
                 None => "-".to_string()
             }
         }
+
+        pub fn get_url(&self, tracker_url: &str) -> String {
+            format!("{}/notes/note?note_id={}", tracker_url, self.note_id)
+        }
     }
 
     impl Display for RemindNote {
