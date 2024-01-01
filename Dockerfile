@@ -12,7 +12,7 @@ WORKDIR build
 COPY Cargo.toml Cargo.lock sqlx-data.json ./
 COPY src ./src
 COPY vendor ./vendor
-COPY .cargo/config.toml .cargo/config.toml
+COPY .cargo/ ./.cargo
 
 RUN cargo build --release --offline --target ${TARGET} --jobs $(nproc) -vv
 
