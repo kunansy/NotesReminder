@@ -116,12 +116,6 @@ pub mod db {
                     dt.format("%Y-%m-%d %H:%M:%S")
                 }
             };
-            let link = match std::env::var("TRACKER_WEB_URL") {
-                Ok(v) => {
-                    format!("<a href=\"{}/notes/note?note_id={}\">Open</a>", v, self.note_id)
-                },
-                Err(_) => String::new()
-            };
 
             let last_material_repeat_info = format!("{}", {
                 if self.material_last_repeated_at != None {
@@ -136,9 +130,9 @@ pub mod db {
                 } else {"Without material\n\n".to_string()}
             });
 
-            write!(f, "{}{}\n\nMaterial status: {}\nAdded at (UTC): {}\n{}Total notes count: {}\n{}",
+            write!(f, "{}{}\n\nMaterial status: {}\nAdded at (UTC): {}\n{}Total notes count: {}",
                    material_info, self.content_html(), &self.material_status, added_at,
-                   last_material_repeat_info, self.notes_count, link)
+                   last_material_repeat_info, self.notes_count)
         }
     }
 
