@@ -1,8 +1,9 @@
-use std::io::Write;
-use std::time;
+use std::{io::Write, process::exit, thread, time};
 
 use chrono::Local;
 use env_logger::Builder;
+use signal_hook::consts::{SIGINT, SIGQUIT, SIGTERM};
+use signal_hook::iterator::Signals;
 use sqlx::PgPool;
 use teloxide::{prelude::*, types, types::{InlineKeyboardButton, InlineKeyboardMarkup}};
 
@@ -10,6 +11,15 @@ use notes_reminder::{db, settings::{load_env, Settings}, tracker_api};
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    let mut signals = Signals::new(&[SIGTERM, SIGQUIT, SIGINT])
+        .map_err(|e| e.to_string())?;
+
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            log::info!("Received a signal '{:?}', terminating", sig);
+            exit(0);
+        }
+    });
     let mode = std::env::args()
         .nth(1)
         .expect("Could not get CLI args");
