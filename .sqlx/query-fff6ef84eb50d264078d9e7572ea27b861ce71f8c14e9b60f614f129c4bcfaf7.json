@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                -- this alias tells sqlx that material_id is nullable\n                m.material_id AS \"material_id?\",\n                m.title AS \"title?\",\n                m.authors AS \"authors?\",\n                n.content,\n                n.added_at,\n                CASE\n                    -- in this case the note have no material\n                    WHEN m IS NULL THEN 'completed'\n                    WHEN s IS NULL THEN 'queue'\n                    WHEN s.completed_at IS NULL THEN 'reading'\n                    ELSE 'completed'\n                END AS \"material_status!\"\n            FROM notes n\n            LEFT JOIN materials m USING(material_id)\n            LEFT JOIN statuses s USING(material_id)\n            WHERE n.note_id = $1::uuid AND NOT n.is_deleted;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "material_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "authors?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "content",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "added_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 5,
+        "name": "material_status!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "fff6ef84eb50d264078d9e7572ea27b861ce71f8c14e9b60f614f129c4bcfaf7"
+}
