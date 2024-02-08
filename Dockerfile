@@ -10,10 +10,10 @@ RUN apt-get update  \
 WORKDIR build
 
 COPY Cargo.toml Cargo.lock ./
-COPY vendor ./
-COPY .cargo ./
-COPY .sqlx ./
-COPY src ./
+COPY .cargo ./.cargo
+COPY vendor ./vendor
+COPY .sqlx ./.sqlx
+COPY src ./src
 
 RUN cargo build --release --offline --target ${TARGET} --jobs $(nproc) -vv
 
