@@ -3,6 +3,10 @@ name = "notes-reminder"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+opt-level = "z"
+lto = "fat"
+
 [dependencies]
 sqlx = { version = "0.6", features = [ "runtime-tokio-rustls", "postgres", "uuid", "chrono" ] }
 tokio = { version = "1.28", features = ["full"] }
