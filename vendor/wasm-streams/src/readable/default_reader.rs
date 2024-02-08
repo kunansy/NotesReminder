@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
-use wasm_bindgen::{throw_val, JsValue};
+use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
 use crate::util::promise_to_void_future;
@@ -13,9 +14,6 @@ use super::{sys, IntoStream, ReadableStream};
 /// This is returned by the [`get_reader`](ReadableStream::get_reader) method.
 ///
 /// When the reader is dropped, it automatically [releases its lock](https://streams.spec.whatwg.org/#release-a-lock).
-/// If the reader still has a pending read request at this point (i.e. if a future returned
-/// by [`read`](Self::read) is not yet ready), then this will **panic**. You must either `await`
-/// all `read` futures, or [`cancel`](Self::cancel) the stream to discard any pending `read` futures.
 #[derive(Debug)]
 pub struct ReadableStreamDefaultReader<'stream> {
     raw: sys::ReadableStreamDefaultReader,
@@ -25,7 +23,11 @@ pub struct ReadableStreamDefaultReader<'stream> {
 impl<'stream> ReadableStreamDefaultReader<'stream> {
     pub(crate) fn new(stream: &mut ReadableStream) -> Result<Self, js_sys::Error> {
         Ok(Self {
-            raw: stream.as_raw().get_reader()?,
+            raw: stream
+                .as_raw()
+                .unchecked_ref::<sys::ReadableStreamExt>()
+                .try_get_reader()?
+                .unchecked_into(),
             _stream: PhantomData,
         })
     }
@@ -68,8 +70,8 @@ impl<'stream> ReadableStreamDefaultReader<'stream> {
     /// * If the stream encounters an `error`, this returns `Err(error)`.
     pub async fn read(&mut self) -> Result<Option<JsValue>, JsValue> {
         let promise = self.as_raw().read();
-        let js_value = JsFuture::from(promise).await?;
-        let result = sys::ReadableStreamDefaultReadResult::from(js_value);
+        let js_result = JsFuture::from(promise).await?;
+        let result = sys::ReadableStreamReadResult::from(js_result);
         if result.is_done() {
             Ok(None)
         } else {
@@ -80,29 +82,40 @@ impl<'stream> ReadableStreamDefaultReader<'stream> {
     /// [Releases](https://streams.spec.whatwg.org/#release-a-lock) this reader's lock on the
     /// corresponding stream.
     ///
-    /// **Panics** if the reader still has a pending read request, i.e. if a future returned
-    /// by [`read`](Self::read) is not yet ready. For a non-panicking variant,
-    /// use [`try_release_lock`](Self::try_release_lock).
+    /// [As of January 2022](https://github.com/whatwg/streams/commit/d5f92d9f17306d31ba6b27424d23d58e89bf64a5),
+    /// the Streams standard allows the lock to be released even when there are still pending read
+    /// requests. Such requests will automatically become rejected, and this function will always
+    /// succeed.
+    ///
+    /// However, if the Streams implementation is not yet up-to-date with this change, then
+    /// releasing the lock while there are pending read requests will **panic**. For a non-panicking
+    /// variant, use [`try_release_lock`](Self::try_release_lock).
     #[inline]
     pub fn release_lock(mut self) {
         self.release_lock_mut()
     }
 
     fn release_lock_mut(&mut self) {
-        self.as_raw()
-            .release_lock()
-            .unwrap_or_else(|error| throw_val(error.into()))
+        self.as_raw().release_lock()
     }
 
     /// Try to [release](https://streams.spec.whatwg.org/#release-a-lock) this reader's lock on the
     /// corresponding stream.
     ///
-    /// The lock cannot be released while the reader still has a pending read request, i.e.
-    /// if a future returned by [`read`](Self::read) is not yet ready. Attempting to do so will
+    /// [As of January 2022](https://github.com/whatwg/streams/commit/d5f92d9f17306d31ba6b27424d23d58e89bf64a5),
+    /// the Streams standard allows the lock to be released even when there are still pending read
+    /// requests. Such requests will automatically become rejected, and this function will always
+    /// return `Ok(())`.
+    ///
+    /// However, if the Streams implementation is not yet up-to-date with this change, then
+    /// the lock cannot be released while there are pending read requests. Attempting to do so will
     /// return an error and leave the reader locked to the stream.
     #[inline]
     pub fn try_release_lock(self) -> Result<(), (js_sys::Error, Self)> {
-        self.as_raw().release_lock().map_err(|error| (error, self))
+        self.as_raw()
+            .unchecked_ref::<sys::ReadableStreamReaderExt>()
+            .try_release_lock()
+            .map_err(|err| (err, self))
     }
 
     /// Converts this `ReadableStreamDefaultReader` into a [`Stream`].
@@ -112,7 +125,7 @@ impl<'stream> ReadableStreamDefaultReader<'stream> {
     /// usable. This allows reading only a few chunks from the `Stream`, while still allowing
     /// another reader to read the remaining chunks later on.
     ///
-    /// [`Stream`]: https://docs.rs/futures/0.3.18/futures/stream/trait.Stream.html
+    /// [`Stream`]: https://docs.rs/futures/0.3.28/futures/stream/trait.Stream.html
     #[inline]
     pub fn into_stream(self) -> IntoStream<'stream> {
         IntoStream::new(self, false)

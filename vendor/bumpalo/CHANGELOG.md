@@ -8,7 +8,6 @@ Released YYYY-MM-DD.
 
 ### Changed
 
-* The minimum supported Rust version (MSRV) is now 1.60.0.
 * TODO (or remove section if none)
 
 ### Deprecated
@@ -26,6 +25,37 @@ Released YYYY-MM-DD.
 ### Security
 
 * TODO (or remove section if none)
+
+--------------------------------------------------------------------------------
+
+## 3.14.0
+
+Released 2023-09-14.
+
+### Added
+
+* Added the `std` cargo feature, which enables implementations of `std` traits
+  for various things. Right now that is just `std::io::Write` for
+  `bumpalo::collections::Vec`, but could be more in the future.
+
+--------------------------------------------------------------------------------
+
+## 3.13.0
+
+Released 2023-05-22.
+
+### Added
+
+* New `"allocator-api2"` feature enables the use of the allocator API on
+  stable. This feature uses a crate that mirrors the API of the unstable Rust
+  `allocator_api` feature. If the feature is enabled, references to `Bump` will
+  implement `allocator_api2::Allocator`. This allows `Bump` to be used as an
+  allocator for collection types from `allocator-api2` and any other crates that
+  support `allocator-api2`.
+
+### Changed
+
+* The minimum supported Rust version (MSRV) is now 1.63.0.
 
 --------------------------------------------------------------------------------
 
@@ -512,7 +542,7 @@ Released 2019-12-20.
   from the allocated chunks are slightly different from the old
   `each_allocated_chunk`: only up to 16-byte alignment is supported now. If you
   allocate anything with greater alignment than that into the bump arena, there
-  might be uninitilized padding inserted in the chunks, and therefore it is no
+  might be uninitialized padding inserted in the chunks, and therefore it is no
   longer safe to read them via `MaybeUninit::assume_init`. See also the note
   about bump direction in the "changed" section; if you're iterating chunks,
   you're likely affected by that change!
@@ -551,7 +581,7 @@ Released 2019-05-20.
 
 * Fixed a bug where chunks were always deallocated with the default chunk
   layout, not the layout that the chunk was actually allocated with (i.e. if we
-  started growing largers chunks with larger layouts, we would deallocate those
+  started growing larger chunks with larger layouts, we would deallocate those
   chunks with an incorrect layout).
 
 --------------------------------------------------------------------------------

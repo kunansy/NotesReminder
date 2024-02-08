@@ -123,6 +123,34 @@ async fn test_readable_stream_multiple_readers() {
 
 #[wasm_bindgen_test]
 async fn test_readable_stream_abort_read() {
+    if supports_release_lock_with_pending_read() {
+        test_readable_stream_abort_read_new().await;
+    } else {
+        test_readable_stream_abort_read_old().await;
+    }
+}
+
+async fn test_readable_stream_abort_read_new() {
+    let stream = pending();
+    let mut readable = ReadableStream::from_stream(stream);
+    let mut reader = readable.get_reader();
+
+    // Start reading
+    // Since the stream will never produce a chunk, this read will remain pending forever
+    let mut fut = reader.read().boxed_local();
+    // We need to poll the future at least once to start the read
+    let poll_result = poll!(&mut fut);
+    assert!(matches!(poll_result, Poll::Pending));
+    // Drop the future, to regain control over the reader
+    drop(fut);
+
+    // Releasing the lock should work even while there are pending reads
+    reader
+        .try_release_lock()
+        .expect("releasing the reader should work even while there are pending reads");
+}
+
+async fn test_readable_stream_abort_read_old() {
     let stream = pending();
     let (stream, observer) = observe_drop(stream);
     let mut readable = ReadableStream::from_stream(stream);
@@ -269,4 +297,29 @@ async fn test_readable_stream_into_stream_then_into_async_read() {
     assert_eq!(&buf, &[4, 5, 6]);
     assert_eq!(async_read.read(&mut buf).await.unwrap(), 0);
     assert_eq!(&buf, &[4, 5, 6]);
+}
+
+#[wasm_bindgen_test]
+async fn test_readable_stream_from_js_array() {
+    let js_array =
+        js_sys::Array::from_iter([JsValue::from_str("Hello"), JsValue::from_str("world!")]);
+    let mut readable = match ReadableStream::try_from(js_array.unchecked_into()) {
+        Ok(readable) => readable,
+        Err(err) => {
+            // ReadableStream.from() is not yet supported in all browsers.
+            assert_eq!(err.name(), "TypeError");
+            assert_eq!(
+                err.message().as_string().unwrap(),
+                "ReadableStream.from is not a function"
+            );
+            return;
+        }
+    };
+    assert!(!readable.is_locked());
+
+    let mut reader = readable.get_reader();
+    assert_eq!(reader.read().await.unwrap(), Some(JsValue::from("Hello")));
+    assert_eq!(reader.read().await.unwrap(), Some(JsValue::from("world!")));
+    assert_eq!(reader.read().await.unwrap(), None);
+    reader.closed().await.unwrap();
 }

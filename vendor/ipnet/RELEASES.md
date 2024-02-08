@@ -1,5 +1,13 @@
 # Releases
 
+## Version 2.9.0
+
+*  Add ser_as_str feature to serialize using serialize_str() #52 
+
+## Version 2.8.0
+
+* Add no_std support on nightly #51 
+
 ## Version 2.7.2
 
 * Inline constructors and field getters #48 

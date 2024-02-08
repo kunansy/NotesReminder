@@ -18,7 +18,7 @@ use core::ops::{
 };
 use core::u32;
 
-use crate::convert::{FromWasmAbi, WasmSlice};
+use crate::convert::{FromWasmAbi, TryFromJsValue, WasmRet, WasmSlice};
 
 macro_rules! if_std {
     ($($i:item)*) => ($(
@@ -28,14 +28,14 @@ macro_rules! if_std {
 
 macro_rules! externs {
     ($(#[$attr:meta])* extern "C" { $(fn $name:ident($($args:tt)*) -> $ret:ty;)* }) => (
-        #[cfg(all(target_arch = "wasm32", not(target_os = "emscripten")))]
+        #[cfg(all(target_arch = "wasm32", not(any(target_os = "emscripten", target_os = "wasi"))))]
         $(#[$attr])*
         extern "C" {
             $(fn $name($($args)*) -> $ret;)*
         }
 
         $(
-            #[cfg(not(all(target_arch = "wasm32", not(target_os = "emscripten"))))]
+            #[cfg(not(all(target_arch = "wasm32", not(any(target_os = "emscripten", target_os = "wasi")))))]
             #[allow(unused_variables)]
             unsafe extern fn $name($($args)*) -> $ret {
                 panic!("function not implemented on non-wasm32 targets")
@@ -71,7 +71,6 @@ pub mod describe;
 
 mod cast;
 pub use crate::cast::{JsCast, JsObject};
-use convert::WasmOption;
 
 if_std! {
     extern crate std;
@@ -95,7 +94,7 @@ pub struct JsValue {
 }
 
 const JSIDX_OFFSET: u32 = 128; // keep in sync with js/mod.rs
-const JSIDX_UNDEFINED: u32 = JSIDX_OFFSET + 0;
+const JSIDX_UNDEFINED: u32 = JSIDX_OFFSET;
 const JSIDX_NULL: u32 = JSIDX_OFFSET + 1;
 const JSIDX_TRUE: u32 = JSIDX_OFFSET + 2;
 const JSIDX_FALSE: u32 = JSIDX_OFFSET + 3;
@@ -103,31 +102,19 @@ const JSIDX_RESERVED: u32 = JSIDX_OFFSET + 4;
 
 impl JsValue {
     /// The `null` JS value constant.
-    pub const NULL: JsValue = JsValue {
-        idx: JSIDX_NULL,
-        _marker: marker::PhantomData,
-    };
+    pub const NULL: JsValue = JsValue::_new(JSIDX_NULL);
 
     /// The `undefined` JS value constant.
-    pub const UNDEFINED: JsValue = JsValue {
-        idx: JSIDX_UNDEFINED,
-        _marker: marker::PhantomData,
-    };
+    pub const UNDEFINED: JsValue = JsValue::_new(JSIDX_UNDEFINED);
 
     /// The `true` JS value constant.
-    pub const TRUE: JsValue = JsValue {
-        idx: JSIDX_TRUE,
-        _marker: marker::PhantomData,
-    };
+    pub const TRUE: JsValue = JsValue::_new(JSIDX_TRUE);
 
     /// The `false` JS value constant.
-    pub const FALSE: JsValue = JsValue {
-        idx: JSIDX_FALSE,
-        _marker: marker::PhantomData,
-    };
+    pub const FALSE: JsValue = JsValue::_new(JSIDX_FALSE);
 
     #[inline]
-    fn _new(idx: u32) -> JsValue {
+    const fn _new(idx: u32) -> JsValue {
         JsValue {
             idx,
             _marker: marker::PhantomData,
@@ -138,6 +125,7 @@ impl JsValue {
     ///
     /// The utf-8 string provided is copied to the JS heap and the string will
     /// be owned by the JS garbage collector.
+    #[allow(clippy::should_implement_trait)] // cannot fix without breaking change
     #[inline]
     pub fn from_str(s: &str) -> JsValue {
         unsafe { JsValue::_new(__wbindgen_string_new(s.as_ptr(), s.len())) }
@@ -166,7 +154,7 @@ impl JsValue {
     /// This function creates a JS object representing a boolean (a heap
     /// allocated boolean) and returns a handle to the JS version of it.
     #[inline]
-    pub fn from_bool(b: bool) -> JsValue {
+    pub const fn from_bool(b: bool) -> JsValue {
         if b {
             JsValue::TRUE
         } else {
@@ -176,13 +164,13 @@ impl JsValue {
 
     /// Creates a new JS value representing `undefined`.
     #[inline]
-    pub fn undefined() -> JsValue {
+    pub const fn undefined() -> JsValue {
         JsValue::UNDEFINED
     }
 
     /// Creates a new JS value representing `null`.
     #[inline]
-    pub fn null() -> JsValue {
+    pub const fn null() -> JsValue {
         JsValue::NULL
     }
 
@@ -276,7 +264,7 @@ impl JsValue {
     /// `None`.
     #[inline]
     pub fn as_f64(&self) -> Option<f64> {
-        unsafe { FromWasmAbi::from_abi(__wbindgen_number_get(self.idx)) }
+        unsafe { __wbindgen_number_get(self.idx).join() }
     }
 
     /// Tests whether this JS value is a JS string.
@@ -620,10 +608,10 @@ impl TryFrom<&JsValue> for f64 {
     #[inline]
     fn try_from(val: &JsValue) -> Result<Self, Self::Error> {
         let jsval = unsafe { JsValue::_new(__wbindgen_try_into_number(val.idx)) };
-        return match jsval.as_f64() {
+        match jsval.as_f64() {
             Some(num) => Ok(num),
             None => Err(jsval),
-        };
+        }
     }
 }
 
@@ -816,6 +804,28 @@ if_std! {
             JsValue::from_str(&s)
         }
     }
+
+    impl TryFrom<JsValue> for String {
+        type Error = JsValue;
+
+        fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+            match value.as_string() {
+                Some(s) => Ok(s),
+                None => Err(value),
+            }
+        }
+    }
+
+    impl TryFromJsValue for String {
+        type Error = JsValue;
+
+        fn try_from_js_value(value: JsValue) -> Result<Self, Self::Error> {
+            match value.as_string() {
+                Some(s) => Ok(s),
+                None => Err(value),
+            }
+        }
+    }
 }
 
 impl From<bool> for JsValue {
@@ -910,7 +920,7 @@ macro_rules! big_numbers {
 }
 
 fn bigint_get_as_i64(v: &JsValue) -> Option<i64> {
-    unsafe { Option::from_abi(__wbindgen_bigint_get_as_i64(v.idx)) }
+    unsafe { __wbindgen_bigint_get_as_i64(v.idx).join() }
 }
 
 macro_rules! try_from_for_num64 {
@@ -1057,10 +1067,10 @@ externs! {
         fn __wbindgen_ge(a: u32, b: u32) -> u32;
         fn __wbindgen_gt(a: u32, b: u32) -> u32;
 
-        fn __wbindgen_number_get(idx: u32) -> WasmOption<f64>;
+        fn __wbindgen_number_get(idx: u32) -> WasmRet<Option<f64>>;
         fn __wbindgen_boolean_get(idx: u32) -> u32;
         fn __wbindgen_string_get(idx: u32) -> WasmSlice;
-        fn __wbindgen_bigint_get_as_i64(idx: u32) -> WasmOption<i64>;
+        fn __wbindgen_bigint_get_as_i64(idx: u32) -> WasmRet<Option<i64>>;
 
         fn __wbindgen_debug_string(ret: *mut [usize; 2], idx: u32) -> ();
 
@@ -1309,19 +1319,36 @@ pub fn anyref_heap_live_count() -> u32 {
 pub trait UnwrapThrowExt<T>: Sized {
     /// Unwrap this `Option` or `Result`, but instead of panicking on failure,
     /// throw an exception to JavaScript.
+    #[cfg_attr(debug_assertions, track_caller)]
     fn unwrap_throw(self) -> T {
-        self.expect_throw("`unwrap_throw` failed")
+        if cfg!(all(debug_assertions, feature = "std")) {
+            let loc = core::panic::Location::caller();
+            let msg = std::format!(
+                "`unwrap_throw` failed ({}:{}:{})",
+                loc.file(),
+                loc.line(),
+                loc.column()
+            );
+            self.expect_throw(&msg)
+        } else {
+            self.expect_throw("`unwrap_throw` failed")
+        }
     }
 
     /// Unwrap this container's `T` value, or throw an error to JS with the
     /// given message if the `T` value is unavailable (e.g. an `Option<T>` is
     /// `None`).
+    #[cfg_attr(debug_assertions, track_caller)]
     fn expect_throw(self, message: &str) -> T;
 }
 
 impl<T> UnwrapThrowExt<T> for Option<T> {
+    #[cfg_attr(debug_assertions, track_caller)]
     fn expect_throw(self, message: &str) -> T {
-        if cfg!(all(target_arch = "wasm32", not(target_os = "emscripten"))) {
+        if cfg!(all(
+            target_arch = "wasm32",
+            not(any(target_os = "emscripten", target_os = "wasi"))
+        )) {
             match self {
                 Some(val) => val,
                 None => throw_str(message),
@@ -1336,8 +1363,12 @@ impl<T, E> UnwrapThrowExt<T> for Result<T, E>
 where
     E: core::fmt::Debug,
 {
+    #[cfg_attr(debug_assertions, track_caller)]
     fn expect_throw(self, message: &str) -> T {
-        if cfg!(all(target_arch = "wasm32", not(target_os = "emscripten"))) {
+        if cfg!(all(
+            target_arch = "wasm32",
+            not(any(target_os = "emscripten", target_os = "wasi"))
+        )) {
             match self {
                 Ok(val) => val,
                 Err(_) => throw_str(message),
@@ -1348,13 +1379,9 @@ where
     }
 }
 
-/// Returns a handle to this wasm instance's `WebAssembly.Module`
-///
-/// Note that this is only available when the final wasm app is built with
-/// `--target no-modules`, it's not recommended to rely on this API yet! This is
-/// largely just an experimental addition to enable threading demos. Using this
-/// may prevent your wasm module from building down the road.
-#[doc(hidden)]
+/// Returns a handle to this Wasm instance's `WebAssembly.Module`.
+/// This is only available when the final Wasm app is built with
+/// `--target no-modules` or `--target web`.
 pub fn module() -> JsValue {
     unsafe { JsValue::_new(__wbindgen_module()) }
 }
@@ -1562,11 +1589,9 @@ pub mod __rt {
 
     if_std! {
         use std::alloc::{alloc, dealloc, realloc, Layout};
-        use std::mem;
 
         #[no_mangle]
-        pub extern "C" fn __wbindgen_malloc(size: usize) -> *mut u8 {
-            let align = mem::align_of::<usize>();
+        pub extern "C" fn __wbindgen_malloc(size: usize, align: usize) -> *mut u8 {
             if let Ok(layout) = Layout::from_size_align(size, align) {
                 unsafe {
                     if layout.size() > 0 {
@@ -1584,8 +1609,7 @@ pub mod __rt {
         }
 
         #[no_mangle]
-        pub unsafe extern "C" fn __wbindgen_realloc(ptr: *mut u8, old_size: usize, new_size: usize) -> *mut u8 {
-            let align = mem::align_of::<usize>();
+        pub unsafe extern "C" fn __wbindgen_realloc(ptr: *mut u8, old_size: usize, new_size: usize, align: usize) -> *mut u8 {
             debug_assert!(old_size > 0);
             debug_assert!(new_size > 0);
             if let Ok(layout) = Layout::from_size_align(old_size, align) {
@@ -1607,13 +1631,12 @@ pub mod __rt {
         }
 
         #[no_mangle]
-        pub unsafe extern "C" fn __wbindgen_free(ptr: *mut u8, size: usize) {
+        pub unsafe extern "C" fn __wbindgen_free(ptr: *mut u8, size: usize, align: usize) {
             // This happens for zero-length slices, and in that case `ptr` is
             // likely bogus so don't actually send this to the system allocator
             if size == 0 {
                 return
             }
-            let align = mem::align_of::<usize>();
             let layout = Layout::from_size_align_unchecked(size, align);
             dealloc(ptr, layout);
         }
@@ -1674,7 +1697,7 @@ pub mod __rt {
             };
             GLOBAL_EXNDATA[0] = 0;
             GLOBAL_EXNDATA[1] = 0;
-            return ret;
+            ret
         }
     }
 

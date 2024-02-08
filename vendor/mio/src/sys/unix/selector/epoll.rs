@@ -1,10 +1,9 @@
 use crate::{Interest, Token};
 
 use libc::{EPOLLET, EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLRDHUP};
-use log::error;
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(debug_assertions)]
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{cmp, i32, io, ptr};
 
@@ -17,8 +16,6 @@ pub struct Selector {
     #[cfg(debug_assertions)]
     id: usize,
     ep: RawFd,
-    #[cfg(debug_assertions)]
-    has_waker: AtomicBool,
 }
 
 impl Selector {
@@ -61,8 +58,6 @@ impl Selector {
             #[cfg(debug_assertions)]
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             ep,
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(false),
         })
     }
 
@@ -72,8 +67,6 @@ impl Selector {
             #[cfg(debug_assertions)]
             id: self.id,
             ep,
-            #[cfg(debug_assertions)]
-            has_waker: AtomicBool::new(self.has_waker.load(Ordering::Acquire)),
         })
     }
 
@@ -92,7 +85,10 @@ impl Selector {
                 // turning sub-millisecond timeouts into a zero timeout, unless
                 // the caller explicitly requests that by specifying a zero
                 // timeout.
-                let to_ms = (to + Duration::from_nanos(999_999)).as_millis();
+                let to_ms = to
+                    .checked_add(Duration::from_nanos(999_999))
+                    .unwrap_or(to)
+                    .as_millis();
                 cmp::min(MAX_SAFE_TIMEOUT, to_ms) as libc::c_int
             })
             .unwrap_or(-1);
@@ -135,11 +131,6 @@ impl Selector {
 
     pub fn deregister(&self, fd: RawFd) -> io::Result<()> {
         syscall!(epoll_ctl(self.ep, libc::EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn register_waker(&self) -> bool {
-        self.has_waker.swap(true, Ordering::AcqRel)
     }
 }
 

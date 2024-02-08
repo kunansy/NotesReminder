@@ -119,12 +119,24 @@ See [serde documentation](https://serde.rs) for more information.
 url = { version = "2", features = ["serde"] }
 ```
 
+# Feature: `debugger_visualizer`
+
+If you enable the `debugger_visualizer` feature, the `url` crate will include
+a [natvis file](https://docs.microsoft.com/en-us/visualstudio/debugger/create-custom-views-of-native-objects)
+for [Visual Studio](https://www.visualstudio.com/) that allows you to view
+[`Url`](struct.Url.html) objects in the debugger.
+
+This feature requires Rust 1.71 or later.
+
+```toml
+url = { version = "2", features = ["debugger_visualizer"] }
+```
+
 */
 
-#![doc(html_root_url = "https://docs.rs/url/2.3.1")]
+#![doc(html_root_url = "https://docs.rs/url/2.5.0")]
 #![cfg_attr(
     feature = "debugger_visualizer",
-    feature(debugger_visualizer),
     debugger_visualizer(natvis_file = "../../debug_metadata/url.natvis")
 )]
 
@@ -193,6 +205,7 @@ pub struct Url {
 
 /// Full configuration for the URL parser.
 #[derive(Copy, Clone)]
+#[must_use]
 pub struct ParseOptions<'a> {
     base_url: Option<&'a Url>,
     encoding_override: EncodingOverride<'a>,
@@ -320,6 +333,32 @@ impl Url {
         }
 
         url
+    }
+
+    /// https://url.spec.whatwg.org/#potentially-strip-trailing-spaces-from-an-opaque-path
+    fn strip_trailing_spaces_from_opaque_path(&mut self) {
+        if !self.cannot_be_a_base() {
+            return;
+        }
+
+        if self.fragment_start.is_some() {
+            return;
+        }
+
+        if self.query_start.is_some() {
+            return;
+        }
+
+        let trailing_space_count = self
+            .serialization
+            .chars()
+            .rev()
+            .take_while(|c| *c == ' ')
+            .count();
+
+        let start = self.serialization.len() - trailing_space_count;
+
+        self.serialization.truncate(start);
     }
 
     /// Parse a string as an URL, with this URL as the base URL.
@@ -601,7 +640,7 @@ impl Url {
         }
 
         assert!(self.scheme_end >= 1);
-        assert!(matches!(self.byte_at(0), b'a'..=b'z' | b'A'..=b'Z'));
+        assert!(self.byte_at(0).is_ascii_alphabetic());
         assert!(self
             .slice(1..self.scheme_end)
             .chars()
@@ -657,7 +696,14 @@ impl Url {
             assert_eq!(self.host_end, self.scheme_end + 1);
             assert_eq!(self.host, HostInternal::None);
             assert_eq!(self.port, None);
-            assert_eq!(self.path_start, self.scheme_end + 1);
+            if self.path().starts_with("//") {
+                // special case when first path segment is empty
+                assert_eq!(self.byte_at(self.scheme_end + 1), b'/');
+                assert_eq!(self.byte_at(self.scheme_end + 2), b'.');
+                assert_eq!(self.path_start, self.scheme_end + 3);
+            } else {
+                assert_eq!(self.path_start, self.scheme_end + 1);
+            }
         }
         if let Some(start) = self.query_start {
             assert!(start >= self.path_start);
@@ -786,11 +832,34 @@ impl Url {
         self.slice(..self.scheme_end)
     }
 
+    /// Return whether the URL is special (has a special scheme)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use url::Url;
+    /// # use url::ParseError;
+    ///
+    /// # fn run() -> Result<(), ParseError> {
+    /// assert!(Url::parse("http:///tmp/foo")?.is_special());
+    /// assert!(Url::parse("file:///tmp/foo")?.is_special());
+    /// assert!(!Url::parse("moz:///tmp/foo")?.is_special());
+    /// # Ok(())
+    /// # }
+    /// # run().unwrap();
+    /// ```
+    pub fn is_special(&self) -> bool {
+        let scheme_type = SchemeType::from(self.scheme());
+        scheme_type.is_special()
+    }
+
     /// Return whether the URL has an 'authority',
     /// which can contain a username, password, host, and port number.
     ///
     /// URLs that do *not* are either path-only like `unix:/run/foo.socket`
     /// or cannot-be-a-base like `data:text/plain,Stuff`.
+    ///
+    /// See also the `authority` method.
     ///
     /// # Examples
     ///
@@ -815,6 +884,47 @@ impl Url {
     pub fn has_authority(&self) -> bool {
         debug_assert!(self.byte_at(self.scheme_end) == b':');
         self.slice(self.scheme_end..).starts_with("://")
+    }
+
+    /// Return the authority of this URL as an ASCII string.
+    ///
+    /// Non-ASCII domains are punycode-encoded per IDNA if this is the host
+    /// of a special URL, or percent encoded for non-special URLs.
+    /// IPv6 addresses are given between `[` and `]` brackets.
+    /// Ports are omitted if they match the well known port of a special URL.
+    ///
+    /// Username and password are percent-encoded.
+    ///
+    /// See also the `has_authority` method.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use url::Url;
+    /// # use url::ParseError;
+    ///
+    /// # fn run() -> Result<(), ParseError> {
+    /// let url = Url::parse("unix:/run/foo.socket")?;
+    /// assert_eq!(url.authority(), "");
+    /// let url = Url::parse("file:///tmp/foo")?;
+    /// assert_eq!(url.authority(), "");
+    /// let url = Url::parse("https://user:password@example.com/tmp/foo")?;
+    /// assert_eq!(url.authority(), "user:password@example.com");
+    /// let url = Url::parse("irc://àlex.рф.example.com:6667/foo")?;
+    /// assert_eq!(url.authority(), "%C3%A0lex.%D1%80%D1%84.example.com:6667");
+    /// let url = Url::parse("http://àlex.рф.example.com:80/foo")?;
+    /// assert_eq!(url.authority(), "xn--lex-8ka.xn--p1ai.example.com");
+    /// # Ok(())
+    /// # }
+    /// # run().unwrap();
+    /// ```
+    pub fn authority(&self) -> &str {
+        let scheme_separator_len = "://".len() as u32;
+        if self.has_authority() && self.path_start > self.scheme_end + scheme_separator_len {
+            self.slice(self.scheme_end + scheme_separator_len..self.path_start)
+        } else {
+            ""
+        }
     }
 
     /// Return whether this URL is a cannot-be-a-base URL,
@@ -1389,9 +1499,10 @@ impl Url {
         if let Some(input) = fragment {
             self.fragment_start = Some(to_u32(self.serialization.len()).unwrap());
             self.serialization.push('#');
-            self.mutate(|parser| parser.parse_fragment(parser::Input::no_trim(input)))
+            self.mutate(|parser| parser.parse_fragment(parser::Input::new_no_trim(input)))
         } else {
-            self.fragment_start = None
+            self.fragment_start = None;
+            self.strip_trailing_spaces_from_opaque_path();
         }
     }
 
@@ -1451,9 +1562,14 @@ impl Url {
                 parser.parse_query(
                     scheme_type,
                     scheme_end,
-                    parser::Input::trim_tab_and_newlines(input, vfn),
+                    parser::Input::new_trim_tab_and_newlines(input, vfn),
                 )
             });
+        } else {
+            self.query_start = None;
+            if fragment.is_none() {
+                self.strip_trailing_spaces_from_opaque_path();
+            }
         }
 
         self.restore_already_parsed_fragment(fragment);
@@ -1569,10 +1685,14 @@ impl Url {
                     parser.serialization.push_str("%2F");
                     path = &path[1..];
                 }
-                parser.parse_cannot_be_a_base_path(parser::Input::new(path));
+                parser.parse_cannot_be_a_base_path(parser::Input::new_no_trim(path));
             } else {
                 let mut has_host = true; // FIXME
-                parser.parse_path_start(scheme_type, &mut has_host, parser::Input::new(path));
+                parser.parse_path_start(
+                    scheme_type,
+                    &mut has_host,
+                    parser::Input::new_no_trim(path),
+                );
             }
         });
         self.restore_after_path(old_after_path_pos, &after_path);
@@ -1989,7 +2109,8 @@ impl Url {
         if !self.has_host() || self.host() == Some(Host::Domain("")) || self.scheme() == "file" {
             return Err(());
         }
-        if let Some(password) = password {
+        let password = password.unwrap_or_default();
+        if !password.is_empty() {
             let host_and_after = self.slice(self.host_start..).to_owned();
             self.serialization.truncate(self.username_end as usize);
             self.serialization.push(':');
@@ -2241,7 +2362,7 @@ impl Url {
     #[allow(clippy::result_unit_err, clippy::suspicious_operation_groupings)]
     pub fn set_scheme(&mut self, scheme: &str) -> Result<(), ()> {
         let mut parser = Parser::for_setter(String::new());
-        let remaining = parser.parse_scheme(parser::Input::new(scheme))?;
+        let remaining = parser.parse_scheme(parser::Input::new_no_trim(scheme))?;
         let new_scheme_type = SchemeType::from(&parser.serialization);
         let old_scheme_type = SchemeType::from(self.scheme());
         // If url’s scheme is a special scheme and buffer is not a special scheme, then return.
@@ -2579,7 +2700,7 @@ impl Ord for Url {
 impl PartialOrd for Url {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.serialization.partial_cmp(&other.serialization)
+        Some(self.cmp(other))
     }
 }
 
@@ -2805,7 +2926,7 @@ fn file_url_segments_to_pathbuf(
 
     // A windows drive letter must end with a slash.
     if bytes.len() > 2
-        && matches!(bytes[bytes.len() - 2], b'a'..=b'z' | b'A'..=b'Z')
+        && bytes[bytes.len() - 2].is_ascii_alphabetic()
         && matches!(bytes[bytes.len() - 1], b':' | b'|')
     {
         bytes.push(b'/');

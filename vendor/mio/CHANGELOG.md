@@ -1,3 +1,66 @@
+# 0.8.10
+
+## Added
+
+* Solaris support
+  (https://github.com/tokio-rs/mio/pull/1724).
+
+# 0.8.9
+
+## Added
+
+* ESP-IDF framework support
+  (https://github.com/tokio-rs/mio/pull/1692).
+* AIX operating system support
+  (https://github.com/tokio-rs/mio/pull/1704).
+* Vita support
+  (https://github.com/tokio-rs/mio/pull/1721).
+* `{UnixListener,UnixStream}:bind_addr`
+  (https://github.com/tokio-rs/mio/pull/1630).
+* `mio_unsupported_force_poll_poll` and `mio_unsupported_force_waker_pipe`
+  **unsupported** configuration flags to force a specific poll or waker
+  implementation
+  (https://github.com/tokio-rs/mio/pull/1684,
+  https://github.com/tokio-rs/mio/pull/1685,
+  https://github.com/tokio-rs/mio/pull/1692).
+
+## Fixed
+
+* The `pipe(2)` based waker (swapped file descriptors)
+  (https://github.com/tokio-rs/mio/pull/1722).
+* The duplicate waker check to work correctly with cloned `Registry`s.
+  (https://github.com/tokio-rs/mio/pull/1706).
+
+# 0.8.8
+
+## Fixed
+
+* Fix compilation on WASI (https://github.com/tokio-rs/mio/pull/1676).
+
+# 0.8.7
+
+## Added
+
+* Add/fix support for tvOS and watchOS, Mio should now build for tvOS and
+  watchOS, but we don't have a CI setup yet
+  (https://github.com/tokio-rs/mio/pull/1658).
+
+## Changed
+
+* Made the `log` dependency optional behind the `log` feature flag (enabled by
+  default). Users that disabled Mio's default features will now not see any
+  logging from Mio, enabling the `log` feature will fix that. This was done in
+  response to the `log` crate increasing it's MSRV to v1.60, see
+  https://github.com/rust-lang/log/pull/552
+  (https://github.com/tokio-rs/mio/pull/1673).
+* Update windows-sys dependency to v0.48
+  (https://github.com/tokio-rs/mio/pull/1663).
+
+## Fixed
+
+* Fix overflow in `Poll::poll` when using `Duration::MAX` as timeout
+  (https://github.com/tokio-rs/mio/pull/1657).
+
 # 0.8.6
 
 ## Added

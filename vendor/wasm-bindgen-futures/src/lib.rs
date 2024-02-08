@@ -30,7 +30,7 @@
 //! systems and make sure that Rust/JavaScript can work together with
 //! asynchronous and I/O work.
 
-#![cfg_attr(target_feature = "atomics", feature(stdsimd))]
+#![cfg_attr(target_feature = "atomics", feature(stdarch_wasm_atomic_wait))]
 #![deny(missing_docs)]
 
 use js_sys::Promise;
@@ -45,6 +45,9 @@ use wasm_bindgen::prelude::*;
 mod queue;
 #[cfg(feature = "futures-core-03-stream")]
 pub mod stream;
+
+pub use js_sys;
+pub use wasm_bindgen;
 
 mod task {
     use cfg_if::cfg_if;

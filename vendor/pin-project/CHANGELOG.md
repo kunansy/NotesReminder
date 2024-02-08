@@ -10,6 +10,22 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 
 ## [Unreleased]
 
+## [1.1.4] - 2024-01-25
+
+- Suppress `clippy::missing_docs_in_private_items` and `clippy::missing_inline_in_public_items` lints in generated code. ([#356](https://github.com/taiki-e/pin-project/pull/356), thanks @daxpedda)
+
+## [1.1.3] - 2023-08-06
+
+- Hide documentation of the `Unpin` implementation for `!Unpin` option to work around [rustdoc issue](https://github.com/rust-lang/rust/issues/80481). ([#355](https://github.com/taiki-e/pin-project/pull/355), thanks @matheus-consoli)
+
+## [1.1.2] - 2023-07-02
+
+- Inline project methods.
+
+## [1.1.1] - 2023-06-29
+
+- Fix build error from dependency when built with `-Z minimal-versions`.
+
 ## [1.1.0] - 2023-05-13
 
 - Update `syn` dependency to 2. This increase the minimum supported Rust version from Rust 1.37 to Rust 1.56. ([#352](https://github.com/taiki-e/pin-project/pull/352), [#354](https://github.com/taiki-e/pin-project/pull/354), thanks @maurer and @daxpedda)
@@ -684,7 +700,11 @@ See also [tracking issue for 0.4 release](https://github.com/taiki-e/pin-project
 
 Initial release
 
-[Unreleased]: https://github.com/taiki-e/pin-project/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/taiki-e/pin-project/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/taiki-e/pin-project/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/taiki-e/pin-project/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/taiki-e/pin-project/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/taiki-e/pin-project/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/taiki-e/pin-project/compare/v1.0.12...v1.1.0
 [1.0.12]: https://github.com/taiki-e/pin-project/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/taiki-e/pin-project/compare/v1.0.10...v1.0.11

@@ -132,7 +132,7 @@ impl Request {
             None => None,
         };
         let mut req = Request::new(self.method().clone(), self.url().clone());
-        *req.timeout_mut() = self.timeout().cloned();
+        *req.timeout_mut() = self.timeout().copied();
         *req.headers_mut() = self.headers().clone();
         *req.version_mut() = self.version();
         req.body = body;
@@ -196,7 +196,7 @@ impl RequestBuilder {
         self.header_sensitive(key, value, false)
     }
 
-    /// Add a `Header` to this Request with ability to define if header_value is sensitive.
+    /// Add a `Header` to this Request with ability to define if `header_value` is sensitive.
     fn header_sensitive<K, V>(mut self, key: K, value: V, sensitive: bool) -> RequestBuilder
     where
         HeaderName: TryFrom<K>,
@@ -440,8 +440,10 @@ impl RequestBuilder {
         if let Ok(ref mut req) = self.request {
             match serde_json::to_vec(json) {
                 Ok(body) => {
-                    req.headers_mut()
-                        .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                    if !req.headers().contains_key(CONTENT_TYPE) {
+                        req.headers_mut()
+                            .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                    }
                     *req.body_mut() = Some(body.into());
                 }
                 Err(err) => error = Some(crate::error::builder(err)),

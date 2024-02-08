@@ -11,9 +11,9 @@
 
 [package]
 edition = "2018"
-rust-version = "1.57.0"
+rust-version = "1.63.0"
 name = "reqwest"
-version = "0.11.17"
+version = "0.11.24"
 authors = ["Sean McArthur <sean@seanmonstar.com>"]
 autotests = true
 description = "higher level HTTP client library"
@@ -142,6 +142,9 @@ optional = true
 [dependencies.serde_urlencoded]
 version = "0.7.1"
 
+[dependencies.sync_wrapper]
+version = "0.1.2"
+
 [dependencies.tower-service]
 version = "0.3"
 
@@ -155,9 +158,8 @@ __rustls = [
     "tokio-rustls",
     "rustls",
     "__tls",
-    "rustls-pemfile",
 ]
-__tls = []
+__tls = ["dep:rustls-pemfile"]
 blocking = [
     "futures-util/io",
     "tokio/rt-multi-thread",
@@ -190,7 +192,7 @@ gzip = [
     "tokio-util",
 ]
 http3 = [
-    "rustls-tls",
+    "rustls-tls-manual-roots",
     "h3",
     "h3-quinn",
     "quinn",
@@ -226,18 +228,18 @@ stream = [
 trust-dns = ["trust-dns-resolver"]
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.async-compression]
-version = "0.3.13"
+version = "0.4.0"
 features = ["tokio"]
 optional = true
 default-features = false
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.cookie_crate]
-version = "0.16"
+version = "0.17.0"
 optional = true
 package = "cookie"
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.cookie_store]
-version = "0.16"
+version = "0.20.0"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.encoding_rs]
@@ -248,21 +250,21 @@ version = "0.3"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.h2]
-version = "0.3.10"
+version = "0.3.14"
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.h3]
-version = "0.0.2"
+version = "0.0.3"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.h3-quinn]
-version = "0.0.2"
+version = "0.0.4"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.http-body]
 version = "0.4.0"
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.hyper]
-version = "0.14.18"
+version = "0.14.21"
 features = [
     "tcp",
     "http1",
@@ -273,7 +275,7 @@ features = [
 default-features = false
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.hyper-rustls]
-version = "0.23"
+version = "0.24.0"
 optional = true
 default-features = false
 
@@ -305,16 +307,17 @@ version = "2.1"
 version = "0.2.0"
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.quinn]
-version = "0.9"
+version = "0.10"
 features = [
     "tls-rustls",
     "ring",
+    "runtime-tokio",
 ]
 optional = true
 default-features = false
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.rustls]
-version = "0.20"
+version = "0.21.6"
 features = ["dangerous_configuration"]
 optional = true
 
@@ -339,7 +342,7 @@ version = "0.3.0"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.tokio-rustls]
-version = "0.23"
+version = "0.24"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.tokio-socks]
@@ -356,11 +359,12 @@ optional = true
 default-features = false
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.trust-dns-resolver]
-version = "0.22"
+version = "0.23"
+features = ["tokio-runtime"]
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.webpki-roots]
-version = "0.22"
+version = "0.25"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.brotli_crate]
@@ -371,7 +375,15 @@ package = "brotli"
 version = "0.3"
 
 [target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.env_logger]
-version = "0.8"
+version = "0.10"
+
+[target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.futures-util]
+version = "0.3.0"
+features = [
+    "std",
+    "alloc",
+]
+default-features = false
 
 [target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.hyper]
 version = "0.14"
@@ -414,7 +426,7 @@ version = "0.2.68"
 version = "0.4.18"
 
 [target."cfg(target_arch = \"wasm32\")".dependencies.wasm-streams]
-version = "0.2"
+version = "0.4"
 optional = true
 
 [target."cfg(target_arch = \"wasm32\")".dependencies.web-sys]
@@ -444,5 +456,8 @@ features = ["serde-serialize"]
 [target."cfg(target_arch = \"wasm32\")".dev-dependencies.wasm-bindgen-test]
 version = "0.3"
 
+[target."cfg(target_os = \"macos\")".dependencies.system-configuration]
+version = "0.5.1"
+
 [target."cfg(windows)".dependencies.winreg]
-version = "0.10"
+version = "0.50.0"

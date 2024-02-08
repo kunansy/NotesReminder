@@ -1,5 +1,8 @@
 use crate::{IpNet, Ipv4Net, Ipv6Net};
-use std::fmt;
+use core::fmt;
+#[cfg(not(feature = "std"))]
+use core::net::{Ipv4Addr, Ipv6Addr};
+#[cfg(feature = "std")]
 use std::net::{Ipv4Addr, Ipv6Addr};
 use serde::{self, Serialize, Deserialize, Serializer, Deserializer};
 use serde::ser::SerializeTuple;
@@ -81,6 +84,13 @@ impl Serialize for Ipv4Net {
         where S: Serializer
     {
         if serializer.is_human_readable() {
+            #[cfg(feature = "ser_as_str")]
+            {
+                let mut buf = heapless::String::<18>::new();
+                fmt::write(&mut buf, format_args!("{self}")).unwrap();
+                serializer.serialize_str(&buf)
+            }
+            #[cfg(not(feature = "ser_as_str"))]
             serializer.collect_str(self)
         } else {
             let mut seq = serializer.serialize_tuple(5)?;
@@ -127,6 +137,13 @@ impl Serialize for Ipv6Net {
         where S: Serializer
     {
         if serializer.is_human_readable() {
+            #[cfg(feature = "ser_as_str")]
+            {
+                let mut buf = heapless::String::<43>::new();
+                fmt::write(&mut buf, format_args!("{self}")).unwrap();
+                serializer.serialize_str(&buf)
+            }
+            #[cfg(not(feature = "ser_as_str"))]
             serializer.collect_str(self)
         } else {
             let mut seq = serializer.serialize_tuple(17)?;

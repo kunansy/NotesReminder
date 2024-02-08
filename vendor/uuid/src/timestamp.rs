@@ -72,6 +72,11 @@ impl Timestamp {
 
     /// Construct a `Timestamp` from an RFC4122 timestamp and counter, as used
     /// in versions 1 and 6 UUIDs.
+    ///
+    /// # Overflow
+    ///
+    /// If conversion from RFC4122 ticks to the internal timestamp format would overflow
+    /// it will wrap.
     pub const fn from_rfc4122(ticks: u64, counter: u16) -> Self {
         #[cfg(not(any(feature = "v1", feature = "v6")))]
         {
@@ -89,6 +94,11 @@ impl Timestamp {
     }
 
     /// Construct a `Timestamp` from a Unix timestamp, as used in version 7 UUIDs.
+    ///
+    /// # Overflow
+    ///
+    /// If conversion from RFC4122 ticks to the internal timestamp format would overflow
+    /// it will wrap.
     pub fn from_unix(context: impl ClockSequence<Output = u16>, seconds: u64, nanos: u32) -> Self {
         #[cfg(not(any(feature = "v1", feature = "v6")))]
         {
@@ -110,6 +120,11 @@ impl Timestamp {
 
     /// Get the value of the timestamp as an RFC4122 timestamp and counter,
     /// as used in versions 1 and 6 UUIDs.
+    ///
+    /// # Overflow
+    ///
+    /// If conversion from RFC4122 ticks to the internal timestamp format would overflow
+    /// it will wrap.
     #[cfg(any(feature = "v1", feature = "v6"))]
     pub const fn to_rfc4122(&self) -> (u64, u16) {
         (
@@ -119,38 +134,37 @@ impl Timestamp {
     }
 
     /// Get the value of the timestamp as a Unix timestamp, as used in version 7 UUIDs.
+    ///
+    /// # Overflow
+    ///
+    /// If conversion from RFC4122 ticks to the internal timestamp format would overflow
+    /// it will wrap.
     pub const fn to_unix(&self) -> (u64, u32) {
         (self.seconds, self.nanos)
     }
 
     #[cfg(any(feature = "v1", feature = "v6"))]
     const fn unix_to_rfc4122_ticks(seconds: u64, nanos: u32) -> u64 {
-        let ticks = UUID_TICKS_BETWEEN_EPOCHS + seconds * 10_000_000 + nanos as u64 / 100;
-
-        ticks
+        UUID_TICKS_BETWEEN_EPOCHS
+            .wrapping_add(seconds.wrapping_mul(10_000_000))
+            .wrapping_add(nanos as u64 / 100)
     }
 
     const fn rfc4122_to_unix(ticks: u64) -> (u64, u32) {
         (
-            (ticks - UUID_TICKS_BETWEEN_EPOCHS) / 10_000_000,
-            ((ticks - UUID_TICKS_BETWEEN_EPOCHS) % 10_000_000) as u32 * 100,
+            ticks.wrapping_sub(UUID_TICKS_BETWEEN_EPOCHS) / 10_000_000,
+            (ticks.wrapping_sub(UUID_TICKS_BETWEEN_EPOCHS) % 10_000_000) as u32 * 100,
         )
     }
 
-    #[deprecated(note = "use `to_unix` instead")]
+    #[deprecated(note = "use `to_unix` instead; this method will be removed in a future release")]
     /// Get the number of fractional nanoseconds in the Unix timestamp.
     ///
     /// This method is deprecated and probably doesn't do what you're expecting it to.
     /// It doesn't return the timestamp as nanoseconds since the Unix epoch, it returns
     /// the fractional seconds of the timestamp.
     pub const fn to_unix_nanos(&self) -> u32 {
-        // NOTE: This method never did what it said on the tin: instead of
-        // converting the timestamp into nanos it simply returned the nanoseconds
-        // part of the timestamp.
-        //
-        // We can't fix the behavior because the return type is too small to fit
-        // a useful value for nanoseconds since the epoch.
-        self.nanos
+        panic!("`Timestamp::to_unix_nanos` is deprecated and will be removed: use `Timestamp::to_unix` instead")
     }
 }
 
@@ -190,7 +204,6 @@ pub(crate) const fn decode_rfc4122_timestamp(uuid: &Uuid) -> (u64, u16) {
     (ticks, counter)
 }
 
-#[cfg(uuid_unstable)]
 pub(crate) const fn encode_sorted_rfc4122_timestamp(
     ticks: u64,
     counter: u16,
@@ -214,7 +227,6 @@ pub(crate) const fn encode_sorted_rfc4122_timestamp(
     Uuid::from_fields(time_high, time_mid, time_low_and_version, &d4)
 }
 
-#[cfg(uuid_unstable)]
 pub(crate) const fn decode_sorted_rfc4122_timestamp(uuid: &Uuid) -> (u64, u16) {
     let bytes = uuid.as_bytes();
 
@@ -232,13 +244,12 @@ pub(crate) const fn decode_sorted_rfc4122_timestamp(uuid: &Uuid) -> (u64, u16) {
     (ticks, counter)
 }
 
-#[cfg(uuid_unstable)]
 pub(crate) const fn encode_unix_timestamp_millis(millis: u64, random_bytes: &[u8; 10]) -> Uuid {
     let millis_high = ((millis >> 16) & 0xFFFF_FFFF) as u32;
     let millis_low = (millis & 0xFFFF) as u16;
 
     let random_and_version =
-        (random_bytes[0] as u16 | ((random_bytes[1] as u16) << 8) & 0x0FFF) | (0x7 << 12);
+        (random_bytes[1] as u16 | ((random_bytes[0] as u16) << 8) & 0x0FFF) | (0x7 << 12);
 
     let mut d4 = [0; 8];
 
@@ -254,7 +265,6 @@ pub(crate) const fn encode_unix_timestamp_millis(millis: u64, random_bytes: &[u8
     Uuid::from_fields(millis_high, millis_low, random_and_version, &d4)
 }
 
-#[cfg(uuid_unstable)]
 pub(crate) const fn decode_unix_timestamp_millis(uuid: &Uuid) -> u64 {
     let bytes = uuid.as_bytes();
 
@@ -268,29 +278,48 @@ pub(crate) const fn decode_unix_timestamp_millis(uuid: &Uuid) -> u64 {
     millis
 }
 
-#[cfg(all(feature = "std", feature = "js", target_arch = "wasm32"))]
+#[cfg(all(
+    feature = "std",
+    feature = "js",
+    all(
+        target_arch = "wasm32",
+        target_vendor = "unknown",
+        target_os = "unknown"
+    )
+))]
 fn now() -> (u64, u32) {
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     extern "C" {
-        #[wasm_bindgen(js_namespace = Date)]
-        fn now() -> f64;
+        // NOTE: This signature works around https://bugzilla.mozilla.org/show_bug.cgi?id=1787770
+        #[wasm_bindgen(js_namespace = Date, catch)]
+        fn now() -> Result<f64, JsValue>;
     }
 
-    let now = now();
+    let now = now().unwrap_throw();
 
     let secs = (now / 1_000.0) as u64;
     let nanos = ((now % 1_000.0) * 1_000_000.0) as u32;
 
-    dbg!((secs, nanos))
+    (secs, nanos)
 }
 
-#[cfg(all(feature = "std", any(not(feature = "js"), not(target_arch = "wasm32"))))]
+#[cfg(all(
+    feature = "std",
+    any(
+        not(feature = "js"),
+        not(all(
+            target_arch = "wasm32",
+            target_vendor = "unknown",
+            target_os = "unknown"
+        ))
+    )
+))]
 fn now() -> (u64, u32) {
-    let dur = std::time::SystemTime::UNIX_EPOCH
-        .elapsed()
-        .expect("Getting elapsed time since UNIX_EPOCH. If this fails, we've somehow violated causality");
+    let dur = std::time::SystemTime::UNIX_EPOCH.elapsed().expect(
+        "Getting elapsed time since UNIX_EPOCH. If this fails, we've somehow violated causality",
+    );
 
     (dur.as_secs(), dur.subsec_nanos())
 }
@@ -403,7 +432,37 @@ pub mod context {
             // increment the clock sequence we want to wrap once it becomes larger
             // than what we can represent in a "u14". Otherwise there'd be patches
             // where the clock sequence doesn't change regardless of the timestamp
-            self.count.fetch_add(1, Ordering::AcqRel) % (u16::MAX >> 2)
+            self.count.fetch_add(1, Ordering::AcqRel) & (u16::MAX >> 2)
         }
+    }
+}
+
+#[cfg(all(test, any(feature = "v1", feature = "v6")))]
+mod tests {
+    use super::*;
+
+    #[cfg(all(
+        target_arch = "wasm32",
+        target_vendor = "unknown",
+        target_os = "unknown"
+    ))]
+    use wasm_bindgen_test::*;
+
+    #[test]
+    #[cfg_attr(
+        all(
+            target_arch = "wasm32",
+            target_vendor = "unknown",
+            target_os = "unknown"
+        ),
+        wasm_bindgen_test
+    )]
+    fn rfc4122_unix_does_not_panic() {
+        // Ensure timestamp conversions never panic
+        Timestamp::unix_to_rfc4122_ticks(u64::MAX, 0);
+        Timestamp::unix_to_rfc4122_ticks(0, u32::MAX);
+        Timestamp::unix_to_rfc4122_ticks(u64::MAX, u32::MAX);
+
+        Timestamp::rfc4122_to_unix(u64::MAX);
     }
 }

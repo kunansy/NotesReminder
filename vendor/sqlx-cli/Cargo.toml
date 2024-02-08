@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "sqlx-cli"
-version = "0.6.3"
+version = "0.7.3"
 authors = [
     "Jesper Axelsson <jesperaxe@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
@@ -64,11 +64,15 @@ features = ["clock"]
 default-features = false
 
 [dependencies.clap]
-version = "3.1.0"
+version = "4.3.10"
 features = [
     "derive",
     "env",
 ]
+
+[dependencies.clap_complete]
+version = "4.3.1"
+optional = true
 
 [dependencies.console]
 version = "0.15.0"
@@ -92,9 +96,6 @@ optional = true
 [dependencies.promptly]
 version = "0.3.0"
 
-[dependencies.remove_dir_all]
-version = "0.7.0"
-
 [dependencies.serde]
 version = "1.0.132"
 features = ["derive"]
@@ -103,11 +104,11 @@ features = ["derive"]
 version = "1.0.73"
 
 [dependencies.sqlx]
-version = "0.6.3"
+version = "=0.7.3"
 features = [
+    "runtime-tokio",
     "migrate",
     "any",
-    "offline",
 ]
 default-features = false
 
@@ -123,12 +124,17 @@ features = [
 version = "2.2.2"
 default-features = false
 
+[dev-dependencies.assert_cmd]
+version = "2.0.11"
+
 [features]
+completions = ["dep:clap_complete"]
 default = [
     "postgres",
     "sqlite",
     "mysql",
     "native-tls",
+    "completions",
 ]
 mysql = ["sqlx/mysql"]
 native-tls = ["sqlx/runtime-tokio-native-tls"]

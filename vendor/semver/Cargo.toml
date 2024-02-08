@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.31"
 name = "semver"
-version = "1.0.17"
+version = "1.0.21"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Parser and evaluator for Cargo's flavor of Semantic Versioning"
 documentation = "https://docs.rs/semver"
@@ -30,6 +30,7 @@ repository = "https://github.com/dtolnay/semver"
 rustdoc-args = [
     "--cfg",
     "doc_cfg",
+    "--generate-link-to-definition",
 ]
 targets = ["x86_64-unknown-linux-gnu"]
 
@@ -37,7 +38,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 doc-scrape-examples = false
 
 [dependencies.serde]
-version = "1.0"
+version = "1.0.194"
 optional = true
 default-features = false
 

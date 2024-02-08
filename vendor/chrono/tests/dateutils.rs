@@ -1,10 +1,8 @@
-use chrono::offset::TimeZone;
-use chrono::Local;
-use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
+#![cfg(all(unix, feature = "clock", feature = "std"))]
 
-use std::{path, process};
+use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Timelike};
+use std::{path, process, thread};
 
-#[cfg(unix)]
 fn verify_against_date_command_local(path: &'static str, dt: NaiveDateTime) {
     let output = process::Command::new(path)
         .arg("-d")
@@ -48,30 +46,61 @@ fn verify_against_date_command_local(path: &'static str, dt: NaiveDateTime) {
     }
 }
 
-#[test]
-#[cfg(unix)]
-fn try_verify_against_date_command() {
-    let date_path = "/usr/bin/date";
+/// path to Unix `date` command. Should work on most Linux and Unixes. Not the
+/// path for MacOS (/bin/date) which uses a different version of `date` with
+/// different arguments (so it won't run which is okay).
+/// for testing only
+#[allow(dead_code)]
+#[cfg(not(target_os = "aix"))]
+const DATE_PATH: &str = "/usr/bin/date";
+#[allow(dead_code)]
+#[cfg(target_os = "aix")]
+const DATE_PATH: &str = "/opt/freeware/bin/date";
 
-    if !path::Path::new(date_path).exists() {
-        // date command not found, skipping
-        // avoid running this on macOS, which has path /bin/date
-        // as the required CLI arguments are not present in the
-        // macOS build.
+#[cfg(test)]
+/// test helper to sanity check the date command behaves as expected
+/// asserts the command succeeded
+fn assert_run_date_version() {
+    // note environment variable `LANG`
+    match std::env::var_os("LANG") {
+        Some(lang) => eprintln!("LANG: {:?}", lang),
+        None => eprintln!("LANG not set"),
+    }
+    let out = process::Command::new(DATE_PATH).arg("--version").output().unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    // note the `date` binary version
+    eprintln!("command: {:?} --version\nstdout: {:?}\nstderr: {:?}", DATE_PATH, stdout, stderr);
+    assert!(out.status.success(), "command failed: {:?} --version", DATE_PATH);
+}
+
+#[test]
+fn try_verify_against_date_command() {
+    if !path::Path::new(DATE_PATH).exists() {
+        eprintln!("date command {:?} not found, skipping", DATE_PATH);
         return;
     }
+    assert_run_date_version();
 
-    let mut date = NaiveDate::from_ymd_opt(1975, 1, 1).unwrap().and_hms_opt(0, 0, 0).unwrap();
+    eprintln!(
+        "Run command {:?} for every hour from 1975 to 2077, skipping some years...",
+        DATE_PATH,
+    );
 
-    while date.year() < 2078 {
-        if (1975..=1977).contains(&date.year())
-            || (2020..=2022).contains(&date.year())
-            || (2073..=2077).contains(&date.year())
-        {
-            verify_against_date_command_local(date_path, date);
-        }
-
-        date += chrono::Duration::hours(1);
+    let mut children = vec![];
+    for year in [1975, 1976, 1977, 2020, 2021, 2022, 2073, 2074, 2075, 2076, 2077].iter() {
+        children.push(thread::spawn(|| {
+            let mut date = NaiveDate::from_ymd_opt(*year, 1, 1).unwrap().and_time(NaiveTime::MIN);
+            let end = NaiveDate::from_ymd_opt(*year + 1, 1, 1).unwrap().and_time(NaiveTime::MIN);
+            while date <= end {
+                verify_against_date_command_local(DATE_PATH, date);
+                date += chrono::Duration::hours(1);
+            }
+        }));
+    }
+    for child in children {
+        // Wait for the thread to finish. Returns a result.
+        let _ = child.join();
     }
 }
 
@@ -91,6 +120,8 @@ fn verify_against_date_command_format_local(path: &'static str, dt: NaiveDateTim
     // Z%Z - too many ways to represent it, will most likely fail
 
     let output = process::Command::new(path)
+        .env("LANG", "c")
+        .env("LC_ALL", "c")
         .arg("-d")
         .arg(format!(
             "{}-{:02}-{:02} {:02}:{:02}:{:02}",
@@ -117,15 +148,15 @@ fn verify_against_date_command_format_local(path: &'static str, dt: NaiveDateTim
 #[test]
 #[cfg(target_os = "linux")]
 fn try_verify_against_date_command_format() {
-    let date_path = "/usr/bin/date";
-
-    if !path::Path::new(date_path).exists() {
-        // date command not found, skipping
+    if !path::Path::new(DATE_PATH).exists() {
+        eprintln!("date command {:?} not found, skipping", DATE_PATH);
         return;
     }
+    assert_run_date_version();
+
     let mut date = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap().and_hms_opt(12, 11, 13).unwrap();
     while date.year() < 2008 {
-        verify_against_date_command_format_local(date_path, date);
+        verify_against_date_command_format_local(DATE_PATH, date);
         date += chrono::Duration::days(55);
     }
 }

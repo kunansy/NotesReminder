@@ -92,7 +92,7 @@
 //! [prettyplease]: https://github.com/dtolnay/prettyplease
 
 // Quote types in rustdoc of other crates get linked to here.
-#![doc(html_root_url = "https://docs.rs/quote/1.0.27")]
+#![doc(html_root_url = "https://docs.rs/quote/1.0.35")]
 #![allow(
     clippy::doc_markdown,
     clippy::missing_errors_doc,
@@ -102,10 +102,9 @@
     clippy::wrong_self_convention,
 )]
 
-#[cfg(all(
-    not(all(target_arch = "wasm32", target_os = "unknown")),
-    feature = "proc-macro"
-))]
+extern crate alloc;
+
+#[cfg(feature = "proc-macro")]
 extern crate proc_macro;
 
 mod ext;
@@ -429,7 +428,7 @@ pub mod spanned;
 /// appears suffixed as integer literals by interpolating them as [`syn::Index`]
 /// instead.
 ///
-/// [`syn::Index`]: https://docs.rs/syn/1.0/syn/struct.Index.html
+/// [`syn::Index`]: https://docs.rs/syn/2.0/syn/struct.Index.html
 ///
 /// ```compile_fail
 /// let i = 0usize..self.fields.len();

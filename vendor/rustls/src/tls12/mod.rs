@@ -1,14 +1,14 @@
 use crate::cipher::{MessageDecrypter, MessageEncrypter};
-use crate::conn::{CommonState, ConnectionRandoms, Side};
-use crate::enums::{CipherSuite, SignatureScheme};
+use crate::common_state::{CommonState, Side};
+use crate::conn::ConnectionRandoms;
+use crate::enums::{AlertDescription, CipherSuite, SignatureScheme};
+use crate::error::{Error, InvalidMessage};
 use crate::kx;
 use crate::msgs::codec::{Codec, Reader};
-use crate::msgs::enums::{AlertDescription, ContentType};
 use crate::msgs::handshake::KeyExchangeAlgorithm;
 use crate::suites::{BulkAlgorithm, CipherSuiteCommon, SupportedCipherSuite};
 #[cfg(feature = "secret_extraction")]
 use crate::suites::{ConnectionTrafficSecrets, PartiallyExtractedSecrets};
-use crate::Error;
 
 use ring::aead;
 use ring::digest::Digest;
@@ -171,7 +171,7 @@ impl Tls12CipherSuite {
     }
 
     /// Which hash function to use with this suite.
-    pub fn hash_algorithm(&self) -> &'static ring::digest::Algorithm {
+    pub(crate) fn hash_algorithm(&self) -> &'static ring::digest::Algorithm {
         self.hmac_algorithm.digest_algorithm()
     }
 }
@@ -234,7 +234,6 @@ impl ConnectionSecrets {
                 label.as_bytes(),
                 seed.as_ref(),
             );
-            Ok(())
         })?;
 
         Ok(ret)
@@ -313,8 +312,7 @@ impl ConnectionSecrets {
         let len =
             (common.aead_algorithm.key_len() + suite.fixed_iv_len) * 2 + suite.explicit_nonce_len;
 
-        let mut out = Vec::new();
-        out.resize(len, 0u8);
+        let mut out = vec![0u8; len];
 
         // NOTE: opposite order to above for no good reason.
         // Don't design security protocols on drugs, kids.
@@ -341,8 +339,7 @@ impl ConnectionSecrets {
     }
 
     fn make_verify_data(&self, handshake_hash: &Digest, label: &[u8]) -> Vec<u8> {
-        let mut out = Vec::new();
-        out.resize(12, 0u8);
+        let mut out = vec![0u8; 12];
 
         prf::prf(
             &mut out,
@@ -383,7 +380,7 @@ impl ConnectionSecrets {
             &self.master_secret,
             label,
             &randoms,
-        )
+        );
     }
 
     #[cfg(feature = "secret_extraction")]
@@ -498,18 +495,14 @@ pub(crate) fn decode_ecdh_params<T: Codec>(
     common: &mut CommonState,
     kx_params: &[u8],
 ) -> Result<T, Error> {
-    decode_ecdh_params_::<T>(kx_params).ok_or_else(|| {
-        common.send_fatal_alert(AlertDescription::DecodeError);
-        Error::CorruptMessagePayload(ContentType::Handshake)
-    })
-}
-
-fn decode_ecdh_params_<T: Codec>(kx_params: &[u8]) -> Option<T> {
     let mut rd = Reader::init(kx_params);
     let ecdh_params = T::read(&mut rd)?;
     match rd.any_left() {
-        false => Some(ecdh_params),
-        true => None,
+        false => Ok(ecdh_params),
+        true => Err(common.send_fatal_alert(
+            AlertDescription::DecodeError,
+            InvalidMessage::InvalidDhParams,
+        )),
     }
 }
 
@@ -518,6 +511,7 @@ pub(crate) const DOWNGRADE_SENTINEL: [u8; 8] = [0x44, 0x4f, 0x57, 0x4e, 0x47, 0x
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common_state::{CommonState, Side};
     use crate::msgs::handshake::{ClientECDHParams, ServerECDHParams};
 
     #[test]
@@ -527,11 +521,14 @@ mod tests {
         let mut server_buf = Vec::new();
         server_params.encode(&mut server_buf);
         server_buf.push(34);
-        assert!(decode_ecdh_params_::<ServerECDHParams>(&server_buf).is_none());
+
+        let mut common = CommonState::new(Side::Client);
+        assert!(decode_ecdh_params::<ServerECDHParams>(&mut common, &server_buf).is_err());
     }
 
     #[test]
     fn client_ecdhe_invalid() {
-        assert!(decode_ecdh_params_::<ClientECDHParams>(&[34]).is_none());
+        let mut common = CommonState::new(Side::Server);
+        assert!(decode_ecdh_params::<ClientECDHParams>(&mut common, &[34]).is_err());
     }
 }

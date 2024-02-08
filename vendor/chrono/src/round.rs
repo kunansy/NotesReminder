@@ -1,8 +1,10 @@
 // This is a part of Chrono.
 // See README.md and LICENSE.txt for details.
 
+//! Functionality for rounding or truncating a `DateTime` by a `Duration`.
+
 use crate::datetime::DateTime;
-use crate::oldtime::Duration;
+use crate::duration::Duration;
 use crate::NaiveDateTime;
 use crate::TimeZone;
 use crate::Timelike;
@@ -24,7 +26,7 @@ pub trait SubsecRound {
     ///
     /// # Example
     /// ``` rust
-    /// # use chrono::{DateTime, SubsecRound, Timelike, TimeZone, Utc, NaiveDate};
+    /// # use chrono::{SubsecRound, Timelike, Utc, NaiveDate};
     /// let dt = NaiveDate::from_ymd_opt(2018, 1, 11).unwrap().and_hms_milli_opt(12, 0, 0, 154).unwrap().and_local_timezone(Utc).unwrap();
     /// assert_eq!(dt.round_subsecs(2).nanosecond(), 150_000_000);
     /// assert_eq!(dt.round_subsecs(1).nanosecond(), 200_000_000);
@@ -36,7 +38,7 @@ pub trait SubsecRound {
     ///
     /// # Example
     /// ``` rust
-    /// # use chrono::{DateTime, SubsecRound, Timelike, TimeZone, Utc, NaiveDate};
+    /// # use chrono::{SubsecRound, Timelike, Utc, NaiveDate};
     /// let dt = NaiveDate::from_ymd_opt(2018, 1, 11).unwrap().and_hms_milli_opt(12, 0, 0, 154).unwrap().and_local_timezone(Utc).unwrap();
     /// assert_eq!(dt.trunc_subsecs(2).nanosecond(), 150_000_000);
     /// assert_eq!(dt.trunc_subsecs(1).nanosecond(), 100_000_000);
@@ -75,7 +77,7 @@ where
 }
 
 // Return the maximum span in nanoseconds for the target number of digits.
-fn span_for_digits(digits: u16) -> u32 {
+const fn span_for_digits(digits: u16) -> u32 {
     // fast lookup form of: 10^(9-min(9,digits))
     match digits {
         0 => 1_000_000_000,
@@ -100,18 +102,18 @@ fn span_for_digits(digits: u16) -> u32 {
 /// will also fail if the `Duration` is bigger than the timestamp.
 pub trait DurationRound: Sized {
     /// Error that can occur in rounding or truncating
-    #[cfg(any(feature = "std", test))]
+    #[cfg(feature = "std")]
     type Err: std::error::Error;
 
     /// Error that can occur in rounding or truncating
-    #[cfg(not(any(feature = "std", test)))]
+    #[cfg(not(feature = "std"))]
     type Err: fmt::Debug + fmt::Display;
 
     /// Return a copy rounded by Duration.
     ///
     /// # Example
     /// ``` rust
-    /// # use chrono::{DateTime, DurationRound, Duration, TimeZone, Utc, NaiveDate};
+    /// # use chrono::{DurationRound, Duration, Utc, NaiveDate};
     /// let dt = NaiveDate::from_ymd_opt(2018, 1, 11).unwrap().and_hms_milli_opt(12, 0, 0, 154).unwrap().and_local_timezone(Utc).unwrap();
     /// assert_eq!(
     ///     dt.duration_round(Duration::milliseconds(10)).unwrap().to_string(),
@@ -128,7 +130,7 @@ pub trait DurationRound: Sized {
     ///
     /// # Example
     /// ``` rust
-    /// # use chrono::{DateTime, DurationRound, Duration, TimeZone, Utc, NaiveDate};
+    /// # use chrono::{DurationRound, Duration, Utc, NaiveDate};
     /// let dt = NaiveDate::from_ymd_opt(2018, 1, 11).unwrap().and_hms_milli_opt(12, 0, 0, 154).unwrap().and_local_timezone(Utc).unwrap();
     /// assert_eq!(
     ///     dt.duration_trunc(Duration::milliseconds(10)).unwrap().to_string(),
@@ -141,9 +143,6 @@ pub trait DurationRound: Sized {
     /// ```
     fn duration_trunc(self, duration: Duration) -> Result<Self, Self::Err>;
 }
-
-/// The maximum number of seconds a DateTime can be to be represented as nanoseconds
-const MAX_SECONDS_TIMESTAMP_FOR_NANOS: i64 = 9_223_372_036;
 
 impl<Tz: TimeZone> DurationRound for DateTime<Tz> {
     type Err = RoundingError;
@@ -178,10 +177,10 @@ where
     T: Timelike + Add<Duration, Output = T> + Sub<Duration, Output = T>,
 {
     if let Some(span) = duration.num_nanoseconds() {
-        if naive.timestamp().abs() > MAX_SECONDS_TIMESTAMP_FOR_NANOS {
-            return Err(RoundingError::TimestampExceedsLimit);
+        if span < 0 {
+            return Err(RoundingError::DurationExceedsLimit);
         }
-        let stamp = naive.timestamp_nanos();
+        let stamp = naive.timestamp_nanos_opt().ok_or(RoundingError::TimestampExceedsLimit)?;
         if span > stamp.abs() {
             return Err(RoundingError::DurationExceedsTimestamp);
         }
@@ -217,10 +216,10 @@ where
     T: Timelike + Add<Duration, Output = T> + Sub<Duration, Output = T>,
 {
     if let Some(span) = duration.num_nanoseconds() {
-        if naive.timestamp().abs() > MAX_SECONDS_TIMESTAMP_FOR_NANOS {
-            return Err(RoundingError::TimestampExceedsLimit);
+        if span < 0 {
+            return Err(RoundingError::DurationExceedsLimit);
         }
-        let stamp = naive.timestamp_nanos();
+        let stamp = naive.timestamp_nanos_opt().ok_or(RoundingError::TimestampExceedsLimit)?;
         if span > stamp.abs() {
             return Err(RoundingError::DurationExceedsTimestamp);
         }
@@ -243,7 +242,7 @@ pub enum RoundingError {
     /// Error when the Duration exceeds the Duration from or until the Unix epoch.
     ///
     /// ``` rust
-    /// # use chrono::{DateTime, DurationRound, Duration, RoundingError, TimeZone, Utc};
+    /// # use chrono::{DurationRound, Duration, RoundingError, TimeZone, Utc};
     /// let dt = Utc.with_ymd_and_hms(1970, 12, 12, 0, 0, 0).unwrap();
     ///
     /// assert_eq!(
@@ -256,7 +255,7 @@ pub enum RoundingError {
     /// Error when `Duration.num_nanoseconds` exceeds the limit.
     ///
     /// ``` rust
-    /// # use chrono::{DateTime, DurationRound, Duration, RoundingError, TimeZone, Utc, NaiveDate};
+    /// # use chrono::{DurationRound, Duration, RoundingError, Utc, NaiveDate};
     /// let dt = NaiveDate::from_ymd_opt(2260, 12, 31).unwrap().and_hms_nano_opt(23, 59, 59, 1_75_500_000).unwrap().and_local_timezone(Utc).unwrap();
     ///
     /// assert_eq!(
@@ -269,7 +268,7 @@ pub enum RoundingError {
     /// Error when `DateTime.timestamp_nanos` exceeds the limit.
     ///
     /// ``` rust
-    /// # use chrono::{DateTime, DurationRound, Duration, RoundingError, TimeZone, Utc};
+    /// # use chrono::{DurationRound, Duration, RoundingError, TimeZone, Utc};
     /// let dt = Utc.with_ymd_and_hms(2300, 12, 12, 0, 0, 0).unwrap();
     ///
     /// assert_eq!(dt.duration_round(Duration::days(1)), Err(RoundingError::TimestampExceedsLimit),);
@@ -293,8 +292,7 @@ impl fmt::Display for RoundingError {
     }
 }
 
-#[cfg(any(feature = "std", test))]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[cfg(feature = "std")]
 impl std::error::Error for RoundingError {
     #[allow(deprecated)]
     fn description(&self) -> &str {
@@ -304,10 +302,10 @@ impl std::error::Error for RoundingError {
 
 #[cfg(test)]
 mod tests {
-    use super::{Duration, DurationRound, SubsecRound};
+    use super::{Duration, DurationRound, RoundingError, SubsecRound};
     use crate::offset::{FixedOffset, TimeZone, Utc};
-    use crate::NaiveDate;
     use crate::Timelike;
+    use crate::{NaiveDate, NaiveDateTime};
 
     #[test]
     fn test_round_subsecs() {
@@ -759,5 +757,20 @@ mod tests {
             dt.duration_trunc(Duration::minutes(10)).unwrap().to_string(),
             "1969-12-12 12:10:00 UTC"
         );
+    }
+
+    #[test]
+    fn issue1010() {
+        let dt = NaiveDateTime::from_timestamp_opt(-4_227_854_320, 678_774_288).unwrap();
+        let span = Duration::microseconds(-7_019_067_213_869_040);
+        assert_eq!(dt.duration_trunc(span), Err(RoundingError::DurationExceedsLimit));
+
+        let dt = NaiveDateTime::from_timestamp_opt(320_041_586, 920_103_021).unwrap();
+        let span = Duration::nanoseconds(-8_923_838_508_697_114_584);
+        assert_eq!(dt.duration_round(span), Err(RoundingError::DurationExceedsLimit));
+
+        let dt = NaiveDateTime::from_timestamp_opt(-2_621_440, 0).unwrap();
+        let span = Duration::nanoseconds(-9_223_372_036_854_771_421);
+        assert_eq!(dt.duration_round(span), Err(RoundingError::DurationExceedsLimit));
     }
 }

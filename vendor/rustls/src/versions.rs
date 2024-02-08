@@ -8,6 +8,7 @@ use crate::enums::ProtocolVersion;
 /// the [`ALL_VERSIONS`] array, as well as individually as [`TLS12`]
 /// and [`TLS13`].
 #[derive(Eq, PartialEq)]
+#[allow(clippy::manual_non_exhaustive)] // Fixed in main
 pub struct SupportedProtocolVersion {
     /// The TLS enumeration naming this version.
     pub version: ProtocolVersion,
@@ -59,10 +60,10 @@ impl fmt::Debug for EnabledVersions {
         let mut list = &mut f.debug_list();
         #[cfg(feature = "tls12")]
         if let Some(v) = self.tls12 {
-            list = list.entry(v)
+            list = list.entry(v);
         }
         if let Some(v) = self.tls13 {
-            list = list.entry(v)
+            list = list.entry(v);
         }
         list.finish()
     }

@@ -34,6 +34,7 @@ extern "C" {
     fn js_test_option_classes();
     fn js_test_inspectable_classes();
     fn js_test_inspectable_classes_can_override_generated_methods();
+    fn js_test_class_defined_in_macro();
 }
 
 #[wasm_bindgen_test]
@@ -599,12 +600,36 @@ impl OverriddenInspectable {
     }
 
     #[wasm_bindgen(js_name = toJSON)]
-    pub fn to_json(&self) -> String {
+    pub fn js_to_json(&self) -> String {
         String::from("JSON was overwritten")
     }
 
     #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> String {
+    pub fn js_to_string(&self) -> String {
         String::from("string was overwritten")
     }
+}
+
+macro_rules! make_struct {
+    ($field:ident) => {
+        #[wasm_bindgen]
+        pub struct InsideMacro {
+            pub $field: u32,
+        }
+    };
+}
+
+make_struct!(a);
+
+#[wasm_bindgen]
+impl InsideMacro {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self { a: 3 }
+    }
+}
+
+#[wasm_bindgen_test]
+fn class_defined_in_macro() {
+    js_test_class_defined_in_macro();
 }

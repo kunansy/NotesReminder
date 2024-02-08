@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![allow(clippy::all)]
 use super::*;
 use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
@@ -48,7 +49,7 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &::js_sys::Object,
         key: &CryptoKey,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = decrypt)]
@@ -61,7 +62,7 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &str,
         key: &CryptoKey,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = deriveBits)]
@@ -180,7 +181,7 @@ extern "C" {
     pub fn digest_with_object_and_u8_array(
         this: &SubtleCrypto,
         algorithm: &::js_sys::Object,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = digest)]
     #[doc = "The `digest()` method."]
@@ -191,7 +192,7 @@ extern "C" {
     pub fn digest_with_str_and_u8_array(
         this: &SubtleCrypto,
         algorithm: &str,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = encrypt)]
@@ -230,7 +231,7 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &::js_sys::Object,
         key: &CryptoKey,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = encrypt)]
@@ -243,7 +244,7 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &str,
         key: &CryptoKey,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = exportKey)]
@@ -346,7 +347,7 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &::js_sys::Object,
         key: &CryptoKey,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = sign)]
@@ -359,7 +360,7 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &str,
         key: &CryptoKey,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = unwrapKey)]
@@ -388,7 +389,7 @@ extern "C" {
     pub fn unwrap_key_with_u8_array_and_object_and_object(
         this: &SubtleCrypto,
         format: &str,
-        wrapped_key: &mut [u8],
+        wrapped_key: &[u8],
         unwrapping_key: &CryptoKey,
         unwrap_algorithm: &::js_sys::Object,
         unwrapped_key_algorithm: &::js_sys::Object,
@@ -422,7 +423,7 @@ extern "C" {
     pub fn unwrap_key_with_u8_array_and_str_and_object(
         this: &SubtleCrypto,
         format: &str,
-        wrapped_key: &mut [u8],
+        wrapped_key: &[u8],
         unwrapping_key: &CryptoKey,
         unwrap_algorithm: &str,
         unwrapped_key_algorithm: &::js_sys::Object,
@@ -456,7 +457,7 @@ extern "C" {
     pub fn unwrap_key_with_u8_array_and_object_and_str(
         this: &SubtleCrypto,
         format: &str,
-        wrapped_key: &mut [u8],
+        wrapped_key: &[u8],
         unwrapping_key: &CryptoKey,
         unwrap_algorithm: &::js_sys::Object,
         unwrapped_key_algorithm: &str,
@@ -490,7 +491,7 @@ extern "C" {
     pub fn unwrap_key_with_u8_array_and_str_and_str(
         this: &SubtleCrypto,
         format: &str,
-        wrapped_key: &mut [u8],
+        wrapped_key: &[u8],
         unwrapping_key: &CryptoKey,
         unwrap_algorithm: &str,
         unwrapped_key_algorithm: &str,
@@ -536,7 +537,7 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &::js_sys::Object,
         key: &CryptoKey,
-        signature: &mut [u8],
+        signature: &[u8],
         data: &::js_sys::Object,
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
@@ -550,7 +551,7 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &str,
         key: &CryptoKey,
-        signature: &mut [u8],
+        signature: &[u8],
         data: &::js_sys::Object,
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
@@ -565,7 +566,7 @@ extern "C" {
         algorithm: &::js_sys::Object,
         key: &CryptoKey,
         signature: &::js_sys::Object,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = verify)]
@@ -579,7 +580,7 @@ extern "C" {
         algorithm: &str,
         key: &CryptoKey,
         signature: &::js_sys::Object,
-        data: &mut [u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = verify)]
@@ -592,8 +593,8 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &::js_sys::Object,
         key: &CryptoKey,
-        signature: &mut [u8],
-        data: &mut [u8],
+        signature: &[u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = verify)]
@@ -606,8 +607,8 @@ extern "C" {
         this: &SubtleCrypto,
         algorithm: &str,
         key: &CryptoKey,
-        signature: &mut [u8],
-        data: &mut [u8],
+        signature: &[u8],
+        data: &[u8],
     ) -> Result<::js_sys::Promise, JsValue>;
     #[cfg(feature = "CryptoKey")]
     # [wasm_bindgen (catch , method , structural , js_class = "SubtleCrypto" , js_name = wrapKey)]

@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
-use js_sys::Uint8Array;
-use wasm_bindgen::{throw_val, JsCast, JsValue};
+use js_sys::{Object, Uint8Array};
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
 use crate::util::{checked_cast_to_usize, clamp_to_u32, promise_to_void_future};
@@ -14,9 +14,6 @@ use super::{sys, IntoAsyncRead, ReadableStream};
 /// This is returned by the [`get_byob_reader`](ReadableStream::get_byob_reader) method.
 ///
 /// When the reader is dropped, it automatically [releases its lock](https://streams.spec.whatwg.org/#release-a-lock).
-/// If the reader still has a pending read request at this point (i.e. if a future returned
-/// by [`read`](Self::read) is not yet ready), then this will **panic**. You must either `await`
-/// all `read` futures, or [`cancel`](Self::cancel) the stream to discard any pending `read` futures.
 #[derive(Debug)]
 pub struct ReadableStreamBYOBReader<'stream> {
     raw: sys::ReadableStreamBYOBReader,
@@ -26,9 +23,14 @@ pub struct ReadableStreamBYOBReader<'stream> {
 impl<'stream> ReadableStreamBYOBReader<'stream> {
     pub(crate) fn new(stream: &mut ReadableStream) -> Result<Self, js_sys::Error> {
         Ok(Self {
-            raw: stream.as_raw().get_reader_with_options(
-                sys::ReadableStreamGetReaderOptions::new(sys::ReadableStreamReaderMode::BYOB),
-            )?,
+            raw: stream
+                .as_raw()
+                .unchecked_ref::<sys::ReadableStreamExt>()
+                .try_get_reader_with_options(
+                    sys::ReadableStreamGetReaderOptions::new()
+                        .mode(sys::ReadableStreamReaderMode::Byob),
+                )?
+                .unchecked_into(),
             _stream: PhantomData,
         })
     }
@@ -112,20 +114,18 @@ impl<'stream> ReadableStreamBYOBReader<'stream> {
         let buffer_len = buffer.byte_length();
         // Limit view to destination slice's length.
         let dst_len = clamp_to_u32(dst.len());
-        let view = buffer
-            .subarray(0, dst_len)
-            .unchecked_into::<sys::ArrayBufferView>();
+        let view = buffer.subarray(0, dst_len).unchecked_into::<Object>();
         // Read into view. This transfers `buffer.buffer()`.
-        let promise = self.as_raw().read(&view);
-        let js_value = JsFuture::from(promise).await?;
-        let result = sys::ReadableStreamBYOBReadResult::from(js_value);
-        let filled_view = match result.value() {
-            Some(view) => view,
-            None => {
-                // No new view was returned. The stream must have been canceled.
-                assert!(result.is_done());
-                return Ok((0, None));
-            }
+        let promise = self.as_raw().read_with_array_buffer_view(&view);
+        let js_result = JsFuture::from(promise).await?;
+        let result = sys::ReadableStreamReadResult::from(js_result);
+        let js_value = result.value();
+        let filled_view = if js_value.is_undefined() {
+            // No new view was returned. The stream must have been canceled.
+            assert!(result.is_done());
+            return Ok((0, None));
+        } else {
+            js_value.unchecked_into::<Uint8Array>()
         };
         let filled_len = checked_cast_to_usize(filled_view.byte_length());
         debug_assert!(filled_len <= dst.len());
@@ -146,29 +146,40 @@ impl<'stream> ReadableStreamBYOBReader<'stream> {
     /// [Releases](https://streams.spec.whatwg.org/#release-a-lock) this reader's lock on the
     /// corresponding stream.
     ///
-    /// **Panics** if the reader still has a pending read request, i.e. if a future returned
-    /// by [`read`](Self::read) is not yet ready. For a non-panicking variant,
-    /// use [`try_release_lock`](Self::try_release_lock).
+    /// [As of January 2022](https://github.com/whatwg/streams/commit/d5f92d9f17306d31ba6b27424d23d58e89bf64a5),
+    /// the Streams standard allows the lock to be released even when there are still pending read
+    /// requests. Such requests will automatically become rejected, and this function will always
+    /// succeed.
+    ///
+    /// However, if the Streams implementation is not yet up-to-date with this change, then
+    /// releasing the lock while there are pending read requests will **panic**. For a non-panicking
+    /// variant, use [`try_release_lock`](Self::try_release_lock).
     #[inline]
     pub fn release_lock(mut self) {
         self.release_lock_mut()
     }
 
     fn release_lock_mut(&mut self) {
-        self.as_raw()
-            .release_lock()
-            .unwrap_or_else(|error| throw_val(error.into()))
+        self.as_raw().release_lock()
     }
 
     /// Try to [release](https://streams.spec.whatwg.org/#release-a-lock) this reader's lock on the
     /// corresponding stream.
     ///
-    /// The lock cannot be released while the reader still has a pending read request, i.e.
-    /// if a future returned by [`read`](Self::read) is not yet ready. Attempting to do so will
+    /// [As of January 2022](https://github.com/whatwg/streams/commit/d5f92d9f17306d31ba6b27424d23d58e89bf64a5),
+    /// the Streams standard allows the lock to be released even when there are still pending read
+    /// requests. Such requests will automatically become rejected, and this function will always
+    /// return `Ok(())`.
+    ///
+    /// However, if the Streams implementation is not yet up-to-date with this change, then
+    /// the lock cannot be released while there are pending read requests. Attempting to do so will
     /// return an error and leave the reader locked to the stream.
     #[inline]
     pub fn try_release_lock(self) -> Result<(), (js_sys::Error, Self)> {
-        self.as_raw().release_lock().map_err(|error| (error, self))
+        self.as_raw()
+            .unchecked_ref::<sys::ReadableStreamReaderExt>()
+            .try_release_lock()
+            .map_err(|err| (err, self))
     }
 
     /// Converts this `ReadableStreamBYOBReader` into an [`AsyncRead`].
@@ -178,7 +189,7 @@ impl<'stream> ReadableStreamBYOBReader<'stream> {
     /// still usable. This allows reading only a few bytes from the `AsyncRead`, while still
     /// allowing another reader to read the remaining bytes later on.
     ///
-    /// [`AsyncRead`]: https://docs.rs/futures/0.3.18/futures/io/trait.AsyncRead.html
+    /// [`AsyncRead`]: https://docs.rs/futures/0.3.28/futures/io/trait.AsyncRead.html
     #[inline]
     pub fn into_async_read(self) -> IntoAsyncRead<'stream> {
         IntoAsyncRead::new(self, false)

@@ -56,10 +56,18 @@
 //!
 //! ### Platform support
 //!
-//! Rustls uses [`ring`](https://crates.io/crates/ring) for implementing the
-//! cryptography in TLS. As a result, rustls only runs on platforms
-//! [supported by `ring`](https://github.com/briansmith/ring#online-automated-testing).
-//! At the time of writing this means x86, x86-64, armv7, and aarch64.
+//! While Rustls itself is platform independent it uses
+//! [`ring`](https://crates.io/crates/ring) for implementing the cryptography in
+//! TLS. As a result, rustls only runs on platforms
+//! supported by `ring`. At the time of writing, this means 32-bit ARM, Aarch64 (64-bit ARM),
+//! x86, x86-64, LoongArch64, 32-bit & 64-bit Little Endian MIPS, 32-bit PowerPC (Big Endian),
+//! 64-bit PowerPC (Big and Little Endian), 64-bit RISC-V, and s390x. We do not presently
+//! support WebAssembly.
+//! For more information, see [the supported `ring` target platforms][ring-target-platforms].
+//!
+//! Rustls requires Rust 1.61 or later.
+//!
+//! [ring-target-platforms]: https://github.com/briansmith/ring/blob/2e8363b433fa3b3962c877d9ed2e9145612f3160/include/ring-core/target.h#L18-L64
 //!
 //! ## Design Overview
 //! ### Rustls does not take care of network IO
@@ -101,9 +109,8 @@
 //!
 //! ```rust,no_run
 //! let mut root_store = rustls::RootCertStore::empty();
-//! root_store.add_server_trust_anchors(
+//! root_store.add_trust_anchors(
 //!     webpki_roots::TLS_SERVER_ROOTS
-//!         .0
 //!         .iter()
 //!         .map(|ta| {
 //!             rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
@@ -133,11 +140,9 @@
 //! # use rustls;
 //! # use webpki;
 //! # use std::sync::Arc;
-//! # use std::convert::TryInto;
 //! # let mut root_store = rustls::RootCertStore::empty();
-//! # root_store.add_server_trust_anchors(
+//! # root_store.add_trust_anchors(
 //! #  webpki_roots::TLS_SERVER_ROOTS
-//! #      .0
 //! #      .iter()
 //! #      .map(|ta| {
 //! #          rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
@@ -167,7 +172,7 @@
 //! therefore call `client.process_new_packets()` which parses and processes the messages.
 //! Any error returned from `process_new_packets` is fatal to the connection, and will tell you
 //! why.  For example, if the server's certificate is expired `process_new_packets` will
-//! return `Err(WebPkiError(CertExpired, ValidateServerCert))`.  From this point on,
+//! return `Err(InvalidCertificate(Expired))`.  From this point on,
 //! `process_new_packets` will not do any new work and will return that error continually.
 //!
 //! You can extract newly received data by calling `client.reader()` (which implements the
@@ -260,7 +265,7 @@
 
 // Require docs for public APIs, deny unsafe code, etc.
 #![forbid(unsafe_code, unused_must_use)]
-#![cfg_attr(not(read_buf), forbid(unstable_features))]
+#![cfg_attr(not(any(read_buf, bench)), forbid(unstable_features))]
 #![deny(
     clippy::clone_on_ref_ptr,
     clippy::use_self,
@@ -300,6 +305,13 @@
 // is used to avoid needing `rustversion` to be compiled twice during
 // cross-compiling.
 #![cfg_attr(read_buf, feature(read_buf))]
+#![cfg_attr(read_buf, feature(core_io_borrowed_buf))]
+#![cfg_attr(bench, feature(test))]
+
+// Import `test` sysroot crate for `Bencher` definitions.
+#[cfg(bench)]
+#[allow(unused_extern_crates)]
+extern crate test;
 
 // log for logging (optional).
 #[cfg(feature = "logging")]
@@ -311,14 +323,15 @@ mod log {
     macro_rules! trace    ( ($($tt:tt)*) => {{}} );
     macro_rules! debug    ( ($($tt:tt)*) => {{}} );
     macro_rules! warn     ( ($($tt:tt)*) => {{}} );
-    macro_rules! error    ( ($($tt:tt)*) => {{}} );
 }
 
 #[macro_use]
 mod msgs;
 mod anchors;
 mod cipher;
+mod common_state;
 mod conn;
+mod dns_name;
 mod error;
 mod hash_hs;
 mod limited_cache;
@@ -357,6 +370,10 @@ pub mod internal {
     pub mod cipher {
         pub use crate::cipher::MessageDecrypter;
     }
+    /// Low-level TLS record layer functions.
+    pub mod record_layer {
+        pub use crate::record_layer::{Decrypted, RecordLayer};
+    }
 }
 
 // The public interface is:
@@ -364,29 +381,34 @@ pub use crate::anchors::{OwnedTrustAnchor, RootCertStore};
 pub use crate::builder::{
     ConfigBuilder, ConfigSide, WantsCipherSuites, WantsKxGroups, WantsVerifier, WantsVersions,
 };
-pub use crate::conn::{
-    CommonState, Connection, ConnectionCommon, IoState, Reader, SideData, Writer,
+pub use crate::common_state::{CommonState, IoState, Side};
+pub use crate::conn::{Connection, ConnectionCommon, Reader, SideData, Writer};
+pub use crate::enums::{
+    AlertDescription, CipherSuite, ContentType, HandshakeType, ProtocolVersion, SignatureAlgorithm,
+    SignatureScheme,
 };
-pub use crate::enums::{CipherSuite, ProtocolVersion, SignatureScheme};
-pub use crate::error::Error;
+pub use crate::error::{
+    CertRevocationListError, CertificateError, Error, InvalidMessage, PeerIncompatible,
+    PeerMisbehaved,
+};
 pub use crate::key::{Certificate, PrivateKey};
 pub use crate::key_log::{KeyLog, NoKeyLog};
 pub use crate::key_log_file::KeyLogFile;
 pub use crate::kx::{SupportedKxGroup, ALL_KX_GROUPS};
-pub use crate::msgs::enums::{
-    AlertDescription, ContentType, HandshakeType, NamedGroup, SignatureAlgorithm,
-};
-pub use crate::msgs::handshake::{DigitallySignedStruct, DistinguishedNames};
+pub use crate::msgs::enums::NamedGroup;
+pub use crate::msgs::handshake::DistinguishedName;
 pub use crate::stream::{Stream, StreamOwned};
 pub use crate::suites::{
     BulkAlgorithm, SupportedCipherSuite, ALL_CIPHER_SUITES, DEFAULT_CIPHER_SUITES,
 };
 #[cfg(feature = "secret_extraction")]
+#[cfg_attr(docsrs, doc(cfg(feature = "secret_extraction")))]
 pub use crate::suites::{ConnectionTrafficSecrets, ExtractedSecrets};
 pub use crate::ticketer::Ticketer;
 #[cfg(feature = "tls12")]
 pub use crate::tls12::Tls12CipherSuite;
 pub use crate::tls13::Tls13CipherSuite;
+pub use crate::verify::DigitallySignedStruct;
 pub use crate::versions::{SupportedProtocolVersion, ALL_VERSIONS, DEFAULT_VERSIONS};
 
 /// Items for use in a client.
@@ -400,23 +422,25 @@ pub mod client {
     mod tls12;
     mod tls13;
 
+    pub use crate::dns_name::InvalidDnsNameError;
     pub use builder::{WantsClientCert, WantsTransparencyPolicyOrClientCert};
-    #[cfg(feature = "quic")]
-    pub use client_conn::ClientQuicExt;
-    pub use client_conn::InvalidDnsNameError;
-    pub use client_conn::ResolvesClientCert;
-    pub use client_conn::ServerName;
-    pub use client_conn::StoresClientSessions;
-    pub use client_conn::{ClientConfig, ClientConnection, ClientConnectionData, WriteEarlyData};
-    pub use handy::{ClientSessionMemoryCache, NoClientSessionStorage};
+    pub use client_conn::{
+        ClientConfig, ClientConnection, ClientConnectionData, ClientSessionStore,
+        ResolvesClientCert, Resumption, ServerName, Tls12Resumption, WriteEarlyData,
+    };
+    pub use handy::ClientSessionMemoryCache;
 
     #[cfg(feature = "dangerous_configuration")]
     pub use crate::verify::{
+        verify_server_cert_signed_by_trust_anchor, verify_server_name,
         CertificateTransparencyPolicy, HandshakeSignatureValid, ServerCertVerified,
         ServerCertVerifier, WebPkiVerifier,
     };
     #[cfg(feature = "dangerous_configuration")]
     pub use client_conn::danger::DangerousClientConfig;
+
+    pub use crate::msgs::persist::Tls12ClientSessionValue;
+    pub use crate::msgs::persist::Tls13ClientSessionValue;
 }
 
 pub use client::{ClientConfig, ClientConnection, ServerName};
@@ -434,12 +458,11 @@ pub mod server {
 
     pub use crate::verify::{
         AllowAnyAnonymousOrAuthenticatedClient, AllowAnyAuthenticatedClient, NoClientAuth,
+        UnparsedCertRevocationList,
     };
     pub use builder::WantsServerCert;
     pub use handy::ResolvesServerCertUsingSni;
     pub use handy::{NoServerSessionStorage, ServerSessionMemoryCache};
-    #[cfg(feature = "quic")]
-    pub use server_conn::ServerQuicExt;
     pub use server_conn::StoresServerSessions;
     pub use server_conn::{
         Accepted, Acceptor, ReadEarlyData, ServerConfig, ServerConnection, ServerConnectionData,
@@ -447,7 +470,11 @@ pub mod server {
     pub use server_conn::{ClientHello, ProducesTickets, ResolvesServerCert};
 
     #[cfg(feature = "dangerous_configuration")]
-    pub use crate::verify::{ClientCertVerified, ClientCertVerifier, DnsName};
+    pub use crate::dns_name::DnsName;
+    #[cfg(feature = "dangerous_configuration")]
+    pub use crate::key::ParsedCertificate;
+    #[cfg(feature = "dangerous_configuration")]
+    pub use crate::verify::{ClientCertVerified, ClientCertVerifier};
 }
 
 pub use server::{ServerConfig, ServerConnection};
@@ -502,28 +529,3 @@ pub mod quic;
 
 /// This is the rustls manual.
 pub mod manual;
-
-/** Type renames. */
-#[allow(clippy::upper_case_acronyms)]
-#[doc(hidden)]
-#[deprecated(since = "0.20.0", note = "Use ResolvesServerCertUsingSni")]
-pub type ResolvesServerCertUsingSNI = server::ResolvesServerCertUsingSni;
-#[allow(clippy::upper_case_acronyms)]
-#[cfg(feature = "dangerous_configuration")]
-#[doc(hidden)]
-#[deprecated(since = "0.20.0", note = "Use client::WebPkiVerifier")]
-pub type WebPKIVerifier = client::WebPkiVerifier;
-#[allow(clippy::upper_case_acronyms)]
-#[doc(hidden)]
-#[deprecated(since = "0.20.0", note = "Use Error")]
-pub type TLSError = Error;
-#[doc(hidden)]
-#[deprecated(since = "0.20.0", note = "Use ClientConnection")]
-pub type ClientSession = ClientConnection;
-#[doc(hidden)]
-#[deprecated(since = "0.20.0", note = "Use ServerConnection")]
-pub type ServerSession = ServerConnection;
-
-/* Apologies: would make a trait alias here, but those remain unstable.
-pub trait Session = Connection;
-*/

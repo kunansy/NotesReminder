@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![allow(clippy::all)]
 use super::*;
 use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
@@ -35,16 +36,6 @@ extern "C" {
     pub fn read_with_array_buffer_view(
         this: &ReadableStreamByobReader,
         view: &::js_sys::Object,
-    ) -> ::js_sys::Promise;
-    # [wasm_bindgen (method , structural , js_class = "ReadableStreamBYOBReader" , js_name = read)]
-    #[doc = "The `read()` method."]
-    #[doc = ""]
-    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamBYOBReader/read)"]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ReadableStreamByobReader`*"]
-    pub fn read_with_u8_array(
-        this: &ReadableStreamByobReader,
-        view: &mut [u8],
     ) -> ::js_sys::Promise;
     # [wasm_bindgen (method , structural , js_class = "ReadableStreamBYOBReader" , js_name = releaseLock)]
     #[doc = "The `releaseLock()` method."]

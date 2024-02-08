@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
@@ -36,7 +38,6 @@ pub(super) fn parse_attribute(args: &TokenStream, input: TokenStream) -> Result<
     })
 }
 
-#[allow(dead_code)] // false positive that fixed in Rust 1.39
 struct Input {
     attrs: Vec<Attribute>,
     body: TokenStream,

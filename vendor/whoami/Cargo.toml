@@ -13,8 +13,8 @@
 [package]
 edition = "2018"
 name = "whoami"
-version = "1.4.0"
-include = ["README.md", "src/*"]
+version = "1.4.1"
+include = ["LICENSE_APACHE", "LICENSE_BOOST", "LICENSE_MIT", "README.md", "src/*"]
 description = "Retrieve the current user and environment."
 homepage = "https://github.com/ardaku/whoami/blob/stable/CHANGELOG.md"
 documentation = "https://docs.rs/whoami"

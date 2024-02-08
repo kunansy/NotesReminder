@@ -1,3 +1,12 @@
+## [0.8.4]
+- Now builds with `#![no_std]`.
+
+## [0.8.3]
+- bump hashbrown to 0.14
+
+## [0.8.2]
+- bump hashbrown to 0.13
+
 ## [0.8.1]
 - Add `retain_with_order` methods, equivalent to `retain` but which iterate
   through the map in the proper linked list order

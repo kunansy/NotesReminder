@@ -86,9 +86,9 @@ impl Uuid {
     ///
     /// * [Version 6 UUIDs in Draft RFC: New UUID Formats, Version 4](https://datatracker.ietf.org/doc/html/draft-peabody-dispatch-new-uuid-format-04#section-5.1)
     ///
-    /// [`Timestamp`]: v1/struct.Timestamp.html
-    /// [`ClockSequence`]: v1/trait.ClockSequence.html
-    /// [`Context`]: v1/struct.Context.html
+    /// [`Timestamp`]: timestamp/struct.Timestamp.html
+    /// [`ClockSequence`]: timestamp/trait.ClockSequence.html
+    /// [`Context`]: timestamp/context/struct.Context.html
     pub fn new_v6(ts: Timestamp, node_id: &[u8; 6]) -> Self {
         let (ticks, counter) = ts.to_rfc4122();
 
@@ -102,11 +102,22 @@ mod tests {
     use crate::{Context, Variant, Version};
     use std::string::ToString;
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(all(
+        target_arch = "wasm32",
+        target_vendor = "unknown",
+        target_os = "unknown"
+    ))]
     use wasm_bindgen_test::*;
 
     #[test]
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    #[cfg_attr(
+        all(
+            target_arch = "wasm32",
+            target_vendor = "unknown",
+            target_os = "unknown"
+        ),
+        wasm_bindgen_test
+    )]
     fn test_new() {
         let time: u64 = 1_496_854_535;
         let time_fraction: u32 = 812_946_000;
@@ -136,7 +147,14 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    #[cfg_attr(
+        all(
+            target_arch = "wasm32",
+            target_vendor = "unknown",
+            target_os = "unknown"
+        ),
+        wasm_bindgen_test
+    )]
     #[cfg(all(feature = "std", feature = "rng"))]
     fn test_now() {
         let node = [1, 2, 3, 4, 5, 6];
@@ -148,14 +166,21 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    #[cfg_attr(
+        all(
+            target_arch = "wasm32",
+            target_vendor = "unknown",
+            target_os = "unknown"
+        ),
+        wasm_bindgen_test
+    )]
     fn test_new_context() {
         let time: u64 = 1_496_854_535;
         let time_fraction: u32 = 812_946_000;
         let node = [1, 2, 3, 4, 5, 6];
 
         // This context will wrap
-        let context = Context::new((u16::MAX >> 2) - 1);
+        let context = Context::new(u16::MAX >> 2);
 
         let uuid1 = Uuid::new_v6(Timestamp::from_unix(&context, time, time_fraction), &node);
 
@@ -163,7 +188,7 @@ mod tests {
 
         let uuid2 = Uuid::new_v6(Timestamp::from_unix(&context, time, time_fraction), &node);
 
-        assert_eq!(uuid1.get_timestamp().unwrap().to_rfc4122().1, 16382);
+        assert_eq!(uuid1.get_timestamp().unwrap().to_rfc4122().1, 16383);
         assert_eq!(uuid2.get_timestamp().unwrap().to_rfc4122().1, 0);
 
         let time = 1_496_854_535;
