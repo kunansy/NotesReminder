@@ -11,7 +11,7 @@ services:
     restart: always
     entrypoint: ["/app/app", "--start"]
     networks:
-      - readingtracker_tracker-net
+      - tracker-net
     healthcheck:
       test: "exit 0"
 
@@ -24,7 +24,7 @@ services:
     depends_on:
       - notes-reminder-bot
     networks:
-      - readingtracker_tracker-net
+      - tracker-net
     healthcheck:
       test: "exit 0"
 
@@ -37,10 +37,10 @@ services:
     depends_on:
       - notes-reminder-bot
     networks:
-      - readingtracker_tracker-net
+      - tracker-net
     healthcheck:
       test: "exit 0"
 
 networks:
-  readingtracker_tracker-net:
+  tracker-net:
     external: true
