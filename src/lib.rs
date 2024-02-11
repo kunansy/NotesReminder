@@ -424,12 +424,16 @@ pub mod settings {
 
             let db_uri = std::env::var("DATABASE_URL")
                 .map_err(|_| "DATABASE_URL not found")?;
+
             let timeout = std::env::var("DATABASE_TIMEOUT")
                 .unwrap_or("10".to_string())
                 .parse()
                 .map_err(|_| "DATABASE_TIMEOUT should be int")?;
+            let db_timeout = time::Duration::from_secs(timeout);
+
             let bot_token = std::env::var("TG_BOT_TOKEN")
                 .map_err(|_| "TG_BOT_TOKEN not found")?;
+
             let tracker_url = std::env::var("TRACKER_URL")
                 .map_or(None, |mut v| {
                     if v.ends_with('/') {
@@ -438,6 +442,7 @@ pub mod settings {
                     Some(v)
                 })
                 .ok_or("TRACKER_URL not found")?;
+
             let tracker_web_url = std::env::var("TRACKER_WEB_URL")
                 .map_or(None, |mut v| {
                     if v.ends_with('/') {
@@ -446,11 +451,11 @@ pub mod settings {
                     Some(v)
                 })
                 .unwrap_or(tracker_url.clone());
+
             let chat_id: i64 = std::env::var("TG_BOT_USER_ID")
                 .map_err(|_| "TG_BOT_USER_ID not found")?
                 .parse()
                 .map_err(|_| "User id should be int")?;
-            let db_timeout = time::Duration::from_secs(timeout);
 
             log::debug!("Settings parsed");
             Ok(Self { db_uri, db_timeout, bot_token, chat_id, tracker_url, tracker_web_url })
