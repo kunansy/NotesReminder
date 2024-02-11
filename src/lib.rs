@@ -117,22 +117,30 @@ pub mod db {
                 }
             };
 
-            let last_material_repeat_info = format!("{}", {
-                if self.material_last_repeated_at != None {
-                    format!("Repeats count: {}\nLast repeated: {}, {}\n",
-                            repeats_count, repeated_at, self.repeated_ago())
-                } else {"".to_string()}
-            });
-            let material_info = format!("{}", {
-                if self.material_title != None {
-                    format!("«{}» – {}\n\n",
-                            self.material_title(), self.material_authors())
-                } else {"Without material\n\n".to_string()}
-            });
+            let mut rows = Vec::with_capacity(10);
 
-            write!(f, "{}{}\n\nMaterial status: {}\nAdded at (UTC): {}\n{}Total notes count: {}",
-                   material_info, self.content_html(), &self.material_status, added_at,
-                   last_material_repeat_info, self.notes_count)
+            if self.material_title.is_some() {
+                let material_info = format!(
+                    "«{}» – {}\n", self.material_title(), self.material_authors());
+                rows.push(material_info)
+            } else {
+                rows.push("Without material\n".to_string());
+            }
+
+            rows.push(self.content_html());
+            rows.push("\n".to_string());
+            if self.material_title.is_some() {
+                rows.push(format!("Material status: {}", self.material_status));
+            }
+            rows.push(format!("Added at (UTC): {}", added_at));
+
+            if self.material_last_repeated_at.is_some() {
+                rows.push(format!("Repeats count: {}", repeats_count));
+                rows.push(format!("Last repeated: {}, {}", repeated_at, self.repeated_ago()))
+            }
+            rows.push(format!("Total notes count: {}", self.notes_count));
+
+            write!(f, "{}", rows.join("\n"))
         }
     }
 
