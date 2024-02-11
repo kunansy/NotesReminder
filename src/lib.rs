@@ -152,29 +152,108 @@ pub mod db {
     }
 
     pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
-        let (notes_count, stat) = join!(get_notes_count(pool), get_remind_statistics(pool));
-        let stat = stat?;
-        let note_id = get_remind_note_id(stat);
+        let stmt = sqlx::query!(r#"
+            WITH repeated_notes_freq AS (
+                SELECT note_id, count(1)
+                FROM note_repeats_history
+                GROUP BY note_id
+            ),
+            all_notes_freq AS (
+                SELECT
+                    n.material_id,
+                    n.note_id AS note_id,
+                    COALESCE(s.count, 0) AS count,
+                    COUNT(1) OVER () AS total
+                FROM notes n
+                LEFT JOIN repeated_notes_freq s USING(note_id)
+                WHERE NOT n.is_deleted
+            ),
+            min_freq AS (
+                SELECT count
+                FROM all_notes_freq
+                ORDER BY count
+                LIMIT 1
+            ),
+            sample_notes AS (
+                SELECT
+                    n.note_id,
+                    n.material_id,
+                    n.page,
+                    n.chapter,
+                    n.title,
+                    n.content,
+                    n.added_at,
+                    f.total AS total_notes_count,
+                    -- m.total AS total_freq_count,
+                    m.count AS min_repeat_freq
+                FROM all_notes_freq f
+                JOIN min_freq m ON f.count = m.count
+                JOIN notes n ON f.note_id = n.note_id
+            ),
+            materials_cte AS (
+                SELECT DISTINCT material_id FROM all_notes_freq
+            ),
+            last_repeat AS (
+                SELECT
+                    r.material_id,
+                    MAX(r.repeated_at) AS repeated_at,
+                    COUNT(1) AS count
+                FROM materials_cte n
+                JOIN repeats r USING(material_id)
+                GROUP BY r.material_id
+            )
+            SELECT
+                n.note_id,
+                m.title AS "material_title?",
+                m.authors AS "material_authors?",
+                n.title AS note_title,
+                n.content,
+                n.added_at,
+                n.chapter,
+                n.page,
+                m.pages AS "material_pages",
+                n.total_notes_count AS "total_notes_count!",
+                -- count of notes to repeat with this frequency
+                -- n.total_freq_count AS "total_freq_count!",
+                -- min frequency of notes repeating
+                n.min_repeat_freq AS "min_repeat_freq!",
+                CASE
+                    -- in this case the note have no material
+                    WHEN m IS NULL THEN 'completed'
+                    WHEN s IS NULL THEN 'queue'
+                    WHEN s.completed_at IS NULL THEN 'reading'
+                    ELSE 'completed'
+                END AS "material_status!",
+                r.repeated_at AS "material_last_repeated_at?",
+                r.count AS "material_repeats_count?"
+            FROM
+                sample_notes n
+            LEFT JOIN materials m on n.material_id = m.material_id
+            LEFT JOIN statuses s on s.material_id = m.material_id
+            LEFT JOIN last_repeat r on r.material_id = s.material_id
+            ORDER BY random()
+            LIMIT 1
+        "#)
+            .fetch_one(pool)
+            .await?;
 
-        let note = get_remind_note(pool, &note_id).await?;
+        // TODO
+        log::info!("Min repeat freq {}, notes with it --, choose the random one", stmt.min_repeat_freq);
 
-        let mut res = RemindNote{
-            note_id,
-            material_title: note.title,
-            material_authors: note.authors,
-            content: note.content,
-            added_at: note.added_at,
-            material_status: note.material_status,
-            notes_count: notes_count?,
-            material_repeats_count: None,
-            material_last_repeated_at: None
-        };
-        if let Some(info) = get_material_repeat_info(pool, &note.material_id).await? {
-            res.material_repeats_count = Some(info.repeats_count);
-            res.material_last_repeated_at = Some(info.repeated_at);
-        }
-
-        Ok(res)
+        Ok(RemindNote {
+            note_id: stmt.note_id,
+            content: stmt.content,
+            page: stmt.page,
+            chapter: stmt.chapter,
+            added_at: stmt.added_at,
+            notes_count: stmt.total_notes_count,
+            material_title: stmt.material_title,
+            material_authors: stmt.material_authors,
+            material_pages: stmt.material_pages,
+            material_status: stmt.material_status,
+            material_repeats_count: stmt.material_repeats_count,
+            material_last_repeated_at: stmt.material_last_repeated_at,
+        })
     }
 
     pub async fn insert_note_history(pool: &PgPool,
