@@ -189,7 +189,6 @@ pub mod db {
                 n.note_id,
                 m.title AS "material_title?",
                 m.authors AS "material_authors?",
-                n.title AS note_title,
                 n.content,
                 n.added_at,
                 n.chapter,
