@@ -27,7 +27,7 @@ async fn main() -> Result<(), String> {
     load_env();
     init_logger();
 
-    let cfg = Settings::parse();
+    let cfg = Settings::parse()?;
     let pool = db::init_pool(&cfg.db_uri, cfg.db_timeout).await
         .expect("Could not connect to the database");
 
@@ -40,7 +40,8 @@ async fn main() -> Result<(), String> {
         log::info!("Start the bot");
 
         teloxide::repl(bot.clone(), move |msg: Message| {
-            let cfg = Settings::parse();
+            // here it must be parseable
+            let cfg = Settings::parse().unwrap();
             let bot = bot.clone();
             let pool = pool.clone();
 
