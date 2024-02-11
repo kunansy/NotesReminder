@@ -193,12 +193,12 @@ pub mod db {
                 n.added_at,
                 n.chapter,
                 n.page,
-                m.pages AS "material_pages",
+                m.pages AS "material_pages?",
                 n.total_notes_count AS "total_notes_count!",
                 -- count of notes to repeat with this frequency
                 -- n.total_freq_count AS "total_freq_count!",
                 -- min frequency of notes repeating
-                n.min_repeat_freq AS "min_repeat_freq!",
+                n.min_repeat_freq AS "min_repeat_freq?",
                 CASE
                     -- in this case the note have no material
                     WHEN m IS NULL THEN 'completed'
@@ -220,7 +220,7 @@ pub mod db {
             .await?;
 
         // TODO
-        log::info!("Min repeat freq {}, notes with it --, choose the random one", stmt.min_repeat_freq);
+        log::info!("Min repeat freq {:?}, notes with it --, choose the random one", stmt.min_repeat_freq);
 
         Ok(RemindNote {
             note_id: stmt.note_id,
@@ -231,7 +231,7 @@ pub mod db {
             notes_count: stmt.total_notes_count,
             material_title: stmt.material_title,
             material_authors: stmt.material_authors,
-            material_pages: stmt.material_pages,
+            material_pages: stmt.material_pages.unwrap_or(0),
             material_status: stmt.material_status,
             material_repeats_count: stmt.material_repeats_count,
             material_last_repeated_at: stmt.material_last_repeated_at,
