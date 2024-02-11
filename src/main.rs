@@ -22,14 +22,14 @@ async fn main() -> Result<(), String> {
     });
     let mode = std::env::args()
         .nth(1)
-        .expect("Could not get CLI args");
+        .ok_or("Could not get CLI args")?;
 
     load_env();
     init_logger();
 
     let cfg = Settings::parse()?;
     let pool = db::init_pool(&cfg.db_uri, cfg.db_timeout).await
-        .expect("Could not connect to the database");
+        .map_err(|_| "Could not connect to the database")?;
 
     let bot = Bot::new(cfg.bot_token.clone())
         .parse_mode(types::ParseMode::Html);
@@ -52,9 +52,10 @@ async fn main() -> Result<(), String> {
 
     } else if mode == "--repeat" {
         remind_repeat(&bot, cfg.chat_id, &cfg.tracker_url, &cfg.tracker_web_url)
-            .await.map_err(|e| e.to_string())?;
+            .await
+            .map_err(|e| e.to_string())?;
     } else {
-        panic!("Invalid mode passed: {}", mode);
+        return Err(format!("Invalid mode passed: {}", mode));
     }
 
     Ok(())
