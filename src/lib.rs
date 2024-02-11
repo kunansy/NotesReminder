@@ -133,10 +133,9 @@ pub mod db {
             rows.push(self.content_html());
             rows.push(String::new());
 
-            rows.push(format!("Chapter: {}", self.chapter));
-            rows.push(format!("Page: {}/{}", self.page, self.material_pages));
-
             if self.material_title.is_some() {
+                rows.push(format!("Chapter: {}", self.chapter));
+                rows.push(format!("Page: {}/{}", self.page, self.material_pages));
                 rows.push(format!("Material status: {}", self.material_status));
             }
             rows.push(format!("Added at (UTC): {}", added_at));
