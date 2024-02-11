@@ -131,7 +131,7 @@ pub mod db {
             }
 
             rows.push(self.content_html());
-            rows.push("\n".to_string());
+            rows.push(String::new());
 
             rows.push(format!("Chapter: {}", self.chapter));
             rows.push(format!("Page: {}/{}", self.page, self.material_pages));
