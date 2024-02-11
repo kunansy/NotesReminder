@@ -27,10 +27,13 @@ pub mod db {
     pub struct RemindNote {
         note_id: Uuid,
         content: String,
+        chapter: i32,
+        page: i32,
         added_at: NaiveDateTime,
         notes_count: i64,
         material_title: Option<String>,
         material_authors: Option<String>,
+        material_pages: i32,
         material_status: String,
         material_repeats_count: Option<i64>,
         material_last_repeated_at: Option<NaiveDateTime>
@@ -129,6 +132,10 @@ pub mod db {
 
             rows.push(self.content_html());
             rows.push("\n".to_string());
+
+            rows.push(format!("Chapter: {}", self.chapter));
+            rows.push(format!("Page: {}/{}", self.page, self.material_pages));
+
             if self.material_title.is_some() {
                 rows.push(format!("Material status: {}", self.material_status));
             }
