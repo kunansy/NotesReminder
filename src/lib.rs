@@ -1,27 +1,10 @@
 pub mod db {
-    use std::collections::HashMap;
     use std::fmt::{Display, Formatter};
     use std::time;
     use chrono::prelude::*;
 
-    use rand::Rng;
     use sqlx::postgres::{PgPool, PgPoolOptions};
-    use tokio::join;
     use uuid::Uuid;
-
-    struct RemindInfo {
-        repeats_count: i64,
-        repeated_at: NaiveDateTime
-    }
-
-    struct Note {
-        material_id: Option<Uuid>,
-        title: Option<String>,
-        authors: Option<String>,
-        content: String,
-        added_at: NaiveDateTime,
-        material_status: String,
-    }
 
     #[derive(Debug)]
     pub struct RemindNote {
@@ -277,130 +260,6 @@ pub mod db {
 
     fn create_uuid() -> Uuid {
         Uuid::new_v4()
-    }
-
-    async fn get_notes_count(pool: &PgPool) -> Result<i64, sqlx::Error> {
-        log::debug!("Getting notes count");
-
-        let stmt = sqlx::query!("SELECT count(1) FROM notes WHERE not is_deleted;")
-            .fetch_one(pool)
-            .await?;
-
-        match stmt.count {
-            Some(count) => {
-                log::debug!("{} notes found", count);
-                Ok(count)
-            },
-            None => panic!("Count not get notes count")
-        }
-    }
-
-    async fn get_material_repeat_info(pool: &PgPool,
-                                      material_id: &Option<Uuid>) -> Result<Option<RemindInfo>, sqlx::Error> {
-        let material_id = match material_id {
-            Some(v) => v,
-            None => return Ok(None)
-        };
-        log::debug!("Getting repeat info for material: {}", material_id);
-
-        let info = sqlx::query!(
-            "
-            SELECT repeated_at, COUNT(1) OVER (PARTITION BY material_id)
-            FROM repeats
-            WHERE material_id = $1::uuid
-            ORDER BY repeated_at DESC
-            LIMIT 1;
-            ",
-            material_id)
-            .fetch_optional(pool)
-            .await?;
-
-        match info {
-            Some(info) => {
-                log::debug!("Repeat info got");
-                Ok(Some(RemindInfo{
-                    repeats_count: info.count.unwrap(),
-                    repeated_at: info.repeated_at
-                }))
-            },
-            None => {
-                log::debug!("No repeat info found");
-                Ok(None)
-            }
-        }
-    }
-
-    async fn get_remind_statistics(pool: &PgPool) -> Result<HashMap<Uuid, i64>, sqlx::Error> {
-        log::debug!("Getting remind statistics");
-        let stat = sqlx::query!(r#"
-            WITH stats AS (
-                SELECT note_id, count(1)
-                FROM note_repeats_history
-                GROUP BY note_id
-            )
-            SELECT
-                n.note_id AS note_id,
-                COALESCE(s.count, 0) AS "count!"
-            FROM notes n
-            LEFT JOIN stats s USING(note_id)
-            WHERE NOT n.is_deleted;
-            "#)
-            .fetch_all(pool)
-            .await?
-            .iter()
-            .map(|row| {(row.note_id, row.count)})
-            .collect::<HashMap<Uuid, i64>>();
-
-        log::debug!("Remind statistics got");
-        Ok(stat)
-    }
-
-    fn get_remind_note_id(stats: HashMap<Uuid, i64>) -> Uuid {
-        log::debug!("Getting note id to remind");
-        if stats.len() == 0 {
-            panic!("Empty stats passed");
-        }
-
-        let min_f = stats.values().min().unwrap().clone();
-        log::debug!("Min frequency is: {}", min_f);
-
-        let min_notes = stats
-            .into_iter()
-            .filter(|(_, freq)| *freq == min_f)
-            .map(|(note_id, _)| note_id)
-            .collect::<Vec<Uuid>>();
-
-        log::debug!("Total {} notes with it, getting the random one", min_notes.len());
-        let index = rand::thread_rng().gen_range(0..min_notes.len());
-        let &note_id = min_notes.get(index)
-            .expect("Could not get list element");
-
-        note_id
-    }
-
-    async fn get_remind_note(pool: &PgPool, note_id: &Uuid) -> Result<Note, sqlx::Error> {
-        sqlx::query_as!(Note, r#"
-            SELECT
-                -- this alias tells sqlx that material_id is nullable
-                m.material_id AS "material_id?",
-                m.title AS "title?",
-                m.authors AS "authors?",
-                n.content,
-                n.added_at,
-                CASE
-                    -- in this case the note have no material
-                    WHEN m IS NULL THEN 'completed'
-                    WHEN s IS NULL THEN 'queue'
-                    WHEN s.completed_at IS NULL THEN 'reading'
-                    ELSE 'completed'
-                END AS "material_status!"
-            FROM notes n
-            LEFT JOIN materials m USING(material_id)
-            LEFT JOIN statuses s USING(material_id)
-            WHERE n.note_id = $1::uuid AND NOT n.is_deleted;"#,
-            note_id)
-            .fetch_one(pool)
-            .await
     }
 
     pub async fn init_pool(uri: &str, timeout: time::Duration) -> Result<PgPool, sqlx::Error> {
