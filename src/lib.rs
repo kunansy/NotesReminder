@@ -170,6 +170,7 @@ pub mod db {
     }
 
     pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
+        // TODO: use a matview?
         let stmt = sqlx::query!(r#"
             WITH repeated_notes_freq AS (
                 SELECT note_id, count(1)
