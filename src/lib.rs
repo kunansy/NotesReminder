@@ -151,7 +151,6 @@ pub mod db {
 
                 rows.push(format!("{}: {}", material_type.as_chapter(), self.chapter));
                 rows.push(format!("{}: {}/{}", material_type.as_page(), self.page, self.material_pages));
-                rows.push(format!("Page: {}/{}", self.page, self.material_pages));
                 rows.push(format!("Material status: {}", self.material_status));
             }
             rows.push(format!("Added at (UTC): {}", added_at));
