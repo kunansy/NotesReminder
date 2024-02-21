@@ -5,6 +5,33 @@ pub mod db {
 
     use sqlx::postgres::{PgPool, PgPoolOptions};
     use uuid::Uuid;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Deserialize, Serialize)]
+    #[sqlx(type_name = "materialtypesenum", rename_all = "lowercase")]
+    enum MaterialTypes {
+        Book,
+        Article,
+        Lecture,
+        Course
+    }
+
+    impl MaterialTypes {
+        pub fn as_chapter(&self) -> &'static str {
+            match self {
+                MaterialTypes::Book | MaterialTypes::Article => "Chapter",
+                MaterialTypes::Lecture | MaterialTypes::Course => "Part",
+            }
+        }
+
+        pub fn as_page(&self) -> &'static str {
+            match self {
+                MaterialTypes::Book | MaterialTypes::Article => "Page",
+                MaterialTypes::Lecture => "Minute",
+                MaterialTypes::Course => "Part",
+            }
+        }
+    }
 
     #[derive(Debug)]
     pub struct RemindNote {
@@ -16,6 +43,7 @@ pub mod db {
         notes_count: i64,
         material_title: Option<String>,
         material_authors: Option<String>,
+        material_type: Option<MaterialTypes>,
         material_pages: i32,
         material_status: String,
         material_repeats_count: Option<i64>,
@@ -115,7 +143,10 @@ pub mod db {
             rows.push(String::new());
 
             if self.material_title.is_some() {
-                rows.push(format!("Chapter: {}", self.chapter));
+                let material_type = self.material_type.as_ref().unwrap();
+
+                rows.push(format!("{}: {}", material_type.as_chapter(), self.chapter));
+                rows.push(format!("{}: {}/{}", material_type.as_page(), self.page, self.material_pages));
                 rows.push(format!("Page: {}/{}", self.page, self.material_pages));
                 rows.push(format!("Material status: {}", self.material_status));
             }
@@ -186,6 +217,7 @@ pub mod db {
                 n.note_id,
                 m.title AS "material_title?",
                 m.authors AS "material_authors?",
+                m.material_type AS "material_type?: MaterialTypes",
                 n.content,
                 n.added_at,
                 n.chapter,
@@ -228,6 +260,7 @@ pub mod db {
             notes_count: stmt.total_notes_count,
             material_title: stmt.material_title,
             material_authors: stmt.material_authors,
+            material_type: stmt.material_type,
             material_pages: stmt.material_pages.unwrap_or(0),
             material_status: stmt.material_status,
             material_repeats_count: stmt.material_repeats_count,
