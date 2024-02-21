@@ -93,7 +93,7 @@ pub mod db {
                 None => "-".to_string()
             };
 
-            // don't write time when it not set
+            // don't write time when it's not set
             let added_at = {
                 let dt = self.added_at;
                 if dt.hour() + dt.minute() + dt.second() == 0 {
