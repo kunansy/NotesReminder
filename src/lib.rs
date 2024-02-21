@@ -115,6 +115,10 @@ pub mod db {
         pub fn has_material(&self) -> bool {
             self.material_type.is_some()
         }
+
+        pub fn has_material_repeat(&self) -> bool {
+            self.material_last_repeated_at.is_some()
+        }
     }
 
     impl Display for RemindNote {
@@ -155,7 +159,7 @@ pub mod db {
             }
             rows.push(format!("Added at (UTC): {}", added_at));
 
-            if self.material_last_repeated_at.is_some() {
+            if self.has_material_repeat() {
                 rows.push(format!("Repeats count: {}", repeats_count));
                 rows.push(format!("Last repeated: {}, {}", repeated_at, self.repeated_ago()))
             }
