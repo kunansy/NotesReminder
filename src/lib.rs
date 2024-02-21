@@ -109,8 +109,6 @@ pub mod db {
                 let material_info = format!(
                     "«{}» – {}\n", self.material_title(), self.material_authors());
                 rows.push(material_info)
-            } else {
-                rows.push("Without material\n".to_string());
             }
 
             rows.push(self.content_html());
