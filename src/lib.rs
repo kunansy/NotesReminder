@@ -111,6 +111,10 @@ pub mod db {
         pub fn get_url(&self, tracker_url: &str) -> String {
             format!("{}/notes/note?note_id={}", tracker_url, self.note_id)
         }
+
+        pub fn has_material(&self) -> bool {
+            self.material_type.is_some()
+        }
     }
 
     impl Display for RemindNote {
@@ -133,7 +137,7 @@ pub mod db {
 
             let mut rows = Vec::with_capacity(10);
 
-            if self.material_title.is_some() {
+            if self.has_material() {
                 let material_info = format!(
                     "«{}» – {}\n", self.material_title(), self.material_authors());
                 rows.push(material_info)
@@ -142,7 +146,7 @@ pub mod db {
             rows.push(self.content_html());
             rows.push(String::new());
 
-            if self.material_title.is_some() {
+            if self.has_material() {
                 let material_type = self.material_type.as_ref().unwrap();
 
                 rows.push(format!("{}: {}", material_type.as_chapter(), self.chapter));
