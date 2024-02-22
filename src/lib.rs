@@ -81,7 +81,7 @@ pub mod db {
                         dur.num_days() + 1
                     };
 
-                    let mut s = String::new();
+                    let mut s = String::with_capacity(32);
                     if dur / 365 != 0 {
                         let v = (dur / 365) as i32;
                         s.push_str(&format!("{} years", v));
