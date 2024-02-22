@@ -123,12 +123,6 @@ pub mod db {
 
     impl Display for RemindNote {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            let repeats_count = self.material_repeats_count.unwrap_or(0);
-            let repeated_at = match self.material_last_repeated_at {
-                Some(v) => v.format("%Y-%m-%d").to_string(),
-                None => "-".to_string()
-            };
-
             // don't write time when it's not set
             let added_at = {
                 let dt = self.added_at;
@@ -160,6 +154,10 @@ pub mod db {
             rows.push(format!("Added at (UTC): {}", added_at));
 
             if self.has_material_repeat() {
+                let repeats_count = self.material_repeats_count.unwrap_or(0);
+                let repeated_at = self.material_last_repeated_at
+                    .unwrap().format("%Y-%m-%d");
+
                 rows.push(format!("Repeats count: {}", repeats_count));
                 rows.push(format!("Last repeated: {}, {}", repeated_at, self.repeated_ago()))
             }
