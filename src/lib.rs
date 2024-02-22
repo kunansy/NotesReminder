@@ -28,7 +28,7 @@ pub mod db {
             match self {
                 MaterialTypes::Book | MaterialTypes::Article => "Page",
                 MaterialTypes::Lecture => "Minute",
-                MaterialTypes::Course => "Part",
+                MaterialTypes::Course => "Lecture",
             }
         }
     }
