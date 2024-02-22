@@ -136,8 +136,12 @@ pub mod db {
             let mut rows = Vec::with_capacity(10);
 
             if self.has_material() {
-                let material_info = format!(
-                    "«{}» – {}\n", self.material_title(), self.material_authors());
+                let material_info = {
+                    let title = self.material_title.as_ref().unwrap();
+                    let authors = self.material_authors.as_ref().unwrap();
+
+                    format!("«{}» – {}\n", title, authors)
+                };
                 rows.push(material_info)
             }
 
