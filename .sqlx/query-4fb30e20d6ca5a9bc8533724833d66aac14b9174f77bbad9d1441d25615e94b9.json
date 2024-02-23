@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                material_id,\n                MAX(repeated_at) AS \"last_repeated_at!\",\n                COUNT(1) AS \"repeats_count!\"\n            FROM repeats\n            GROUP BY material_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "material_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_repeated_at!",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 2,
+        "name": "repeats_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "4fb30e20d6ca5a9bc8533724833d66aac14b9174f77bbad9d1441d25615e94b9"
+}

@@ -1,0 +1,105 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH repeated_notes_freq AS (\n                SELECT note_id, count(1)\n                FROM note_repeats_history\n                GROUP BY note_id\n            ),\n            all_notes_freq AS (\n                SELECT\n                    n.material_id,\n                    n.note_id AS note_id,\n                    COALESCE(s.count, 0) AS count,\n                    COUNT(1) OVER () AS total\n                FROM notes n\n                LEFT JOIN repeated_notes_freq s USING(note_id)\n                WHERE NOT n.is_deleted\n            ),\n            min_freq AS (\n                SELECT count\n                FROM all_notes_freq\n                ORDER BY count\n                LIMIT 1\n            ),\n            sample_notes AS (\n                SELECT\n                    n.note_id,\n                    n.material_id,\n                    n.page,\n                    n.chapter,\n                    n.title,\n                    n.content,\n                    n.added_at,\n                    f.total AS total_notes_count,\n                    -- m.total AS total_freq_count,\n                    m.count AS min_repeat_freq\n                FROM all_notes_freq f\n                JOIN min_freq m ON f.count = m.count\n                JOIN notes n ON f.note_id = n.note_id\n            )\n            SELECT\n                n.note_id,\n                m.material_id,\n                m.title AS \"material_title?\",\n                m.authors AS \"material_authors?\",\n                m.material_type AS \"material_type?: MaterialTypes\",\n                n.content,\n                n.added_at,\n                n.chapter,\n                n.page,\n                m.pages AS \"material_pages?\",\n                n.total_notes_count AS \"total_notes_count!\",\n                n.min_repeat_freq AS \"min_repeat_freq!\",\n                CASE\n                    -- in this case the note have no material\n                    WHEN m IS NULL THEN 'completed'\n                    WHEN s IS NULL THEN 'queue'\n                    WHEN s.completed_at IS NULL THEN 'reading'\n                    ELSE 'completed'\n                END AS \"material_status!\"\n            FROM\n                sample_notes n\n            LEFT JOIN materials m on n.material_id = m.material_id\n            LEFT JOIN statuses s on s.material_id = m.material_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "note_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "material_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "material_title?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "material_authors?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "material_type?: MaterialTypes",
+        "type_info": {
+          "Custom": {
+            "name": "materialtypesenum",
+            "kind": {
+              "Enum": [
+                "book",
+                "article",
+                "course",
+                "lecture",
+                "audiobook"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "content",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "added_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 7,
+        "name": "chapter",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "page",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "material_pages?",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "total_notes_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "min_repeat_freq!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 12,
+        "name": "material_status!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "418065ef10cbaae7e3f7f54a743b93bf0a46c50ba2d7198ece6c3de9510f75c4"
+}
