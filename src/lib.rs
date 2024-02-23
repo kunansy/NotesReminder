@@ -1,4 +1,5 @@
 pub mod db {
+    use std::collections::HashMap;
     use std::fmt::{Display, Formatter};
     use std::time;
     use chrono::prelude::*;
@@ -171,6 +172,12 @@ pub mod db {
         }
     }
 
+    struct MaterialRepeats {
+        material_id: Uuid,
+        last_repeated_at: NaiveDateTime,
+        repeats_count: u8
+    }
+
     pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
         // TODO: use a matview?
         let stmt = sqlx::query!(r#"
@@ -276,6 +283,26 @@ pub mod db {
             material_repeats_count: stmt.material_repeats_count,
             material_last_repeated_at: stmt.material_last_repeated_at,
         })
+    }
+
+    async fn get_material_repeats_analytics(pool: &PgPool) -> Result<HashMap<Uuid, MaterialRepeats>, sqlx::Error> {
+        let stmt = sqlx::query!(r#"
+            SELECT
+                material_id,
+                MAX(repeated_at) AS "last_repeated_at!",
+                COUNT(1) AS "repeats_count!"
+            FROM repeats
+            GROUP BY material_id
+        "#)
+            .fetch_all(pool)
+            .await?
+            .into_iter()
+            .map(|r| (r.material_id, MaterialRepeats{material_id: r.material_id, last_repeated_at: r.last_repeated_at, repeats_count: r.repeats_count as u8 }))
+            .collect::<HashMap<Uuid, MaterialRepeats>>();
+
+        log::info!("{} material repeats found", stmt.len());
+
+        Ok(stmt)
     }
 
     pub async fn insert_note_history(pool: &PgPool,
