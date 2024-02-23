@@ -173,7 +173,6 @@ pub mod db {
     }
 
     struct MaterialRepeats {
-        material_id: Uuid,
         last_repeated_at: NaiveDateTime,
         repeats_count: u8
     }
@@ -297,7 +296,7 @@ pub mod db {
             .fetch_all(pool)
             .await?
             .into_iter()
-            .map(|r| (r.material_id, MaterialRepeats{material_id: r.material_id, last_repeated_at: r.last_repeated_at, repeats_count: r.repeats_count as u8 }))
+            .map(|r| (r.material_id, MaterialRepeats{last_repeated_at: r.last_repeated_at, repeats_count: r.repeats_count as u8}))
             .collect::<HashMap<Uuid, MaterialRepeats>>();
 
         log::info!("{} material repeats found", stmt.len());
