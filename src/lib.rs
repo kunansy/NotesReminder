@@ -245,7 +245,7 @@ pub mod db {
     }
 
     fn create_uuid() -> Uuid {
-        Uuid::new_v4()
+        Uuid::now_v7()
     }
 
     pub async fn init_pool(uri: &str, timeout: time::Duration) -> Result<PgPool, sqlx::Error> {
