@@ -74,9 +74,11 @@ async fn remind_note<T>(bot: &T, cfg: &Settings, pool: &PgPool)
 
     log::info!("Sending message to the bot");
 
-    let url = note.get_url(&cfg.tracker_web_url).parse().unwrap();
-    let open_button = InlineKeyboardButton::url("Open".to_string(), url);
-    let keyboard = InlineKeyboardMarkup::default().append_row(vec![open_button]);
+    let keyboard = {
+        let url = note.get_url(&cfg.tracker_web_url).parse().unwrap();
+        let open_button = InlineKeyboardButton::url("Open".to_string(), url);
+        InlineKeyboardMarkup::default().append_row(vec![open_button])
+    };
 
     // TODO: process API, timeout errors
     bot.send_message(ChatId(cfg.chat_id), &note.to_string())
@@ -89,6 +91,11 @@ async fn remind_note<T>(bot: &T, cfg: &Settings, pool: &PgPool)
     db::insert_note_history(&pool, note.note_id(), cfg.chat_id)
         .await.expect("Error inserting note history");
     log::info!("History inserted");
+
+    log::info!("Refresh repeat notes view");
+    db::refresh_repeat_notes_view(&pool)
+        .await.expect("Error refreshing the view");
+    log::info!("View refreshed");
 
     let exec_time = start.elapsed();
     log::info!("Note reminded for {:?}", exec_time);

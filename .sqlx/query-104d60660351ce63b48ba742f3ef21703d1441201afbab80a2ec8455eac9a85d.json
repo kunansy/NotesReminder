@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "REFRESH MATERIALIZED VIEW mvw_repeat_notes;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "104d60660351ce63b48ba742f3ef21703d1441201afbab80a2ec8455eac9a85d"
+}
