@@ -74,9 +74,11 @@ async fn remind_note<T>(bot: &T, cfg: &Settings, pool: &PgPool)
 
     log::info!("Sending message to the bot");
 
-    let url = note.get_url(&cfg.tracker_web_url).parse().unwrap();
-    let open_button = InlineKeyboardButton::url("Open".to_string(), url);
-    let keyboard = InlineKeyboardMarkup::default().append_row(vec![open_button]);
+    let keyboard = {
+        let url = note.get_url(&cfg.tracker_web_url).parse().unwrap();
+        let open_button = InlineKeyboardButton::url("Open".to_string(), url);
+        InlineKeyboardMarkup::default().append_row(vec![open_button])
+    };
 
     // TODO: process API, timeout errors
     bot.send_message(ChatId(cfg.chat_id), &note.to_string())
