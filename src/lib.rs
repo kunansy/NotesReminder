@@ -1,5 +1,4 @@
 pub mod db {
-    use std::collections::HashMap;
     use std::fmt::{Display, Formatter};
     use std::time;
     use chrono::prelude::*;
@@ -8,7 +7,6 @@ pub mod db {
     use sqlx::postgres::{PgPool, PgPoolOptions};
     use uuid::Uuid;
     use serde::{Deserialize, Serialize};
-    use tokio::join;
 
     #[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Deserialize, Serialize)]
     #[sqlx(type_name = "materialtypesenum", rename_all = "lowercase")]
@@ -175,11 +173,6 @@ pub mod db {
         }
     }
 
-    struct MaterialRepeats {
-        last_repeated_at: NaiveDateTime,
-        repeats_count: u8
-    }
-
     pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
         let stmt = sqlx::query!(r#"
         SELECT
@@ -230,119 +223,6 @@ pub mod db {
 
         let note = notes.remove(index);
         Ok(note)
-    }
-
-    async fn get_fit_notes(pool: &PgPool) -> Result<Vec<RemindNote>, sqlx::Error> {
-        let stmt = sqlx::query!(r#"
-            WITH repeated_notes_freq AS (
-                SELECT note_id, count(1)
-                FROM note_repeats_history
-                GROUP BY note_id
-            ),
-            all_notes_freq AS (
-                SELECT
-                    n.material_id,
-                    n.note_id AS note_id,
-                    COALESCE(s.count, 0) AS count,
-                    COUNT(1) OVER () AS total
-                FROM notes n
-                LEFT JOIN repeated_notes_freq s USING(note_id)
-                WHERE NOT n.is_deleted
-            ),
-            min_freq AS (
-                SELECT count
-                FROM all_notes_freq
-                ORDER BY count
-                LIMIT 1
-            ),
-            sample_notes AS (
-                SELECT
-                    n.note_id,
-                    n.material_id,
-                    n.page,
-                    n.chapter,
-                    n.title,
-                    n.content,
-                    n.added_at,
-                    f.total AS total_notes_count,
-                    -- m.total AS total_freq_count,
-                    m.count AS min_repeat_freq
-                FROM all_notes_freq f
-                JOIN min_freq m ON f.count = m.count
-                JOIN notes n ON f.note_id = n.note_id
-            )
-            SELECT
-                n.note_id,
-                m.material_id,
-                m.title AS "material_title?",
-                m.authors AS "material_authors?",
-                m.material_type AS "material_type?: MaterialTypes",
-                n.content,
-                n.added_at,
-                n.chapter,
-                n.page,
-                m.pages AS "material_pages?",
-                n.total_notes_count AS "total_notes_count!",
-                n.min_repeat_freq AS "min_repeat_freq!",
-                CASE
-                    -- in this case the note have no material
-                    WHEN m IS NULL THEN 'completed'
-                    WHEN s IS NULL THEN 'queue'
-                    WHEN s.completed_at IS NULL THEN 'reading'
-                    ELSE 'completed'
-                END AS "material_status!"
-            FROM
-                sample_notes n
-            LEFT JOIN materials m on n.material_id = m.material_id
-            LEFT JOIN statuses s on s.material_id = m.material_id
-        "#)
-            .fetch_all(pool)
-            .await?;
-
-        log::info!("Min repeat freq {}, total notes with it {}",
-            stmt.get(0).unwrap().min_repeat_freq, stmt.len());
-
-        let notes = stmt
-            .into_iter()
-            .map(|r| RemindNote{
-                note_id: r.note_id,
-                material_id: r.material_id,
-                content: r.content,
-                page: r.page,
-                chapter: r.chapter,
-                added_at: r.added_at,
-                notes_count: r.total_notes_count,
-                material_title: r.material_title,
-                material_authors: r.material_authors,
-                material_type: r.material_type,
-                material_pages: r.material_pages.unwrap_or(0),
-                material_status: r.material_status,
-                material_repeats_count: None,
-                material_last_repeated_at: None,
-            })
-            .collect::<Vec<RemindNote>>();
-
-        Ok(notes)
-    }
-
-    async fn get_material_repeats_analytics(pool: &PgPool) -> Result<HashMap<Uuid, MaterialRepeats>, sqlx::Error> {
-        let stmt = sqlx::query!(r#"
-            SELECT
-                material_id,
-                MAX(repeated_at) AS "last_repeated_at!",
-                COUNT(1) AS "repeats_count!"
-            FROM repeats
-            GROUP BY material_id
-        "#)
-            .fetch_all(pool)
-            .await?
-            .into_iter()
-            .map(|r| (r.material_id, MaterialRepeats{last_repeated_at: r.last_repeated_at, repeats_count: r.repeats_count as u8}))
-            .collect::<HashMap<Uuid, MaterialRepeats>>();
-
-        log::info!("{} material repeats found", stmt.len());
-
-        Ok(stmt)
     }
 
     pub async fn insert_note_history(pool: &PgPool,
