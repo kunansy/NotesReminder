@@ -1,0 +1,117 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            note_id AS \"note_id!\",\n            material_id,\n            material_title,\n            material_authors,\n            material_type AS \"material_type?: MaterialTypes\",\n            content AS \"content!\",\n            added_at AS \"added_at!\",\n            chapter AS \"chapter!\",\n            page AS \"page!\",\n            material_pages,\n            total_notes_count AS \"total_notes_count!\",\n            min_repeat_freq AS \"min_repeat_freq!\",\n            material_status AS \"material_status!\",\n            repeated_at,\n            repeats_count AS \"repeats_count?\"\n        FROM mvw_repeat_notes\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "note_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "material_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "material_title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "material_authors",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "material_type?: MaterialTypes",
+        "type_info": {
+          "Custom": {
+            "name": "materialtypesenum",
+            "kind": {
+              "Enum": [
+                "book",
+                "article",
+                "course",
+                "lecture",
+                "audiobook"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "content!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "added_at!",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 7,
+        "name": "chapter!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "page!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "material_pages",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "total_notes_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "min_repeat_freq!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 12,
+        "name": "material_status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "repeated_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 14,
+        "name": "repeats_count?",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e236efe269bdbd26e6084fceb4779b535bd0001d6a125f02ee7335c4cea1e451"
+}
