@@ -33,7 +33,7 @@ services:
     container_name: repeat-reminder
     env_file: .env
     restart: always
-    entrypoint: ["/srv/cronn", "-c", "0 ${WEEKEND_REPEAT_HOUR} * * 5-6 /app/app --repeat"]
+    entrypoint: ["/srv/cronn", "-c", "0 17 * * 5-6 /app/app --repeat"]
     depends_on:
       - notes-reminder-bot
     networks:
