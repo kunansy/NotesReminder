@@ -92,6 +92,11 @@ async fn remind_note<T>(bot: &T, cfg: &Settings, pool: &PgPool)
         .await.expect("Error inserting note history");
     log::info!("History inserted");
 
+    log::info!("Refresh repeat notes view");
+    db::refresh_repeat_notes_view(&pool)
+        .await.expect("Error refreshing the view");
+    log::info!("View refreshed");
+
     let exec_time = start.elapsed();
     log::info!("Note reminded for {:?}", exec_time);
 }

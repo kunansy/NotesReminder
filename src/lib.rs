@@ -244,6 +244,12 @@ pub mod db {
         Ok(())
     }
 
+    pub async fn refresh_repeat_notes_view(pool: &PgPool) -> Result<(), sqlx::Error> {
+        sqlx::query!("REFRESH MATERIALIZED VIEW mvw_repeat_notes;").fetch_all(pool).await?;
+
+        Ok(())
+    }
+
     fn create_uuid() -> Uuid {
         Uuid::now_v7()
     }
