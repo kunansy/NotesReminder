@@ -50,7 +50,7 @@ pub mod db {
         material_type: Option<MaterialTypes>,
         material_pages: i32,
         material_status: String,
-        material_repeats_count: Option<u8>,
+        material_repeats_count: Option<i64>,
         material_last_repeated_at: Option<NaiveDateTime>
     }
 
@@ -181,23 +181,54 @@ pub mod db {
     }
 
     pub async fn get_note(pool: &PgPool) -> Result<RemindNote, sqlx::Error> {
-        let (notes, material_repeats) = join!(
-            get_fit_notes(&pool),
-            get_material_repeats_analytics(&pool)
-        );
+        let stmt = sqlx::query!(r#"
+        SELECT
+            note_id AS "note_id!",
+            material_id,
+            material_title,
+            material_authors,
+            material_type AS "material_type?: MaterialTypes",
+            content AS "content!",
+            added_at AS "added_at!",
+            chapter AS "chapter!",
+            page AS "page!",
+            material_pages,
+            total_notes_count AS "total_notes_count!",
+            min_repeat_freq AS "min_repeat_freq!",
+            material_status AS "material_status!",
+            repeated_at,
+            repeats_count AS "repeats_count?"
+        FROM mvw_repeat_notes
+        "#)
+            .fetch_all(pool)
+            .await?;
 
-        let (mut notes, material_repeats) = (notes?, material_repeats?);
+        log::info!("Min repeat freq {}, total notes with it {}",
+            stmt.get(0).unwrap().min_repeat_freq, stmt.len());
+
+        let mut notes = stmt
+            .into_iter()
+            .map(|r| RemindNote{
+                note_id: r.note_id,
+                material_id: r.material_id,
+                content: r.content,
+                page: r.page,
+                chapter: r.chapter,
+                added_at: r.added_at,
+                notes_count: r.total_notes_count,
+                material_title: r.material_title,
+                material_authors: r.material_authors,
+                material_type: r.material_type,
+                material_pages: r.material_pages.unwrap_or(0),
+                material_status: r.material_status,
+                material_repeats_count: r.repeats_count,
+                material_last_repeated_at: r.repeated_at,
+            })
+            .collect::<Vec<RemindNote>>();
 
         let index = rand::thread_rng().gen_range(0..notes.len());
 
-        let mut note = notes.remove(index);
-        if let Some(material_id)  = note.material_id {
-            if let Some(repeat_info) = material_repeats.get(&material_id) {
-                note.material_last_repeated_at = Some(repeat_info.last_repeated_at.clone());
-                note.material_repeats_count = Some(repeat_info.repeats_count);
-            }
-        }
-
+        let note = notes.remove(index);
         Ok(note)
     }
 
