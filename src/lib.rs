@@ -183,6 +183,8 @@ pub mod db {
             repeated_at,
             repeats_count AS "repeats_count?"
         FROM mvw_repeat_notes
+        ORDER BY random()
+        LIMIT 1
         "#)
             .fetch_all(pool)
             .await?;
