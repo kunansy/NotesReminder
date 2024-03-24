@@ -82,28 +82,21 @@ pub mod db {
                         dur.num_days() + 1
                     };
 
-                    let mut s = String::with_capacity(32);
+                    let mut s = Vec::with_capacity(4);
                     if dur / 365 != 0 {
                         let v = (dur / 365) as i32;
-                        s.push_str(&format!("{} years", v));
+                        s.push(format!("{} years", v));
                     }
                     if dur % 365 / 30 != 0 {
                         let v = (dur % 365 / 30) as i32;
-                        if !s.is_empty() {
-                            s.push_str(", ");
-                        }
-                        s.push_str(&format!("{} months", v));
+                        s.push(format!("{} months", v));
                     }
                     if dur % 30 != 0 {
                         let v = (dur % 30) as i32;
-                        if !s.is_empty() {
-                            s.push_str(", ");
-                        }
-                        s.push_str(&format!("{} days", v));
+                        s.push(format!("{} days", v));
                     }
-                    s.push_str(" ago");
 
-                    s
+                    format!("{} ago", s.join(", "))
                 },
                 None => "-".to_string()
             }
