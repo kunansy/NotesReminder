@@ -181,7 +181,8 @@ pub mod db {
             min_repeat_freq AS "min_repeat_freq!",
             material_status AS "material_status!",
             repeated_at,
-            repeats_count AS "repeats_count?"
+            repeats_count AS "repeats_count?",
+            COUNT(1) OVER () AS "notes_to_repeat!"
         FROM mvw_repeat_notes
         ORDER BY random()
         LIMIT 1
@@ -190,7 +191,7 @@ pub mod db {
             .await?;
 
         log::info!("Min repeat freq {}, total notes with it {}",
-            stmt.get(0).unwrap().min_repeat_freq, stmt.len());
+            stmt.min_repeat_freq, stmt.notes_to_repeat);
 
         Ok(RemindNote{
             note_id: stmt.note_id,
