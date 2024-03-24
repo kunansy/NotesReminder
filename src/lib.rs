@@ -186,35 +186,27 @@ pub mod db {
         ORDER BY random()
         LIMIT 1
         "#)
-            .fetch_all(pool)
+            .fetch_one(pool)
             .await?;
 
         log::info!("Min repeat freq {}, total notes with it {}",
             stmt.get(0).unwrap().min_repeat_freq, stmt.len());
 
-        let mut notes = stmt
-            .into_iter()
-            .map(|r| RemindNote{
-                note_id: r.note_id,
-                content: r.content,
-                page: r.page,
-                chapter: r.chapter,
-                added_at: r.added_at,
-                notes_count: r.total_notes_count,
-                material_title: r.material_title,
-                material_authors: r.material_authors,
-                material_type: r.material_type,
-                material_pages: r.material_pages.unwrap_or(0),
-                material_status: r.material_status,
-                material_repeats_count: r.repeats_count,
-                material_last_repeated_at: r.repeated_at,
-            })
-            .collect::<Vec<RemindNote>>();
-
-        let index = rand::thread_rng().gen_range(0..notes.len());
-
-        let note = notes.remove(index);
-        Ok(note)
+        Ok(RemindNote{
+            note_id: stmt.note_id,
+            content: stmt.content,
+            page: stmt.page,
+            chapter: stmt.chapter,
+            added_at: stmt.added_at,
+            notes_count: stmt.total_notes_count,
+            material_title: stmt.material_title,
+            material_authors: stmt.material_authors,
+            material_type: stmt.material_type,
+            material_pages: stmt.material_pages.unwrap_or(0),
+            material_status: stmt.material_status,
+            material_repeats_count: stmt.repeats_count,
+            material_last_repeated_at: stmt.repeated_at,
+        })
     }
 
     pub async fn insert_note_history(pool: &PgPool,
