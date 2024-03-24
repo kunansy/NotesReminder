@@ -42,7 +42,6 @@ pub mod db {
         page: i32,
         added_at: NaiveDateTime,
         notes_count: i64,
-        material_id: Option<Uuid>,
         material_title: Option<String>,
         material_authors: Option<String>,
         material_type: Option<MaterialTypes>,
@@ -177,7 +176,6 @@ pub mod db {
         let stmt = sqlx::query!(r#"
         SELECT
             note_id AS "note_id!",
-            material_id,
             material_title,
             material_authors,
             material_type AS "material_type?: MaterialTypes",
@@ -203,7 +201,6 @@ pub mod db {
             .into_iter()
             .map(|r| RemindNote{
                 note_id: r.note_id,
-                material_id: r.material_id,
                 content: r.content,
                 page: r.page,
                 chapter: r.chapter,
