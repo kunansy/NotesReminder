@@ -49,7 +49,7 @@
       {
         "ordinal": 6,
         "name": "chapter!",
-        "type_info": "Int4"
+        "type_info": "Varchar"
       },
       {
         "ordinal": 7,

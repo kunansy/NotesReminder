@@ -38,7 +38,7 @@ pub mod db {
     pub struct RemindNote {
         note_id: Uuid,
         content: String,
-        chapter: i32,
+        chapter: String,
         page: i32,
         added_at: NaiveDateTime,
         notes_count: i64,
