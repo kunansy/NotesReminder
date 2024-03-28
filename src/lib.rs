@@ -2,7 +2,6 @@ pub mod db {
     use std::fmt::{Display, Formatter};
     use std::time;
     use chrono::prelude::*;
-    use rand::Rng;
 
     use sqlx::postgres::{PgPool, PgPoolOptions};
     use uuid::Uuid;
