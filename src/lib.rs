@@ -250,47 +250,35 @@ pub mod db {
         use regex::{Captures, Regex};
 
         pub fn demark(content: &str) -> String {
-            remove_sub_sup(&dereplace_new_lines(&demark_code(
-                &demark_italic(&demark_bold(content))))).to_string()
+            demark_code(&demark_code_block(&demark_italic(&demark_bold(content)))).to_string()
         }
 
         fn demark_bold(content: &str) -> String {
-            let demark_bold_pattern = Regex::new(r#"<span class="?font-weight-bold"?>(.*?)</span>"#).unwrap();
+            let demark_bold_pattern = Regex::new(r#"\*{2}(.*?)\*{2}"#).unwrap();
             demark_bold_pattern.replace_all(content, |r: &Captures| {
                 format!("<b>{}</b>", &r[1])
             }).to_string()
         }
 
         fn demark_italic(content: &str) -> String {
-            let demark_italic_pattern = Regex::new(r#"<span class="?font-italic"?>(.*?)</span>"#).unwrap();
+            let demark_italic_pattern = Regex::new(r#"\*(.*?)\*"#).unwrap();
             demark_italic_pattern.replace_all(content, |r: &Captures| {
                 format!("<i>{}</i>", &r[1])
             }).to_string()
         }
 
         fn demark_code(content: &str) -> String {
-            let demark_code_pattern = Regex::new(r#"<span class="?font-code"?>(.*?)</span>"#).unwrap();
+            let demark_code_pattern = Regex::new(r#"`(.*?)`"#).unwrap();
             demark_code_pattern.replace_all(content, |r: &Captures| {
                 format!("<code>{}</code>", &r[1])
             }).to_string()
         }
 
-        fn remove_sub_sup(content: &str) -> String {
-            let remove_sub_sup = Regex::new(r"<su[bp]>(.*?)</su[bp]>").unwrap();
-            let remove_span_sub_sup = Regex::new(r#"<span class="?su[bp]"?>(.*?)</span>"#).unwrap();
-
-            let content = remove_sub_sup.replace_all(content, |r: &Captures| {
-                format!("_{}", &r[1])
-            });
-            remove_span_sub_sup.replace_all(&content, |r: &Captures| {
-                format!("_{}", &r[1])
+        fn demark_code_block(content: &str) -> String {
+            let demark_code_pattern = Regex::new(r#"```(.*?)```"#).unwrap();
+            demark_code_pattern.replace_all(content, |r: &Captures| {
+                format!("<pre>{}</pre>", &r[1])
             }).to_string()
-        }
-
-        fn dereplace_new_lines(content: &str) -> String {
-            content.replace("<br/>", "\n")
-                .replace("\r", "")
-                .replace("<br>", "\n")
         }
     }
 }
