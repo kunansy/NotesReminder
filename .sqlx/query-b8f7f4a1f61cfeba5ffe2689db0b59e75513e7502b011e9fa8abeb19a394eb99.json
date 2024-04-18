@@ -69,7 +69,7 @@
       {
         "ordinal": 10,
         "name": "min_repeat_freq!",
-        "type_info": "Int8"
+        "type_info": "Int4"
       },
       {
         "ordinal": 11,
