@@ -1,7 +1,7 @@
 version: '3'
 
 x-img: &img
-    image: kunansy/notes_reminder:2.1.8
+    image: kunansy/notes_reminder:2.1.9
 
 services:
   notes-reminder-bot:
