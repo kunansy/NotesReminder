@@ -13,13 +13,14 @@ pub mod db {
         Book,
         Article,
         Lecture,
-        Course
+        Course,
+        Audiobook,
     }
 
     impl MaterialTypes {
         pub fn as_chapter(&self) -> &'static str {
             match self {
-                MaterialTypes::Book | MaterialTypes::Article => "Chapter",
+                MaterialTypes::Book | MaterialTypes::Article | MaterialTypes::Audiobook => "Chapter",
                 MaterialTypes::Lecture | MaterialTypes::Course => "Part",
             }
         }
@@ -27,7 +28,7 @@ pub mod db {
         pub fn as_page(&self) -> &'static str {
             match self {
                 MaterialTypes::Book | MaterialTypes::Article => "Page",
-                MaterialTypes::Lecture => "Minute",
+                MaterialTypes::Lecture | MaterialTypes::Audiobook => "Minute",
                 MaterialTypes::Course => "Lecture",
             }
         }
