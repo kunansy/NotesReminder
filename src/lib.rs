@@ -4,6 +4,7 @@ pub mod db {
     use chrono::prelude::*;
 
     use sqlx::postgres::{PgPool, PgPoolOptions};
+    use sqlx::types::JsonValue;
     use uuid::Uuid;
     use serde::{Deserialize, Serialize};
 
@@ -41,6 +42,7 @@ pub mod db {
         chapter: String,
         page: i32,
         added_at: NaiveDateTime,
+        tags: JsonValue,
         notes_count: i64,
         material_title: Option<String>,
         material_authors: Option<String>,
