@@ -104,6 +104,10 @@ pub mod db {
             }
         }
 
+        pub fn tags(&self) -> Vec<String> {
+            self.tags.as_array().unwrap().iter().map(|tag| format!("#{}", tag.as_str().unwrap())).collect()
+        }
+
         pub fn get_url(&self, tracker_url: &str) -> String {
             format!("{}/notes/note?note_id={}", tracker_url, self.note_id)
         }
@@ -129,7 +133,7 @@ pub mod db {
                 }
             };
 
-            let mut rows = Vec::with_capacity(10);
+            let mut rows = Vec::with_capacity(12);
 
             if self.has_material() {
                 let material_info = {
@@ -143,6 +147,12 @@ pub mod db {
 
             rows.push(self.content_html());
             rows.push(String::new());
+
+            let tags = self.tags();
+            if tags.len() > 0 {
+                rows.push(format!("{}", tags.join(" ")));
+                rows.push(String::new());
+            }
 
             if self.has_material() {
                 let material_type = self.material_type.as_ref().unwrap();
