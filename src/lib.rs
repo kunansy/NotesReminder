@@ -265,7 +265,7 @@ pub mod db {
         use regex::{Captures, Regex};
 
         pub fn demark(content: &str) -> String {
-            demark_code(&demark_code_block(&demark_italic(&demark_bold(content)))).to_string()
+            demark_sub(&demark_sup(&demark_lt(&demark_gt(&demark_code(&demark_code_block(&demark_italic(&demark_bold(content)))))))).to_string()
         }
 
         fn demark_bold(content: &str) -> String {
@@ -293,6 +293,28 @@ pub mod db {
             let demark_code_pattern = Regex::new(r#"```(.*?)```"#).unwrap();
             demark_code_pattern.replace_all(content, |r: &Captures| {
                 format!("<pre>{}</pre>", &r[1])
+            }).to_string()
+        }
+
+        fn demark_lt(content: &str) -> String {
+            content.replace("<", "&lt;").to_string()
+        }
+
+        fn demark_gt(content: &str) -> String {
+            content.replace(">", "&gt;").to_string()
+        }
+
+        fn demark_sup(content: &str) -> String {
+            let demark_code_pattern = Regex::new(r#"<sup>(.*?)</sup>"#).unwrap();
+            demark_code_pattern.replace_all(content, |r: &Captures| {
+                format!("^{}", &r[1])
+            }).to_string()
+        }
+
+        fn demark_sub(content: &str) -> String {
+            let demark_code_pattern = Regex::new(r#"<sub>(.*?)</sub>"#).unwrap();
+            demark_code_pattern.replace_all(content, |r: &Captures| {
+                format!("_{}", &r[1])
             }).to_string()
         }
     }
