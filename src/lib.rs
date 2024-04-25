@@ -317,6 +317,61 @@ pub mod db {
                 format!("_({})", &r[1])
             }).to_string()
         }
+
+        #[cfg(test)]
+        mod test_demark {
+            use crate::db::demark;
+
+            #[test]
+            fn test_demark_sup() {
+                let res1 = demark::demark_sup("some content <sup>some sup</sup> some end");
+                let res2 = demark::demark_sup("some content <sup>some123</sup> some end");
+
+                assert_eq!(res1, "some content ^(some sup) some end");
+                assert_eq!(res2, "some content ^(some123) some end");
+            }
+
+            #[test]
+            fn test_demark_sub() {
+                let res1 = demark::demark_sub("some content <sub>some sub</sub> some end");
+                let res2 = demark::demark_sub("some content <sub>some123</sub> some end");
+
+                assert_eq!(res1, "some content _(some sub) some end");
+                assert_eq!(res2, "some content _(some123) some end");
+            }
+
+            #[test]
+            fn test_demark_bold() {
+                let res1 = demark::demark_bold("some content **some bold** some end");
+                let res2 = demark::demark_bold("some content **some123** some end");
+                let res3 = demark::demark_bold("**some123**");
+                let res4 = demark::demark_bold("some content **some123**");
+                let res5 = demark::demark_bold("**some123** some end");
+
+                assert_eq!(res1, "some content <b>some bold</b> some end");
+                assert_eq!(res2, "some content <b>some123</b> some end");
+                assert_eq!(res3, "<b>some123</b>");
+                assert_eq!(res4, "some content <b>some123</b>");
+                assert_eq!(res5, "<b>some123</b> some end");
+            }
+
+            #[test]
+            fn test_demark_italic() {
+                let res1 = demark::demark_italic("some content *some italic* some end");
+                let res2 = demark::demark_italic("some content *some123* some end");
+                let res3 = demark::demark_italic("*some123*");
+                let res4 = demark::demark_italic("some content *some123*");
+                let res5 = demark::demark_italic("*some123* some end");
+                let res6 = demark::demark_italic("(*zero flag*)");
+
+                assert_eq!(res1, "some content <i>some italic</i> some end");
+                assert_eq!(res2, "some content <i>some123</i> some end");
+                assert_eq!(res3, "<i>some123</i>");
+                assert_eq!(res4, "some content <i>some123</i>");
+                assert_eq!(res5, "<i>some123</i> some end");
+                assert_eq!(res6, "(<i>zero flag</i>)");
+            }
+        }
     }
 }
 
