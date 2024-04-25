@@ -297,11 +297,11 @@ pub mod db {
         }
 
         fn demark_lt(content: &str) -> String {
-            content.replace("<", "&lt;").to_string()
+            content.replace(" < ", " &lt; ").to_string()
         }
 
         fn demark_gt(content: &str) -> String {
-            content.replace(">", "&gt;").to_string()
+            content.replace(" > ", " &gt; ").to_string()
         }
 
         fn demark_sup(content: &str) -> String {
