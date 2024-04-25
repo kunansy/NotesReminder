@@ -307,14 +307,14 @@ pub mod db {
         fn demark_sup(content: &str) -> String {
             let demark_code_pattern = Regex::new(r#"<sup>(.*?)</sup>"#).unwrap();
             demark_code_pattern.replace_all(content, |r: &Captures| {
-                format!("^{}", &r[1])
+                format!("^({})", &r[1])
             }).to_string()
         }
 
         fn demark_sub(content: &str) -> String {
             let demark_code_pattern = Regex::new(r#"<sub>(.*?)</sub>"#).unwrap();
             demark_code_pattern.replace_all(content, |r: &Captures| {
-                format!("_{}", &r[1])
+                format!("_({})", &r[1])
             }).to_string()
         }
     }
