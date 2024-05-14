@@ -368,13 +368,26 @@ pub mod db {
                 let res4 = demark::demark_italic("some content *some123*");
                 let res5 = demark::demark_italic("*some123* some end");
                 let res6 = demark::demark_italic("(*zero flag*)");
-
+                let res7 = demark::demark_italic("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
+                
                 assert_eq!(res1, "some content <i>some italic</i> some end");
                 assert_eq!(res2, "some content <i>some123</i> some end");
                 assert_eq!(res3, "<i>some123</i>");
                 assert_eq!(res4, "some content <i>some123</i>");
                 assert_eq!(res5, "<i>some123</i> some end");
                 assert_eq!(res6, "(<i>zero flag</i>)");
+                assert_eq!(res7, "Комментарий @ava: <i>«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»</i>.");
+            }
+
+            #[test]
+            fn test_demark() {
+                let res = demark::demark_italic("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
+                let res2 = demark::demark("aksdflsk sdkfja:
+* **sdfsdf** (*dfsdf*) — asda
+* **adfsdj** (*dfsjdk*) — asdas!");
+
+                assert_eq!(res, "Комментарий @ava: <i>«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»</i>.");
+                assert_eq!(res2, "aksdflsk sdkfja:\n* <b>sdfsdf</b> (<i>dfsdf</i>) — asda\n* <b>adfsdj</b> (<i>dfsjdk</i>) — asdas!");
             }
         }
     }
