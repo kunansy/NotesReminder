@@ -157,8 +157,12 @@ pub mod db {
             if self.has_material() {
                 let material_type = self.material_type.as_ref().unwrap();
 
-                rows.push(format!("{}: {}", material_type.as_chapter(), self.chapter));
-                rows.push(format!("{}: {}/{}", material_type.as_page(), self.page, self.material_pages));
+                if self.chapter.len() > 0 {
+                    rows.push(format!("{}: {}", material_type.as_chapter(), self.chapter));
+                }
+                if self.page > 0 {
+                    rows.push(format!("{}: {}/{}", material_type.as_page(), self.page, self.material_pages));
+                }
                 rows.push(format!("Material status: {}", self.material_status));
             }
             rows.push(format!("Added at (UTC): {}", added_at));
