@@ -280,7 +280,8 @@ pub mod db {
         }
 
         fn demark_italic(content: &str) -> String {
-            let demark_italic_pattern = Regex::new(r#"\*(.*?)\*"#).unwrap();
+            // to allow unordered lists the first symbol should be not space
+            let demark_italic_pattern = Regex::new(r#"\*(\S.*?)\*"#).unwrap();
             demark_italic_pattern.replace_all(content, |r: &Captures| {
                 format!("<i>{}</i>", &r[1])
             }).to_string()
