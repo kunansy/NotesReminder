@@ -20,7 +20,7 @@ services:
     container_name: notes-reminder
     env_file: .env
     restart: always
-    entrypoint: ["/srv/cronn", "-c", "0 * * * * /app/app --remind"]
+    entrypoint: ["/srv/cronn", "-c", "${NOTE_REPEAT_SCHEDULE} /app/app --remind"]
     depends_on:
       - notes-reminder-bot
     networks:
