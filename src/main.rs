@@ -137,7 +137,7 @@ async fn answer<T>(bot: &T,
 async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str, tracker_web_url: &str) -> Result<(), T::Err>
     where T: Requester
 {
-    let repeat_q = tracker_api::tracker_api::get_repeat_queue(tracker_url)
+    let repeat_q = tracker_api::get_repeat_queue(tracker_url)
         .await.expect("Could not get repeat queue");
 
     if repeat_q.is_empty() {
