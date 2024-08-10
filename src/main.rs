@@ -1,3 +1,4 @@
+mod tracker_api;
 use std::{io::Write, process::exit, thread, time};
 
 use chrono::Local;
@@ -7,7 +8,7 @@ use signal_hook::iterator::Signals;
 use sqlx::PgPool;
 use teloxide::{prelude::*, types, types::{InlineKeyboardButton, InlineKeyboardMarkup}};
 
-use notes_reminder::{db, settings::{load_env, Settings}, tracker_api};
+use notes_reminder::{db, settings::{load_env, Settings}};
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -136,7 +137,7 @@ async fn answer<T>(bot: &T,
 async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str, tracker_web_url: &str) -> Result<(), T::Err>
     where T: Requester
 {
-    let repeat_q = tracker_api::get_repeat_queue(tracker_url)
+    let repeat_q = tracker_api::tracker_api::get_repeat_queue(tracker_url)
         .await.expect("Could not get repeat queue");
 
     if repeat_q.is_empty() {
