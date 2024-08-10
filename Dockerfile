@@ -15,11 +15,16 @@ COPY vendor ./vendor
 COPY .sqlx ./.sqlx
 COPY src ./src
 
-RUN cargo build --release --offline --target ${TARGET} --jobs $(nproc) -vv
+RUN cargo build \
+    --release \
+    --offline \
+    --target ${TARGET} \
+    --jobs $(nproc) \
+    --target-dir out \
+    -vv
 
 FROM ubuntu:20.04
 
-ARG TARGET=x86_64-unknown-linux-gnu
 ENV RUST_BACKTRACE full
 
 LABEL maintainer="Kirill <k@kunansy.ru>"
@@ -33,7 +38,7 @@ RUN apt-get update  \
 WORKDIR /app
 
 COPY --from=umputun/cronn:latest /srv/cronn /srv/cronn
-COPY --from=builder /build/target/${TARGET}/release/app /app/app
+COPY --from=builder /build/out/release/app /app/app
 
 COPY entrypoint.sh /app
 RUN /app/entrypoint.sh \
