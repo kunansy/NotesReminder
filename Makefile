@@ -6,7 +6,7 @@ build-status:
 	@curl -L \
 		-H "Accept: application/vnd.github+json" \
 		-H "X-GitHub-Api-Version: 2022-11-28" \
-		https://api.github.com/repos/kunansy/NotesReinder/actions/runs \
+		https://api.github.com/repos/kunansy/NotesReminder/actions/runs \
 		| jq '.workflow_runs | .[0] | .display_title,.status,.conclusion'
 
 CURRENT_TAG := $(shell git describe --tags --abbrev=0)
