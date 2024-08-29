@@ -7,12 +7,15 @@ use crate::{
     requests::{Request, Requester},
     types::{Update, UpdateKind},
     update_listeners::{self, UpdateListener},
-    utils::shutdown_token::shutdown_check_timeout_for,
 };
 
 use dptree::di::{DependencyMap, DependencySupplier};
-use futures::{future::BoxFuture, stream::FuturesUnordered, StreamExt};
-use tokio::time::timeout;
+use either::Either;
+use futures::{
+    future::{self, BoxFuture},
+    stream::FuturesUnordered,
+    FutureExt as _, StreamExt as _,
+};
 use tokio_stream::wrappers::ReceiverStream;
 
 use std::{
@@ -21,6 +24,7 @@ use std::{
     future::Future,
     hash::Hash,
     ops::{ControlFlow, Deref},
+    pin::pin,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
@@ -102,6 +106,59 @@ where
 
     /// Specifies the distribution function that decides how updates are grouped
     /// before execution.
+    ///
+    /// ## Update grouping
+    ///
+    /// When [`Dispatcher`] receives updates, it runs dispatching tree
+    /// (handlers) concurrently. This means that multiple updates can be
+    /// processed at the same time.
+    ///
+    /// However, this is not always convenient. For example, if you have global
+    /// state, then you may want to process some updates sequentially, to
+    /// prevent state inconsistencies.
+    ///
+    /// This is why `teloxide` allows grouping updates. Updates for which the
+    /// distribution function `f` returns the same "distribution key" `K` will
+    /// be run in sequence (while still being processed concurrently with the
+    /// updates with different distribution keys).
+    ///
+    /// Updates for which `f` returns `None` will always be processed in
+    /// parallel.
+    ///
+    /// ## Default distribution function
+    ///
+    /// By default the distribution function is equivalent to `|upd|
+    /// upd.chat().map(|chat| chat.id)`, so updates from the same chat will be
+    /// processed sequentially.
+    ///
+    /// This pair nicely with dialogue system, which has state attached to
+    /// chats.
+    ///
+    /// ## Examples
+    ///
+    /// Grouping updates by user who caused this update to happen:
+    ///
+    /// ```
+    /// use teloxide::{dispatching::Dispatcher, dptree, Bot};
+    ///
+    /// let bot = Bot::new("TOKEN");
+    /// let handler = dptree::entry() /* ... */;
+    /// let dp = Dispatcher::builder(bot, handler)
+    ///     .distribution_function(|upd| upd.from().map(|user| user.id))
+    ///     .build();
+    /// # let _: Dispatcher<_, (), _> = dp;
+    /// ```
+    ///
+    /// Not grouping updates at all, always processing updates concurrently:
+    ///
+    /// ```
+    /// use teloxide::{dispatching::Dispatcher, dptree, Bot};
+    ///
+    /// let bot = Bot::new("TOKEN");
+    /// let handler = dptree::entry() /* ... */;
+    /// let dp = Dispatcher::builder(bot, handler).distribution_function(|_| None::<()>).build();
+    /// # let _: Dispatcher<_, (), _> = dp;
+    /// ```
     #[must_use]
     pub fn distribution_function<K>(
         self,
@@ -180,10 +237,13 @@ where
 
 /// The base for update dispatching.
 ///
-/// Updates from different chats are handled concurrently, whereas updates from
-/// the same chats are handled sequentially. If the dispatcher is unable to
-/// determine a chat ID of an incoming update, it will be handled concurrently.
-/// Note that this behaviour can be altered with [`distribution_function`].
+/// ## Update grouping
+///
+/// `Dispatcher` generally processes updates concurrently. However, by default,
+/// updates from the same chat are processed sequentially. [Learn more about
+/// update grouping].
+///
+/// [update grouping]: distribution_function#update-grouping
 ///
 /// See also: ["Dispatching or
 /// REPLs?"](../dispatching/index.html#dispatching-or-repls)
@@ -273,7 +333,6 @@ where
     ///  - An update from Telegram;
     ///  - [`crate::types::Me`] (can be used in [`HandlerExt::filter_command`]).
     ///
-    /// [`shutdown`]: ShutdownToken::shutdown
     /// [`HandlerExt::filter_command`]: crate::dispatching::HandlerExt::filter_command
     pub async fn dispatch(&mut self)
     where
@@ -291,19 +350,39 @@ where
     /// `update_listener_error_handler`.
     ///
     /// This method adds the same dependencies as [`Dispatcher::dispatch`].
-    ///
-    /// [`shutdown`]: ShutdownToken::shutdown
     pub async fn dispatch_with_listener<'a, UListener, Eh>(
         &'a mut self,
-        mut update_listener: UListener,
+        update_listener: UListener,
         update_listener_error_handler: Arc<Eh>,
     ) where
         UListener: UpdateListener + 'a,
         Eh: ErrorHandler<UListener::Err> + 'a,
         UListener::Err: Debug,
     {
+        self.try_dispatch_with_listener(update_listener, update_listener_error_handler)
+            .await
+            .expect("Couldn't prepare dispatching context")
+    }
+
+    /// Same as `dispatch_with_listener` but returns a `Err(_)` instead of
+    /// panicking when the initial telegram api call (`get_me`) fails.
+    ///
+    /// Starts your bot with custom `update_listener` and
+    /// `update_listener_error_handler`.
+    ///
+    /// This method adds the same dependencies as [`Dispatcher::dispatch`].
+    pub async fn try_dispatch_with_listener<'a, UListener, Eh>(
+        &'a mut self,
+        mut update_listener: UListener,
+        update_listener_error_handler: Arc<Eh>,
+    ) -> Result<(), R::Err>
+    where
+        UListener: UpdateListener + 'a,
+        Eh: ErrorHandler<UListener::Err> + 'a,
+        UListener::Err: Debug,
+    {
         // FIXME: there should be a way to check if dependency is already inserted
-        let me = self.bot.get_me().send().await.expect("Failed to retrieve 'me'");
+        let me = self.bot.get_me().send().await?;
         self.dependencies.insert(me);
         self.dependencies.insert(self.bot.clone());
 
@@ -312,7 +391,6 @@ where
         log::debug!("hinting allowed updates: {:?}", allowed_updates);
         update_listener.hint_allowed_updates(&mut allowed_updates.into_iter());
 
-        let shutdown_check_timeout = shutdown_check_timeout_for(&update_listener);
         let mut stop_token = Some(update_listener.stop_token());
 
         self.state.start_dispatching();
@@ -324,19 +402,23 @@ where
             loop {
                 self.remove_inactive_workers_if_needed().await;
 
-                // False positive
-                #[allow(clippy::collapsible_match)]
-                if let Ok(upd) = timeout(shutdown_check_timeout, stream.next()).await {
-                    match upd {
-                        None => break,
-                        Some(upd) => self.process_update(upd, &update_listener_error_handler).await,
-                    }
-                }
+                let res = future::select(stream.next(), pin!(self.state.wait_for_changes()))
+                    .map(either)
+                    .await
+                    .map_either(|l| l.0, |r| r.0);
 
-                if self.state.is_shutting_down() {
-                    if let Some(token) = stop_token.take() {
-                        log::debug!("Start shutting down dispatching...");
-                        token.stop();
+                match res {
+                    Either::Left(upd) => match upd {
+                        Some(upd) => self.process_update(upd, &update_listener_error_handler).await,
+                        None => break,
+                    },
+                    Either::Right(()) => {
+                        if self.state.is_shutting_down() {
+                            if let Some(token) = stop_token.take() {
+                                log::debug!("Start shutting down dispatching...");
+                                token.stop();
+                            }
+                        }
                     }
                 }
             }
@@ -353,6 +435,7 @@ where
             .await;
 
         self.state.done();
+        Ok(())
     }
 
     async fn process_update<LErr, LErrHandler>(
@@ -455,18 +538,8 @@ where
         }
     }
 
-    /// Setups the `^C` handler that [`shutdown`]s dispatching.
-    ///
-    /// [`shutdown`]: ShutdownToken::shutdown
-    #[cfg(feature = "ctrlc_handler")]
-    #[deprecated(since = "0.10.0", note = "use `enable_ctrlc_handler` on builder instead")]
-    pub fn setup_ctrlc_handler(&mut self) -> &mut Self {
-        self.setup_ctrlc_handler_inner();
-        self
-    }
-
-    /// Returns a shutdown token, which can later be used to shutdown
-    /// dispatching.
+    /// Returns a shutdown token, which can later be used to
+    /// [`ShutdownToken::shutdown`].
     pub fn shutdown_token(&self) -> ShutdownToken {
         self.state.clone()
     }
@@ -584,6 +657,12 @@ async fn handle_update<Err>(
     }
 }
 
+fn either<L, R>(x: future::Either<L, R>) -> Either<L, R> {
+    match x {
+        future::Either::Left(l) => Either::Left(l),
+        future::Either::Right(r) => Either::Right(r),
+    }
+}
 #[cfg(test)]
 mod tests {
     use std::convert::Infallible;

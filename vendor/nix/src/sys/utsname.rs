@@ -1,9 +1,8 @@
 //! Get system identification
-use crate::{Errno, Result};
-use libc::c_char;
-use std::ffi::OsStr;
 use std::mem;
-use std::os::unix::ffi::OsStrExt;
+use libc::{self, c_char};
+use std::ffi::CStr;
+use std::str::from_utf8_unchecked;
 
 /// Describes the running system.  Return type of [`uname`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -11,56 +10,47 @@ use std::os::unix::ffi::OsStrExt;
 pub struct UtsName(libc::utsname);
 
 impl UtsName {
-    /// Name of the operating system implementation.
-    pub fn sysname(&self) -> &OsStr {
-        cast_and_trim(&self.0.sysname)
+    /// Name of the operating system implementation
+    pub fn sysname(&self) -> &str {
+        to_str(&(&self.0.sysname as *const c_char ) as *const *const c_char)
     }
 
     /// Network name of this machine.
-    pub fn nodename(&self) -> &OsStr {
-        cast_and_trim(&self.0.nodename)
+    pub fn nodename(&self) -> &str {
+        to_str(&(&self.0.nodename as *const c_char ) as *const *const c_char)
     }
 
     /// Release level of the operating system.
-    pub fn release(&self) -> &OsStr {
-        cast_and_trim(&self.0.release)
+    pub fn release(&self) -> &str {
+        to_str(&(&self.0.release as *const c_char ) as *const *const c_char)
     }
 
     /// Version level of the operating system.
-    pub fn version(&self) -> &OsStr {
-        cast_and_trim(&self.0.version)
+    pub fn version(&self) -> &str {
+        to_str(&(&self.0.version as *const c_char ) as *const *const c_char)
     }
 
     /// Machine hardware platform.
-    pub fn machine(&self) -> &OsStr {
-        cast_and_trim(&self.0.machine)
-    }
-
-    /// NIS or YP domain name of this machine.
-    #[cfg(any(target_os = "android", target_os = "linux"))]
-    pub fn domainname(&self) -> &OsStr {
-        cast_and_trim(&self.0.domainname)
+    pub fn machine(&self) -> &str {
+        to_str(&(&self.0.machine as *const c_char ) as *const *const c_char)
     }
 }
 
 /// Get system identification
-pub fn uname() -> Result<UtsName> {
+pub fn uname() -> UtsName {
     unsafe {
-        let mut ret = mem::MaybeUninit::zeroed();
-        Errno::result(libc::uname(ret.as_mut_ptr()))?;
-        Ok(UtsName(ret.assume_init()))
+        let mut ret = mem::MaybeUninit::uninit();
+        libc::uname(ret.as_mut_ptr());
+        UtsName(ret.assume_init())
     }
 }
 
-fn cast_and_trim(slice: &[c_char]) -> &OsStr {
-    let length = slice
-        .iter()
-        .position(|&byte| byte == 0)
-        .unwrap_or(slice.len());
-    let bytes =
-        unsafe { std::slice::from_raw_parts(slice.as_ptr().cast(), length) };
-
-    OsStr::from_bytes(bytes)
+#[inline]
+fn to_str<'a>(s: *const *const c_char) -> &'a str {
+    unsafe {
+        let res = CStr::from_ptr(*s).to_bytes();
+        from_utf8_unchecked(res)
+    }
 }
 
 #[cfg(test)]
@@ -68,18 +58,18 @@ mod test {
     #[cfg(target_os = "linux")]
     #[test]
     pub fn test_uname_linux() {
-        assert_eq!(super::uname().unwrap().sysname(), "Linux");
+        assert_eq!(super::uname().sysname(), "Linux");
     }
 
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     #[test]
     pub fn test_uname_darwin() {
-        assert_eq!(super::uname().unwrap().sysname(), "Darwin");
+        assert_eq!(super::uname().sysname(), "Darwin");
     }
 
     #[cfg(target_os = "freebsd")]
     #[test]
     pub fn test_uname_freebsd() {
-        assert_eq!(super::uname().unwrap().sysname(), "FreeBSD");
+        assert_eq!(super::uname().sysname(), "FreeBSD");
     }
 }

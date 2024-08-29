@@ -11,9 +11,14 @@
 
 [package]
 edition = "2021"
-rust-version = "1.64"
+rust-version = "1.70"
 name = "teloxide-core"
-version = "0.9.1"
+version = "0.10.1"
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Core part of the `teloxide` library - telegram bot API client"
 homepage = "https://github.com/teloxide/teloxide"
 documentation = "https://docs.rs/teloxide-core/"
@@ -31,9 +36,12 @@ categories = [
 ]
 license = "MIT"
 repository = "https://github.com/teloxide/teloxide"
-resolver = "1"
 
 [package.metadata.docs.rs]
+cargo-args = [
+    "-Zunstable-options",
+    "-Zrustdoc-scrape-examples",
+]
 features = [
     "full",
     "nightly",
@@ -45,26 +53,51 @@ rustdoc-args = [
     "docsrs",
     "-Znormalize-docs",
 ]
-cargo-args = [
-    "-Zunstable-options",
-    "-Zrustdoc-scrape-examples",
-]
 
-[[example]]
-name = "self_info"
-doc-scrape-examples = true
-required-features = [
-    "tokio/macros",
-    "tokio/rt-multi-thread",
-]
+[package.metadata.release]
+enable-features = ["full"]
+tag-prefix = "core-"
+
+[[package.metadata.release.pre-release-replacements]]
+file = "README.md"
+replace = 'teloxide-core = "{{version}}"'
+search = 'teloxide-core = "[^"]+"'
+
+[[package.metadata.release.pre-release-replacements]]
+file = "src/lib.rs"
+replace = 'teloxide-core = "{{version}}"'
+search = 'teloxide-core = "[^"]+"'
+
+[[package.metadata.release.pre-release-replacements]]
+exactly = 1
+file = "CHANGELOG.md"
+replace = """
+## unreleased
+
+## {{version}} - {{date}}"""
+search = "## unreleased"
+
+[lib]
+name = "teloxide_core"
+path = "src/lib.rs"
 
 [[example]]
 name = "erased"
+path = "examples/erased.rs"
 required-features = [
     "tokio/macros",
     "tokio/rt-multi-thread",
     "erased",
     "trace_adaptor",
+]
+
+[[example]]
+name = "self_info"
+path = "examples/self_info.rs"
+doc-scrape-examples = true
+required-features = [
+    "tokio/macros",
+    "tokio/rt-multi-thread",
 ]
 
 [dependencies.bitflags]
@@ -74,7 +107,7 @@ version = "1.2"
 version = "1.0.0"
 
 [dependencies.chrono]
-version = "0.4.19"
+version = "0.4.32"
 default-features = false
 
 [dependencies.derive_more]
@@ -91,9 +124,6 @@ version = "0.4"
 
 [dependencies.mime]
 version = "0.3.16"
-
-[dependencies.never]
-version = "0.1.0"
 
 [dependencies.once_cell]
 version = "1.5.0"
@@ -120,7 +150,7 @@ features = ["derive"]
 [dependencies.serde_json]
 version = "1.0.55"
 
-[dependencies.serde_with_macros]
+[dependencies.serde_with]
 version = "1.5.2"
 
 [dependencies.take_mut]
@@ -184,7 +214,6 @@ features = [
 version = "0.2"
 
 [features]
-auto_send = []
 cache_me = []
 default = ["native-tls"]
 erased = []
@@ -193,13 +222,15 @@ full = [
     "trace_adaptor",
     "erased",
     "cache_me",
-    "auto_send",
 ]
 native-tls = ["reqwest/native-tls"]
 nightly = []
 rustls = ["reqwest/rustls-tls"]
-throttle = [
-    "vecrem",
-    "tokio/macros",
-]
+rustls-native-roots = ["reqwest/rustls-tls-native-roots"]
+throttle = ["vecrem"]
 trace_adaptor = []
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+priority = 0
+check-cfg = ["cfg(dep_docsrs)"]

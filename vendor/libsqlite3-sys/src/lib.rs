@@ -5,12 +5,8 @@
 #[cfg(feature = "bundled-sqlcipher-vendored-openssl")]
 extern crate openssl_sys;
 
-#[cfg(all(windows, feature = "winsqlite3", target_pointer_width = "32"))]
-compile_error!("The `libsqlite3-sys/winsqlite3` feature is not supported on 32 bit targets.");
-
 pub use self::error::*;
 
-use std::default::Default;
 use std::mem;
 
 mod error;
@@ -22,10 +18,10 @@ pub fn SQLITE_STATIC() -> sqlite3_destructor_type {
 
 #[must_use]
 pub fn SQLITE_TRANSIENT() -> sqlite3_destructor_type {
-    Some(unsafe { mem::transmute(-1_isize) })
+    Some(unsafe { mem::transmute::<isize, unsafe extern "C" fn(*mut std::ffi::c_void)>(-1_isize) })
 }
 
-#[allow(clippy::all)]
+#[allow(dead_code, clippy::all)]
 mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
 }

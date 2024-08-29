@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Message, User};
+use crate::types::{MaybeInaccessibleMessage, Message, User};
 
 /// This object represents an incoming callback query from a callback button in
 /// an [inline keyboard].
@@ -15,7 +15,7 @@ use crate::types::{Message, User};
 ///
 /// [inline keyboard]: https://core.telegram.org/bots#inline-keyboards-and-on-the-fly-updating
 /// [inline mode]: https://core.telegram.org/bots/api#inline-mode
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CallbackQuery {
     /// An unique identifier for this query.
@@ -24,10 +24,12 @@ pub struct CallbackQuery {
     /// A sender.
     pub from: User,
 
-    /// A message with the callback button that originated the query. Note that
-    /// message content and message date will not be available if the message
-    /// is too old.
-    pub message: Option<Message>,
+    /// Message sent by the bot with the callback button that originated the
+    /// query.
+    ///
+    /// Note: if the message is too old, it will be
+    /// [`MaybeInaccessibleMessage::Inaccessible`].
+    pub message: Option<MaybeInaccessibleMessage>,
 
     /// An identifier of the message sent via the bot in inline mode, that
     /// originated the query.
@@ -40,13 +42,34 @@ pub struct CallbackQuery {
     /// [games]: https://core.telegram.org/bots/api#games
     pub chat_instance: String,
 
-    /// A data associated with the callback button. Be aware that a bad client
-    /// can send arbitrary data in this field.
+    /// A data associated with the callback button.
     pub data: Option<String>,
 
     /// A short name of a Game to be returned, serves as the unique identifier
     /// for the game.
     pub game_short_name: Option<String>,
+}
+
+impl CallbackQuery {
+    /// Returns all users that are "contained" in this `CallbackQuery`
+    /// structure.
+    ///
+    /// This might be useful to track information about users.
+    /// Note that this function can return duplicate users.
+    pub fn mentioned_users(&self) -> impl Iterator<Item = &User> {
+        use crate::util::flatten;
+        use std::iter::once;
+
+        once(&self.from).chain(flatten(self.regular_message().map(Message::mentioned_users)))
+    }
+
+    #[must_use]
+    pub fn regular_message(&self) -> Option<&Message> {
+        self.message
+            .as_ref()
+            // If we can access the message
+            .and_then(|maybe| maybe.regular_message())
+    }
 }
 
 #[cfg(test)]

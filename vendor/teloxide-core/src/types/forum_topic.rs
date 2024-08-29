@@ -1,14 +1,16 @@
+use crate::types::ThreadId;
+
 use serde::{Deserialize, Serialize};
 
 /// This object represents a forum topic.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#forumtopiccreated).
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct ForumTopic {
     /// Unique identifier of the forum topic
-    // FIXME: MessageThreadId or something
-    pub message_thread_id: i32,
+    #[serde(rename = "message_thread_id")]
+    pub thread_id: ThreadId,
 
     /// Name of the topic.
     pub name: String,

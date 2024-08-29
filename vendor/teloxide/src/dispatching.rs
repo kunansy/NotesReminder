@@ -91,8 +91,7 @@
 //! several techniques:
 //!
 //!  - **Branching:** `a.branch(b)` roughly means "try to handle an update with
-//!    `a`, then, if it
-//! neglects the update, try `b`".
+//!    `a`, then, if it neglects the update, try `b`".
 //!  - **Pattern matching:** We also use the [`dptree::case!`] macro
 //!    extensively, which acts as a filter on an enumeration: if it is of a
 //!    certain variant, it passes the variant's payload down the handler chain;
@@ -216,23 +215,6 @@
 //! [`Update`]: crate::types::Update
 
 pub mod dialogue;
-
-/// This module was moved to [`teloxide::update_listeners`].
-///
-/// [`teloxide::update_listeners`]: crate::update_listeners
-#[deprecated = "This module was moved. Use `teloxide::update_listeners` instead."]
-pub mod update_listeners {
-    pub use crate::update_listeners::*;
-}
-
-/// This module was moved to [`teloxide::repls`].
-///
-/// [`teloxide::repls`]: crate::repls
-#[deprecated = "This module was moved. Use `teloxide::repls` instead."]
-#[cfg(all(feature = "ctrlc_handler"))]
-pub mod repls {
-    pub use crate::repls::*;
-}
 
 mod dispatcher;
 mod distribution;

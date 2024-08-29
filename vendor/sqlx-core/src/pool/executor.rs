@@ -3,7 +3,7 @@ use futures_core::future::BoxFuture;
 use futures_core::stream::BoxStream;
 use futures_util::TryStreamExt;
 
-use crate::database::{Database, HasStatement};
+use crate::database::Database;
 use crate::describe::Describe;
 use crate::error::Error;
 use crate::executor::{Execute, Executor};
@@ -15,12 +15,12 @@ where
 {
     type Database = DB;
 
-    fn fetch_many<'e, 'q: 'e, E: 'q>(
+    fn fetch_many<'e, 'q: 'e, E>(
         self,
         query: E,
     ) -> BoxStream<'e, Result<Either<DB::QueryResult, DB::Row>, Error>>
     where
-        E: Execute<'q, Self::Database>,
+        E: 'q + Execute<'q, Self::Database>,
     {
         let pool = self.clone();
 
@@ -36,12 +36,12 @@ where
         })
     }
 
-    fn fetch_optional<'e, 'q: 'e, E: 'q>(
+    fn fetch_optional<'e, 'q: 'e, E>(
         self,
         query: E,
     ) -> BoxFuture<'e, Result<Option<DB::Row>, Error>>
     where
-        E: Execute<'q, Self::Database>,
+        E: 'q + Execute<'q, Self::Database>,
     {
         let pool = self.clone();
 
@@ -52,7 +52,7 @@ where
         self,
         sql: &'q str,
         parameters: &'e [<Self::Database as Database>::TypeInfo],
-    ) -> BoxFuture<'e, Result<<Self::Database as HasStatement<'q>>::Statement, Error>> {
+    ) -> BoxFuture<'e, Result<<Self::Database as Database>::Statement<'q>, Error>> {
         let pool = self.clone();
 
         Box::pin(async move { pool.acquire().await?.prepare_with(sql, parameters).await })
@@ -117,7 +117,7 @@ where
 //         parameters: &'e [<DB as crate::database::Database>::TypeInfo],
 //     ) -> futures_core::future::BoxFuture<
 //         'e,
-//         Result<<DB as crate::database::HasStatement<'q>>::Statement, crate::error::Error>,
+//         Result<<DB as crate::database::Database>::Statement<'q>, crate::error::Error>,
 //     >
 //     where
 //         'c: 'e,

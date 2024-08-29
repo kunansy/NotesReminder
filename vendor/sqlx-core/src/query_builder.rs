@@ -5,7 +5,7 @@ use std::fmt::Write;
 use std::marker::PhantomData;
 
 use crate::arguments::{Arguments, IntoArguments};
-use crate::database::{Database, HasArguments};
+use crate::database::Database;
 use crate::encode::Encode;
 use crate::from_row::FromRow;
 use crate::query::Query;
@@ -27,7 +27,7 @@ where
 {
     query: String,
     init_len: usize,
-    arguments: Option<<DB as HasArguments<'args>>::Arguments>,
+    arguments: Option<<DB as Database>::Arguments<'args>>,
 }
 
 impl<'args, DB: Database> Default for QueryBuilder<'args, DB> {
@@ -49,7 +49,7 @@ where
     /// Start building a query with an initial SQL fragment, which may be an empty string.
     pub fn new(init: impl Into<String>) -> Self
     where
-        <DB as HasArguments<'args>>::Arguments: Default,
+        <DB as Database>::Arguments<'args>: Default,
     {
         let init = init.into();
 
@@ -147,7 +147,7 @@ where
     /// [postgres-limit-issue]: https://github.com/launchbadge/sqlx/issues/671#issuecomment-687043510
     pub fn push_bind<T>(&mut self, value: T) -> &mut Self
     where
-        T: 'args + Encode<'args, DB> + Send + Type<DB>,
+        T: 'args + Encode<'args, DB> + Type<DB>,
     {
         self.sanity_check();
 
@@ -155,7 +155,7 @@ where
             .arguments
             .as_mut()
             .expect("BUG: Arguments taken already");
-        arguments.add(value);
+        arguments.add(value).expect("Failed to add argument");
 
         arguments
             .format_placeholder(&mut self.query)
@@ -445,12 +445,12 @@ where
     /// to the state it was in immediately after [`new()`][Self::new].
     ///
     /// Calling any other method but `.reset()` after `.build()` will panic for sanity reasons.
-    pub fn build(&mut self) -> Query<'_, DB, <DB as HasArguments<'args>>::Arguments> {
+    pub fn build(&mut self) -> Query<'_, DB, <DB as Database>::Arguments<'args>> {
         self.sanity_check();
 
         Query {
             statement: Either::Left(&self.query),
-            arguments: self.arguments.take(),
+            arguments: self.arguments.take().map(Ok),
             database: PhantomData,
             persistent: true,
         }
@@ -470,7 +470,7 @@ where
     /// Calling any other method but `.reset()` after `.build()` will panic for sanity reasons.
     pub fn build_query_as<'q, T: FromRow<'q, DB::Row>>(
         &'q mut self,
-    ) -> QueryAs<'q, DB, T, <DB as HasArguments<'args>>::Arguments> {
+    ) -> QueryAs<'q, DB, T, <DB as Database>::Arguments<'args>> {
         QueryAs {
             inner: self.build(),
             output: PhantomData,
@@ -491,7 +491,7 @@ where
     /// Calling any other method but `.reset()` after `.build()` will panic for sanity reasons.
     pub fn build_query_scalar<'q, T>(
         &'q mut self,
-    ) -> QueryScalar<'q, DB, T, <DB as HasArguments<'args>>::Arguments>
+    ) -> QueryScalar<'q, DB, T, <DB as Database>::Arguments<'args>>
     where
         DB: Database,
         (T,): for<'r> FromRow<'r, DB::Row>,
@@ -569,7 +569,7 @@ where
     /// See [`QueryBuilder::push_bind()`] for details.
     pub fn push_bind<T>(&mut self, value: T) -> &mut Self
     where
-        T: 'args + Encode<'args, DB> + Send + Type<DB>,
+        T: 'args + Encode<'args, DB> + Type<DB>,
     {
         if self.push_separator {
             self.query_builder.push(&self.separator);
@@ -587,124 +587,9 @@ where
     /// Simply calls [`QueryBuilder::push_bind()`] directly.
     pub fn push_bind_unseparated<T>(&mut self, value: T) -> &mut Self
     where
-        T: 'args + Encode<'args, DB> + Send + Type<DB>,
+        T: 'args + Encode<'args, DB> + Type<DB>,
     {
         self.query_builder.push_bind(value);
         self
-    }
-}
-
-#[cfg(all(test, feature = "postgres"))]
-mod test {
-    use crate::postgres::Postgres;
-
-    use super::*;
-
-    #[test]
-    fn test_new() {
-        let qb: QueryBuilder<'_, Postgres> = QueryBuilder::new("SELECT * FROM users");
-        assert_eq!(qb.query, "SELECT * FROM users");
-    }
-
-    #[test]
-    fn test_push() {
-        let mut qb: QueryBuilder<'_, Postgres> = QueryBuilder::new("SELECT * FROM users");
-        let second_line = " WHERE last_name LIKE '[A-N]%;";
-        qb.push(second_line);
-
-        assert_eq!(
-            qb.query,
-            "SELECT * FROM users WHERE last_name LIKE '[A-N]%;".to_string(),
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_push_panics_when_no_arguments() {
-        let mut qb: QueryBuilder<'_, Postgres> = QueryBuilder::new("SELECT * FROM users;");
-        qb.arguments = None;
-
-        qb.push("SELECT * FROM users;");
-    }
-
-    #[test]
-    fn test_push_bind() {
-        let mut qb: QueryBuilder<'_, Postgres> =
-            QueryBuilder::new("SELECT * FROM users WHERE id = ");
-
-        qb.push_bind(42i32)
-            .push(" OR membership_level = ")
-            .push_bind(3i32);
-
-        assert_eq!(
-            qb.query,
-            "SELECT * FROM users WHERE id = $1 OR membership_level = $2"
-        );
-    }
-
-    #[test]
-    fn test_build() {
-        let mut qb: QueryBuilder<'_, Postgres> = QueryBuilder::new("SELECT * FROM users");
-
-        qb.push(" WHERE id = ").push_bind(42i32);
-        let query = qb.build();
-
-        assert_eq!(
-            query.statement.unwrap_left(),
-            "SELECT * FROM users WHERE id = $1"
-        );
-        assert_eq!(query.persistent, true);
-    }
-
-    #[test]
-    fn test_reset() {
-        let mut qb: QueryBuilder<'_, Postgres> = QueryBuilder::new("");
-
-        let _query = qb
-            .push("SELECT * FROM users WHERE id = ")
-            .push_bind(42i32)
-            .build();
-
-        qb.reset();
-
-        assert_eq!(qb.query, "");
-    }
-
-    #[test]
-    fn test_query_builder_reuse() {
-        let mut qb: QueryBuilder<'_, Postgres> = QueryBuilder::new("");
-
-        let _query = qb
-            .push("SELECT * FROM users WHERE id = ")
-            .push_bind(42i32)
-            .build();
-
-        qb.reset();
-
-        let query = qb.push("SELECT * FROM users WHERE id = 99").build();
-
-        assert_eq!(
-            query.statement.unwrap_left(),
-            "SELECT * FROM users WHERE id = 99"
-        );
-    }
-
-    #[test]
-    fn test_query_builder_with_args() {
-        let mut qb: QueryBuilder<'_, Postgres> = QueryBuilder::new("");
-
-        let query = qb
-            .push("SELECT * FROM users WHERE id = ")
-            .push_bind(42i32)
-            .build();
-
-        let mut qb: QueryBuilder<'_, Postgres> =
-            QueryBuilder::new_with(query.sql(), query.take_arguments());
-        let query = qb.push("OR membership_level =").push_bind(3i32).build();
-
-        assert_eq!(
-            query.sql(),
-            "SELECT * FROM users WHERE id = $1 OR membership_level = $2"
-        );
     }
 }

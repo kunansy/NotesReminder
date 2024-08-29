@@ -78,6 +78,10 @@ pub enum Error {
         source: BoxDynError,
     },
 
+    /// Error occured while encoding a value.
+    #[error("error occured while encoding a value: {0}")]
+    Encode(#[source] BoxDynError),
+
     /// Error occurred while decoding a value.
     #[error("error occurred while decoding: {0}")]
     Decode(#[source] BoxDynError),
@@ -308,11 +312,16 @@ impl From<crate::migrate::MigrateError> for Error {
 /// Format an error message as a `Protocol` error
 #[macro_export]
 macro_rules! err_protocol {
-    ($expr:expr) => {
-        $crate::error::Error::Protocol($expr.into())
-    };
-
-    ($fmt:expr, $($arg:tt)*) => {
-        $crate::error::Error::Protocol(format!($fmt, $($arg)*))
+    ($($fmt_args:tt)*) => {
+        $crate::error::Error::Protocol(
+            format!(
+                "{} ({}:{})",
+                // Note: the format string needs to be unmodified (e.g. by `concat!()`)
+                // for implicit formatting arguments to work
+                format_args!($($fmt_args)*),
+                module_path!(),
+                line!(),
+            )
+        )
     };
 }

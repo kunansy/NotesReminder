@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, ParseMode};
+use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, ParseMode, Seconds};
 
 /// Represents a link to a video animation (H.264/MPEG-4 AVC video without
 /// sound).
@@ -10,26 +10,34 @@ use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, Par
 /// a message with the specified content instead of the animation.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#inlinequeryresultmpeg4gif).
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InlineQueryResultMpeg4Gif {
     /// Unique identifier for this result, 1-64 bytes.
     pub id: String,
 
+    // FIXME: rename everything so that it doesn't have `mpeg4_` (and similarly for other
+    // `InlineQueryResult*`)
     /// A valid URL for the MP4 file. File size must not exceed 1MB.
     pub mpeg4_url: reqwest::Url,
 
     /// Video width.
-    pub mpeg4_width: Option<i32>,
+    pub mpeg4_width: Option<u32>,
 
     /// Video height.
-    pub mpeg4_height: Option<i32>,
+    pub mpeg4_height: Option<u32>,
 
     /// Video duration.
-    pub mpeg4_duration: Option<i32>,
+    pub mpeg4_duration: Option<Seconds>,
 
-    /// URL of the static thumbnail (jpeg or gif) for the result.
-    pub thumb_url: reqwest::Url,
+    /// URL of the static (JPEG or GIF) or animated (MPEG4) thumbnail for the
+    /// result
+    pub thumbnail_url: reqwest::Url,
+
+    // FIXME: maybe make dedicated enum for the mime type?
+    /// MIME type of the thumbnail, must be one of “image/jpeg”, “image/gif”, or
+    /// “video/mp4”. Defaults to “image/jpeg”
+    pub thumbnail_mime_type: Option<String>,
 
     /// Title for the result.
     pub title: Option<String>,
@@ -59,14 +67,15 @@ pub struct InlineQueryResultMpeg4Gif {
 }
 
 impl InlineQueryResultMpeg4Gif {
-    pub fn new<S>(id: S, mpeg4_url: reqwest::Url, thumb_url: reqwest::Url) -> Self
+    pub fn new<S>(id: S, mpeg4_url: reqwest::Url, thumbnail_url: reqwest::Url) -> Self
     where
         S: Into<String>,
     {
         Self {
             id: id.into(),
             mpeg4_url,
-            thumb_url,
+            thumbnail_url,
+            thumbnail_mime_type: None,
             mpeg4_width: None,
             mpeg4_height: None,
             mpeg4_duration: None,
@@ -94,26 +103,26 @@ impl InlineQueryResultMpeg4Gif {
     }
 
     #[must_use]
-    pub fn mpeg4_width(mut self, val: i32) -> Self {
+    pub fn mpeg4_width(mut self, val: u32) -> Self {
         self.mpeg4_width = Some(val);
         self
     }
 
     #[must_use]
-    pub fn mpeg4_height(mut self, val: i32) -> Self {
+    pub fn mpeg4_height(mut self, val: u32) -> Self {
         self.mpeg4_height = Some(val);
         self
     }
 
     #[must_use]
-    pub fn mpeg4_duration(mut self, val: i32) -> Self {
+    pub fn mpeg4_duration(mut self, val: Seconds) -> Self {
         self.mpeg4_duration = Some(val);
         self
     }
 
     #[must_use]
-    pub fn thumb_url(mut self, val: reqwest::Url) -> Self {
-        self.thumb_url = val;
+    pub fn thumbnail_url(mut self, val: reqwest::Url) -> Self {
+        self.thumbnail_url = val;
         self
     }
 

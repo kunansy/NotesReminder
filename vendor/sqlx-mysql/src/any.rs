@@ -6,7 +6,7 @@ use crate::{
 use either::Either;
 use futures_core::future::BoxFuture;
 use futures_core::stream::BoxStream;
-use futures_util::{StreamExt, TryFutureExt, TryStreamExt};
+use futures_util::{stream, StreamExt, TryFutureExt, TryStreamExt};
 use sqlx_core::any::{
     Any, AnyArguments, AnyColumn, AnyConnectOptions, AnyConnectionBackend, AnyQueryResult, AnyRow,
     AnyStatement, AnyTypeInfo, AnyTypeInfoKind,
@@ -16,6 +16,7 @@ use sqlx_core::database::Database;
 use sqlx_core::describe::Describe;
 use sqlx_core::executor::Executor;
 use sqlx_core::transaction::TransactionManager;
+use std::future;
 
 sqlx_core::declare_driver_with_optional_migrate!(DRIVER = MySql);
 
@@ -74,13 +75,19 @@ impl AnyConnectionBackend for MySqlConnection {
     fn fetch_many<'q>(
         &'q mut self,
         query: &'q str,
+        persistent: bool,
         arguments: Option<AnyArguments<'q>>,
     ) -> BoxStream<'q, sqlx_core::Result<Either<AnyQueryResult, AnyRow>>> {
-        let persistent = arguments.is_some();
-        let args = arguments.as_ref().map(AnyArguments::convert_to);
+        let persistent = persistent && arguments.is_some();
+        let arguments = match arguments.as_ref().map(AnyArguments::convert_to).transpose() {
+            Ok(arguments) => arguments,
+            Err(error) => {
+                return stream::once(future::ready(Err(sqlx_core::Error::Encode(error)))).boxed()
+            }
+        };
 
         Box::pin(
-            self.run(query, args, persistent)
+            self.run(query, arguments, persistent)
                 .try_flatten_stream()
                 .map(|res| {
                     Ok(match res? {
@@ -94,17 +101,25 @@ impl AnyConnectionBackend for MySqlConnection {
     fn fetch_optional<'q>(
         &'q mut self,
         query: &'q str,
+        persistent: bool,
         arguments: Option<AnyArguments<'q>>,
     ) -> BoxFuture<'q, sqlx_core::Result<Option<AnyRow>>> {
-        let persistent = arguments.is_some();
-        let args = arguments.as_ref().map(AnyArguments::convert_to);
+        let persistent = persistent && arguments.is_some();
+        let arguments = arguments
+            .as_ref()
+            .map(AnyArguments::convert_to)
+            .transpose()
+            .map_err(sqlx_core::Error::Encode);
 
         Box::pin(async move {
-            let stream = self.run(query, args, persistent).await?;
+            let arguments = arguments?;
+            let stream = self.run(query, arguments, persistent).await?;
             futures_util::pin_mut!(stream);
 
-            if let Some(Either::Right(row)) = stream.try_next().await? {
-                return Ok(Some(AnyRow::try_from(&row)?));
+            while let Some(result) = stream.try_next().await? {
+                if let Either::Right(row) = result {
+                    return Ok(Some(AnyRow::try_from(&row)?));
+                }
             }
 
             Ok(None)
@@ -198,6 +213,8 @@ impl<'a> TryFrom<&'a AnyConnectOptions> for MySqlConnectOptions {
 fn map_result(result: MySqlQueryResult) -> AnyQueryResult {
     AnyQueryResult {
         rows_affected: result.rows_affected,
+        // Don't expect this to be a problem
+        #[allow(clippy::cast_possible_wrap)]
         last_insert_id: Some(result.last_insert_id as i64),
     }
 }

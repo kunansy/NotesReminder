@@ -3,7 +3,9 @@
 use serde::Serialize;
 use url::Url;
 
-use crate::types::{InlineKeyboardMarkup, LabeledPrice, Message, Recipient};
+use crate::types::{
+    InlineKeyboardMarkup, LabeledPrice, Message, Recipient, ReplyParameters, ThreadId,
+};
 
 impl_payload! {
     /// Use this method to send invoices. On success, the sent [`Message`] is returned.
@@ -31,7 +33,7 @@ impl_payload! {
         }
         optional {
             /// Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
-            pub message_thread_id: i32,
+            pub message_thread_id: ThreadId,
             /// The maximum accepted amount for tips in the smallest units of the currency (integer, **not** float/double). For example, for a maximum tip of `US$ 1.45` pass `max_tip_amount = 145`. See the exp parameter in [`currencies.json`], it shows the number of digits past the decimal point for each currency (2 for the majority of currencies). Defaults to 0
             ///
             /// [`currencies.json`]: https://core.telegram.org/bots/payments/currencies.json
@@ -45,11 +47,11 @@ impl_payload! {
             /// URL of the product photo for the invoice. Can be a photo of the goods or a marketing image for a service. People like it better when they see what they are paying for.
             pub photo_url: Url,
             /// Photo size in bytes
-            pub photo_size: String [into],
+            pub photo_size: u32,
             /// Photo width
-            pub photo_width: String [into],
+            pub photo_width: u32,
             /// Photo height
-            pub photo_height: String [into],
+            pub photo_height: u32,
             /// Pass _True_, if you require the user's full name to complete the order
             pub need_name: bool,
             /// Pass _True_, if you require the user's phone number to complete the order
@@ -70,10 +72,8 @@ impl_payload! {
             pub disable_notification: bool,
             /// Protects the contents of sent messages from forwarding and saving
             pub protect_content: bool,
-            /// If the message is a reply, ID of the original message
-            pub reply_to_message_id: i32,
-            /// Pass _True_, if the message should be sent even if the specified replied-to message is not found
-            pub allow_sending_without_reply: bool,
+            /// Description of the message to reply to
+            pub reply_parameters: ReplyParameters,
             /// A JSON-serialized object for an [inline keyboard]. If empty, one 'Pay `total price`' button will be shown. If not empty, the first button must be a Pay button.
             ///
             /// [inline keyboard]: https://core.telegram.org/bots#inline-keyboards-and-on-the-fly-updating

@@ -9,6 +9,7 @@ use crate::types::{User, UserId};
 /// For example, hashtags, usernames, URLs, etc.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#messageentity).
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct MessageEntity {
     #[serde(flatten)]
@@ -235,7 +236,7 @@ impl<'a> MessageEntityRef<'a> {
     }
 }
 
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
@@ -248,6 +249,7 @@ pub enum MessageEntityKind {
     Email,
     PhoneNumber,
     Bold,
+    Blockquote,
     Italic,
     Underline,
     Strikethrough,
@@ -263,7 +265,6 @@ pub enum MessageEntityKind {
 mod tests {
     use super::*;
     use cool_asserts::assert_matches;
-    use MessageEntity;
     use MessageEntityKind::*;
 
     #[test]
@@ -282,6 +283,18 @@ mod tests {
                 r#"{"type":"text_link","url":"https://example.com","offset":1,"length":2}"#
             )
             .unwrap()
+        );
+    }
+
+    // https://github.com/teloxide/teloxide/issues/1062
+    #[test]
+    fn blockquote() {
+        use serde_json::from_str;
+
+        assert_eq!(
+            MessageEntity { kind: MessageEntityKind::Blockquote, offset: 32, length: 92 },
+            from_str::<MessageEntity>(r#"{"type": "blockquote", "offset": 32, "length": 92}"#)
+                .unwrap()
         );
     }
 

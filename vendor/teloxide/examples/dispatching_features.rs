@@ -5,7 +5,7 @@ use rand::Rng;
 
 use teloxide::{
     prelude::*,
-    types::{Dice, Update, UserId},
+    types::{Dice, ReplyParameters},
     utils::command::BotCommands,
 };
 
@@ -34,13 +34,13 @@ async fn main() {
         .branch(
             // Filter a maintainer by a user ID.
             dptree::filter(|cfg: ConfigParameters, msg: Message| {
-                msg.from().map(|user| user.id == cfg.bot_maintainer).unwrap_or_default()
+                msg.from.map(|user| user.id == cfg.bot_maintainer).unwrap_or_default()
             })
             .filter_command::<MaintainerCommands>()
             .endpoint(|msg: Message, bot: Bot, cmd: MaintainerCommands| async move {
                 match cmd {
                     MaintainerCommands::Rand { from, to } => {
-                        let mut rng = rand::rngs::OsRng::default();
+                        let mut rng = rand::rngs::OsRng;
                         let value: u64 = rng.gen_range(from..=to);
 
                         bot.send_message(msg.chat.id, value.to_string()).await?;
@@ -64,7 +64,7 @@ async fn main() {
             // filter only messages with dices.
             Message::filter_dice().endpoint(|bot: Bot, msg: Message, dice: Dice| async move {
                 bot.send_message(msg.chat.id, format!("Dice value: {}", dice.value))
-                    .reply_to_message_id(msg.id)
+                    .reply_parameters(ReplyParameters::new(msg.id))
                     .await?;
                 Ok(())
             }),
@@ -95,21 +95,24 @@ struct ConfigParameters {
     maintainer_username: Option<String>,
 }
 
+/// Simple commands
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "Simple commands")]
+#[command(rename_rule = "lowercase")]
 enum SimpleCommand {
-    #[command(description = "shows this message.")]
+    /// Shows this message.
     Help,
-    #[command(description = "shows maintainer info.")]
+    /// Shows maintainer info.
     Maintainer,
-    #[command(description = "shows your ID.")]
+    /// Shows your ID.
     MyId,
 }
 
+/// Maintainer commands
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "Maintainer commands")]
+#[command(rename_rule = "lowercase")]
 enum MaintainerCommands {
-    #[command(parse_with = "split", description = "generate a number within range")]
+    /// Generate a number within range
+    #[command(parse_with = "split")]
     Rand { from: u64, to: u64 },
 }
 
@@ -122,7 +125,7 @@ async fn simple_commands_handler(
 ) -> Result<(), teloxide::RequestError> {
     let text = match cmd {
         SimpleCommand::Help => {
-            if msg.from().unwrap().id == cfg.bot_maintainer {
+            if msg.from.unwrap().id == cfg.bot_maintainer {
                 format!(
                     "{}\n\n{}",
                     SimpleCommand::descriptions(),
@@ -135,7 +138,7 @@ async fn simple_commands_handler(
             }
         }
         SimpleCommand::Maintainer => {
-            if msg.from().unwrap().id == cfg.bot_maintainer {
+            if msg.from.as_ref().unwrap().id == cfg.bot_maintainer {
                 "Maintainer is you!".into()
             } else if let Some(username) = cfg.maintainer_username {
                 format!("Maintainer is @{username}")
@@ -144,7 +147,7 @@ async fn simple_commands_handler(
             }
         }
         SimpleCommand::MyId => {
-            format!("{}", msg.from().unwrap().id)
+            format!("{}", msg.from.unwrap().id)
         }
     };
 

@@ -81,32 +81,48 @@
 use camino::Utf8PathBuf;
 #[cfg(feature = "builder")]
 use derive_builder::Builder;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
+use std::ffi::OsString;
 use std::fmt;
+use std::hash::Hash;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str::from_utf8;
 
 pub use camino;
-pub use semver::{Version, VersionReq};
+pub use semver;
+use semver::Version;
 
+#[cfg(feature = "builder")]
+pub use dependency::DependencyBuilder;
 pub use dependency::{Dependency, DependencyKind};
 use diagnostic::Diagnostic;
 pub use errors::{Error, Result};
+#[cfg(feature = "unstable")]
+pub use libtest::TestMessage;
 #[allow(deprecated)]
 pub use messages::parse_messages;
 pub use messages::{
-    Artifact, ArtifactProfile, BuildFinished, BuildScript, CompilerMessage, Message, MessageIter,
+    Artifact, ArtifactDebuginfo, ArtifactProfile, BuildFinished, BuildScript, CompilerMessage,
+    Message, MessageIter,
 };
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "builder")]
+pub use messages::{
+    ArtifactBuilder, ArtifactProfileBuilder, BuildFinishedBuilder, BuildScriptBuilder,
+    CompilerMessageBuilder,
+};
+use serde::{Deserialize, Deserializer, Serialize};
 
 mod dependency;
 pub mod diagnostic;
 mod errors;
+#[cfg(feature = "unstable")]
+pub mod libtest;
 mod messages;
 
 /// An "opaque" identifier for a package.
+///
 /// It is possible to inspect the `repr` field, if the need arises, but its
 /// precise format is an implementation detail and is subject to change.
 ///
@@ -118,18 +134,15 @@ pub struct PackageId {
     pub repr: String,
 }
 
-impl std::fmt::Display for PackageId {
+impl fmt::Display for PackageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.repr, f)
     }
 }
 
-// Helpers for default metadata fields
+/// Helpers for default metadata fields
 fn is_null(value: &serde_json::Value) -> bool {
-    match value {
-        serde_json::Value::Null => true,
-        _ => false,
-    }
+    matches!(value, serde_json::Value::Null)
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -142,6 +155,11 @@ pub struct Metadata {
     pub packages: Vec<Package>,
     /// A list of all workspace members
     pub workspace_members: Vec<PackageId>,
+    /// The list of default workspace members
+    ///
+    /// This not available if running with a version of Cargo older than 1.71.
+    #[serde(skip_serializing_if = "workspace_default_members_is_missing")]
+    pub workspace_default_members: WorkspaceDefaultMembers,
     /// Dependencies graph
     pub resolve: Option<Resolve>,
     /// Workspace root
@@ -156,10 +174,42 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    /// Get the root package of this metadata instance.
+    /// Get the workspace's root package of this metadata instance.
     pub fn root_package(&self) -> Option<&Package> {
-        let root = self.resolve.as_ref()?.root.as_ref()?;
-        self.packages.iter().find(|pkg| &pkg.id == root)
+        match &self.resolve {
+            Some(resolve) => {
+                // if dependencies are resolved, use Cargo's answer
+                let root = resolve.root.as_ref()?;
+                self.packages.iter().find(|pkg| &pkg.id == root)
+            }
+            None => {
+                // if dependencies aren't resolved, check for a root package manually
+                let root_manifest_path = self.workspace_root.join("Cargo.toml");
+                self.packages
+                    .iter()
+                    .find(|pkg| pkg.manifest_path == root_manifest_path)
+            }
+        }
+    }
+
+    /// Get the workspace packages.
+    pub fn workspace_packages(&self) -> Vec<&Package> {
+        self.packages
+            .iter()
+            .filter(|&p| self.workspace_members.contains(&p.id))
+            .collect()
+    }
+
+    /// Get the workspace default packages.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if running with a version of Cargo older than 1.71.
+    pub fn workspace_default_packages(&self) -> Vec<&Package> {
+        self.packages
+            .iter()
+            .filter(|&p| self.workspace_default_members.contains(&p.id))
+            .collect()
     }
 }
 
@@ -172,6 +222,41 @@ impl<'a> std::ops::Index<&'a PackageId> for Metadata {
             .find(|p| p.id == *idx)
             .unwrap_or_else(|| panic!("no package with this id: {:?}", idx))
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(transparent)]
+/// A list of default workspace members.
+///
+/// See [`Metadata::workspace_default_members`].
+///
+/// It is only available if running a version of Cargo of 1.71 or newer.
+///
+/// # Panics
+///
+/// Dereferencing when running an older version of Cargo will panic.
+pub struct WorkspaceDefaultMembers(Option<Vec<PackageId>>);
+
+impl core::ops::Deref for WorkspaceDefaultMembers {
+    type Target = [PackageId];
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+            .as_ref()
+            .expect("WorkspaceDefaultMembers should only be dereferenced on Cargo versions >= 1.71")
+    }
+}
+
+/// Return true if a valid value for [`WorkspaceDefaultMembers`] is missing, and
+/// dereferencing it would panic.
+///
+/// Internal helper for `skip_serializing_if` and test code. Might be removed in
+/// the future.
+#[doc(hidden)]
+pub fn workspace_default_members_is_missing(
+    workspace_default_members: &WorkspaceDefaultMembers,
+) -> bool {
+    workspace_default_members.0.is_none()
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -260,11 +345,12 @@ pub struct DepKindInfo {
 /// Each [`target`][Package::targets] of a `Package` will be built as a crate.
 /// For more information, see <https://doc.rust-lang.org/book/ch07-01-packages-and-crates.html>.
 pub struct Package {
-    /// Name as given in the `Cargo.toml`
+    /// The [`name` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-name-field) as given in the `Cargo.toml`
+    // (We say "given in" instead of "specified in" since the `name` key cannot be inherited from the workspace.)
     pub name: String,
-    /// Version given in the `Cargo.toml`
+    /// The [`version` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-version-field) as specified in the `Cargo.toml`
     pub version: Version,
-    /// Authors given in the `Cargo.toml`
+    /// The [`authors` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-authors-field) as specified in the `Cargo.toml`
     #[serde(default)]
     pub authors: Vec<String>,
     /// An opaque identifier for a package
@@ -272,47 +358,49 @@ pub struct Package {
     /// The source of the package, e.g.
     /// crates.io or `None` for local projects.
     pub source: Option<Source>,
-    /// Description as given in the `Cargo.toml`
+    /// The [`description` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-description-field) as specified in the `Cargo.toml`
     pub description: Option<String>,
     /// List of dependencies of this particular package
     pub dependencies: Vec<Dependency>,
-    /// License as given in the `Cargo.toml`
+    /// The [`license` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-license-and-license-file-fields) as specified in the `Cargo.toml`
     pub license: Option<String>,
+    /// The [`license-file` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-license-and-license-file-fields) as specified in the `Cargo.toml`.
     /// If the package is using a nonstandard license, this key may be specified instead of
     /// `license`, and must point to a file relative to the manifest.
     pub license_file: Option<Utf8PathBuf>,
     /// Targets provided by the crate (lib, bin, example, test, ...)
     pub targets: Vec<Target>,
     /// Features provided by the crate, mapped to the features required by that feature.
-    pub features: HashMap<String, Vec<String>>,
+    pub features: BTreeMap<String, Vec<String>>,
     /// Path containing the `Cargo.toml`
     pub manifest_path: Utf8PathBuf,
-    /// Categories as given in the `Cargo.toml`
+    /// The [`categories` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-categories-field) as specified in the `Cargo.toml`
     #[serde(default)]
     pub categories: Vec<String>,
-    /// Keywords as given in the `Cargo.toml`
+    /// The [`keywords` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-keywords-field) as specified in the `Cargo.toml`
     #[serde(default)]
     pub keywords: Vec<String>,
-    /// Readme as given in the `Cargo.toml`
+    /// The [`readme` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-readme-field) as specified in the `Cargo.toml`
     pub readme: Option<Utf8PathBuf>,
-    /// Repository as given in the `Cargo.toml`
+    /// The [`repository` URL](https://doc.rust-lang.org/cargo/reference/manifest.html#the-repository-field) as specified in the `Cargo.toml`
     // can't use `url::Url` because that requires a more recent stable compiler
     pub repository: Option<String>,
-    /// Homepage as given in the `Cargo.toml`
+    /// The [`homepage` URL](https://doc.rust-lang.org/cargo/reference/manifest.html#the-homepage-field) as specified in the `Cargo.toml`.
     ///
     /// On versions of cargo before 1.49, this will always be [`None`].
     pub homepage: Option<String>,
-    /// Documentation URL as given in the `Cargo.toml`
+    /// The [`documentation` URL](https://doc.rust-lang.org/cargo/reference/manifest.html#the-documentation-field) as specified in the `Cargo.toml`.
     ///
     /// On versions of cargo before 1.49, this will always be [`None`].
     pub documentation: Option<String>,
-    /// Default Rust edition for the package
+    /// The default Rust edition for the package (either what's specified in the [`edition` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-edition-field)
+    /// or defaulting to [`Edition::E2015`]).
     ///
     /// Beware that individual targets may specify their own edition in
     /// [`Target::edition`].
-    #[serde(default = "edition_default")]
-    pub edition: String,
-    /// Contents of the free form package.metadata section
+    #[serde(default)]
+    pub edition: Edition,
+    /// Contents of the free form [`package.metadata` section](https://doc.rust-lang.org/cargo/reference/manifest.html#the-metadata-table).
     ///
     /// This contents can be serialized to a struct using serde:
     ///
@@ -339,20 +427,25 @@ pub struct Package {
     pub metadata: serde_json::Value,
     /// The name of a native library the package is linking to.
     pub links: Option<String>,
-    /// List of registries to which this package may be published.
+    /// List of registries to which this package may be published (derived from the [`publish` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-publish-field)).
     ///
     /// Publishing is unrestricted if `None`, and forbidden if the `Vec` is empty.
     ///
     /// This is always `None` if running with a version of Cargo older than 1.39.
     pub publish: Option<Vec<String>>,
+    /// The [`default-run` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-default-run-field) as given in the `Cargo.toml`
+    // (We say "given in" instead of "specified in" since the `default-run` key cannot be inherited from the workspace.)
     /// The default binary to run by `cargo run`.
     ///
     /// This is always `None` if running with a version of Cargo older than 1.55.
     pub default_run: Option<String>,
+    /// The [`rust-version` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field) as specified in the `Cargo.toml`.
     /// The minimum supported Rust version of this package.
     ///
     /// This is always `None` if running with a version of Cargo older than 1.58.
-    pub rust_version: Option<VersionReq>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_rust_version")]
+    pub rust_version: Option<Version>,
 }
 
 impl Package {
@@ -368,13 +461,19 @@ impl Package {
 
     /// Full path to the readme file if one is present in the manifest
     pub fn readme(&self) -> Option<Utf8PathBuf> {
-        self.readme
-            .as_ref()
-            .map(|file| self.manifest_path.join(file))
+        self.readme.as_ref().map(|file| {
+            self.manifest_path
+                .parent()
+                .unwrap_or(&self.manifest_path)
+                .join(file)
+        })
     }
 }
 
 /// The source of a package such as crates.io.
+///
+/// It is possible to inspect the `repr` field, if the need arises, but its
+/// precise format is an implementation detail and is subject to change.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct Source {
@@ -389,7 +488,7 @@ impl Source {
     }
 }
 
-impl std::fmt::Display for Source {
+impl fmt::Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.repr, f)
     }
@@ -403,7 +502,7 @@ impl std::fmt::Display for Source {
 pub struct Target {
     /// Name as given in the `Cargo.toml` or generated from the file name
     pub name: String,
-    /// Kind of target ("bin", "example", "test", "bench", "lib")
+    /// Kind of target ("bin", "example", "test", "bench", "lib", "custom-build")
     pub kind: Vec<String>,
     /// Almost the same as `kind`, except when an example is a library instead of an executable.
     /// In that case `crate_types` contains things like `rlib` and `dylib` while `kind` is `example`
@@ -420,9 +519,9 @@ pub struct Target {
     /// Path to the main source file of the target
     pub src_path: Utf8PathBuf,
     /// Rust edition for this target
-    #[serde(default = "edition_default")]
-    #[cfg_attr(feature = "builder", builder(default = "edition_default()"))]
-    pub edition: String,
+    #[serde(default)]
+    #[cfg_attr(feature = "builder", builder(default))]
+    pub edition: Edition,
     /// Whether or not this target has doc tests enabled, and the target is
     /// compatible with doc testing.
     ///
@@ -444,12 +543,97 @@ pub struct Target {
     pub doc: bool,
 }
 
-fn default_true() -> bool {
-    true
+impl Target {
+    fn is_kind(&self, name: &str) -> bool {
+        self.kind.iter().any(|kind| kind == name)
+    }
+
+    /// Return true if this target is of kind "lib".
+    pub fn is_lib(&self) -> bool {
+        self.is_kind("lib")
+    }
+
+    /// Return true if this target is of kind "bin".
+    pub fn is_bin(&self) -> bool {
+        self.is_kind("bin")
+    }
+
+    /// Return true if this target is of kind "example".
+    pub fn is_example(&self) -> bool {
+        self.is_kind("example")
+    }
+
+    /// Return true if this target is of kind "test".
+    pub fn is_test(&self) -> bool {
+        self.is_kind("test")
+    }
+
+    /// Return true if this target is of kind "bench".
+    pub fn is_bench(&self) -> bool {
+        self.is_kind("bench")
+    }
+
+    /// Return true if this target is of kind "custom-build".
+    pub fn is_custom_build(&self) -> bool {
+        self.is_kind("custom-build")
+    }
 }
 
-fn edition_default() -> String {
-    "2015".to_string()
+/// The Rust edition
+///
+/// As of writing this comment rust editions 2024, 2027 and 2030 are not actually a thing yet but are parsed nonetheless for future proofing.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum Edition {
+    /// Edition 2015
+    #[serde(rename = "2015")]
+    E2015,
+    /// Edition 2018
+    #[serde(rename = "2018")]
+    E2018,
+    /// Edition 2021
+    #[serde(rename = "2021")]
+    E2021,
+    #[doc(hidden)]
+    #[serde(rename = "2024")]
+    _E2024,
+    #[doc(hidden)]
+    #[serde(rename = "2027")]
+    _E2027,
+    #[doc(hidden)]
+    #[serde(rename = "2030")]
+    _E2030,
+}
+
+impl Edition {
+    /// Return the string representation of the edition
+    pub fn as_str(&self) -> &'static str {
+        use Edition::*;
+        match self {
+            E2015 => "2015",
+            E2018 => "2018",
+            E2021 => "2021",
+            _E2024 => "2024",
+            _E2027 => "2027",
+            _E2030 => "2030",
+        }
+    }
+}
+
+impl fmt::Display for Edition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Default for Edition {
+    fn default() -> Self {
+        Self::E2015
+    }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Cargo features flags
@@ -474,7 +658,7 @@ pub struct MetadataCommand {
     manifest_path: Option<PathBuf>,
     /// Current directory of the `cargo metadata` process.
     current_dir: Option<PathBuf>,
-    /// Output information only about the root package and don't fetch dependencies.
+    /// Output information only about workspace members and don't fetch dependencies.
     no_deps: bool,
     /// Collections of `CargoOpt::SomeFeatures(..)`
     features: Vec<String>,
@@ -485,6 +669,11 @@ pub struct MetadataCommand {
     /// Arbitrary command line flags to pass to `cargo`.  These will be added
     /// to the end of the command line invocation.
     other_options: Vec<String>,
+    /// Arbitrary environment variables to set when running `cargo`.  These will be merged into
+    /// the calling environment, overriding any which clash.
+    env: BTreeMap<OsString, OsString>,
+    /// Show stderr
+    verbose: bool,
 }
 
 impl MetadataCommand {
@@ -510,7 +699,7 @@ impl MetadataCommand {
         self.current_dir = Some(path.into());
         self
     }
-    /// Output information only about the root package and don't fetch dependencies.
+    /// Output information only about workspace members and don't fetch dependencies.
     pub fn no_deps(&mut self) -> &mut MetadataCommand {
         self.no_deps = true;
         self
@@ -580,6 +769,38 @@ impl MetadataCommand {
         self
     }
 
+    /// Arbitrary environment variables to set when running `cargo`.  These will be merged into
+    /// the calling environment, overriding any which clash.
+    ///
+    /// Some examples of when you may want to use this:
+    /// 1. Setting cargo config values without needing a .cargo/config.toml file, e.g. to set
+    ///    `CARGO_NET_GIT_FETCH_WITH_CLI=true`
+    /// 2. To specify a custom path to RUSTC if your rust toolchain components aren't laid out in
+    ///    the way cargo expects by default.
+    ///
+    /// ```no_run
+    /// # use cargo_metadata::{CargoOpt, MetadataCommand};
+    /// MetadataCommand::new()
+    ///     .env("CARGO_NET_GIT_FETCH_WITH_CLI", "true")
+    ///     .env("RUSTC", "/path/to/rustc")
+    ///     // ...
+    ///     # ;
+    /// ```
+    pub fn env<K: Into<OsString>, V: Into<OsString>>(
+        &mut self,
+        key: K,
+        val: V,
+    ) -> &mut MetadataCommand {
+        self.env.insert(key.into(), val.into());
+        self
+    }
+
+    /// Set whether to show stderr
+    pub fn verbose(&mut self, verbose: bool) -> &mut MetadataCommand {
+        self.verbose = verbose;
+        self
+    }
+
     /// Builds a command for `cargo metadata`.  This is the first
     /// part of the work of `exec`.
     pub fn cargo_command(&self) -> Command {
@@ -589,7 +810,7 @@ impl MetadataCommand {
             .or_else(|| env::var("CARGO").map(PathBuf::from).ok())
             .unwrap_or_else(|| PathBuf::from("cargo"));
         let mut cmd = Command::new(cargo);
-        cmd.args(&["metadata", "--format-version", "1"]);
+        cmd.args(["metadata", "--format-version", "1"]);
 
         if self.no_deps {
             cmd.arg("--no-deps");
@@ -614,6 +835,8 @@ impl MetadataCommand {
         }
         cmd.args(&self.other_options);
 
+        cmd.envs(&self.env);
+
         cmd
     }
 
@@ -626,7 +849,11 @@ impl MetadataCommand {
 
     /// Runs configured `cargo metadata` and returns parsed `Metadata`.
     pub fn exec(&self) -> Result<Metadata> {
-        let output = self.cargo_command().output()?;
+        let mut command = self.cargo_command();
+        if self.verbose {
+            command.stderr(Stdio::inherit());
+        }
+        let output = command.output()?;
         if !output.status.success() {
             return Err(Error::CargoMetadata {
                 stderr: String::from_utf8(output.stderr)?,
@@ -635,7 +862,85 @@ impl MetadataCommand {
         let stdout = from_utf8(&output.stdout)?
             .lines()
             .find(|line| line.starts_with('{'))
-            .ok_or_else(|| Error::NoJson)?;
+            .ok_or(Error::NoJson)?;
         Self::parse(stdout)
+    }
+}
+
+/// As per the Cargo Book the [`rust-version` field](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field) must:
+///
+/// > be a bare version number with two or three components;
+/// > it cannot include semver operators or pre-release identifiers.
+///
+/// [`semver::Version`] however requires three components. This function takes
+/// care of appending `.0` if the provided version number only has two components
+/// and ensuring that it does not contain a pre-release version or build metadata.
+fn deserialize_rust_version<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Version>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut buf = match Option::<String>::deserialize(deserializer)? {
+        None => return Ok(None),
+        Some(buf) => buf,
+    };
+
+    for char in buf.chars() {
+        if char == '-' {
+            return Err(serde::de::Error::custom(
+                "pre-release identifiers are not supported in rust-version",
+            ));
+        } else if char == '+' {
+            return Err(serde::de::Error::custom(
+                "build metadata is not supported in rust-version",
+            ));
+        }
+    }
+
+    if buf.matches('.').count() == 1 {
+        // e.g. 1.0 -> 1.0.0
+        buf.push_str(".0");
+    }
+
+    Ok(Some(
+        Version::parse(&buf).map_err(serde::de::Error::custom)?,
+    ))
+}
+
+#[cfg(test)]
+mod test {
+    use semver::Version;
+
+    #[derive(Debug, serde::Deserialize)]
+    struct BareVersion(
+        #[serde(deserialize_with = "super::deserialize_rust_version")] Option<semver::Version>,
+    );
+
+    fn bare_version(str: &str) -> Version {
+        serde_json::from_str::<BareVersion>(&format!(r#""{}""#, str))
+            .unwrap()
+            .0
+            .unwrap()
+    }
+
+    fn bare_version_err(str: &str) -> String {
+        serde_json::from_str::<BareVersion>(&format!(r#""{}""#, str))
+            .unwrap_err()
+            .to_string()
+    }
+
+    #[test]
+    fn test_deserialize_rust_version() {
+        assert_eq!(bare_version("1.2"), Version::new(1, 2, 0));
+        assert_eq!(bare_version("1.2.0"), Version::new(1, 2, 0));
+        assert_eq!(
+            bare_version_err("1.2.0-alpha"),
+            "pre-release identifiers are not supported in rust-version"
+        );
+        assert_eq!(
+            bare_version_err("1.2.0+123"),
+            "build metadata is not supported in rust-version"
+        );
     }
 }

@@ -9,12 +9,13 @@ use teloxide::{
     utils::command::BotCommands,
 };
 
+/// These commands are supported:
 #[derive(BotCommands)]
-#[command(rename_rule = "lowercase", description = "These commands are supported:")]
+#[command(rename_rule = "lowercase")]
 enum Command {
-    #[command(description = "Display this text")]
+    /// Display this text
     Help,
-    #[command(description = "Start")]
+    /// Start
     Start,
 }
 
@@ -115,8 +116,8 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
         bot.answer_callback_query(q.id).await?;
 
         // Edit text of the message to which the buttons were attached
-        if let Some(Message { id, chat, .. }) = q.message {
-            bot.edit_message_text(chat.id, id, text).await?;
+        if let Some(message) = q.message {
+            bot.edit_message_text(message.chat().id, message.id(), text).await?;
         } else if let Some(id) = q.inline_message_id {
             bot.edit_message_text_inline(id, text).await?;
         }

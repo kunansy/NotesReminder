@@ -117,7 +117,7 @@ fn parse_with_split() {
 
     assert_eq!(
         DefaultCommands::Start(10, "hello".to_string()),
-        DefaultCommands::parse("/start 10 hello", "").unwrap()
+        DefaultCommands::parse("/start 10 hello", "").unwrap(),
     );
 }
 
@@ -136,6 +136,95 @@ fn parse_with_split2() {
         DefaultCommands::Start(10, "hello".to_string()),
         DefaultCommands::parse("/start 10|hello", "").unwrap()
     );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn parse_with_split3() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "lowercase")]
+    #[command(parse_with = "split")]
+    enum DefaultCommands {
+        Start(u8),
+        Help,
+    }
+
+    assert_eq!(DefaultCommands::Start(10), DefaultCommands::parse("/start 10", "").unwrap(),);
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn parse_with_split4() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "lowercase")]
+    #[command(parse_with = "split")]
+    enum DefaultCommands {
+        Start(),
+        Help,
+    }
+
+    assert_eq!(DefaultCommands::Start(), DefaultCommands::parse("/start", "").unwrap(),);
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn parse_with_command_separator1() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "lowercase")]
+    #[command(parse_with = "split", separator = "|", command_separator = "_")]
+    enum DefaultCommands {
+        Start(u8, String),
+        Help,
+    }
+
+    assert_eq!(
+        DefaultCommands::Start(10, "hello".to_string()),
+        DefaultCommands::parse("/start_10|hello", "").unwrap()
+    );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn parse_with_command_separator2() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "lowercase")]
+    #[command(parse_with = "split", separator = "_", command_separator = "_")]
+    enum DefaultCommands {
+        Start(u8, String),
+        Help,
+    }
+
+    assert_eq!(
+        DefaultCommands::Start(10, "hello".to_string()),
+        DefaultCommands::parse("/start_10_hello", "").unwrap()
+    );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn parse_with_command_separator3() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "lowercase")]
+    #[command(parse_with = "split", command_separator = ":")]
+    enum DefaultCommands {
+        Help,
+    }
+
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/help", "").unwrap());
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn parse_with_command_separator4() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "lowercase")]
+    #[command(parse_with = "split", command_separator = ":")]
+    enum DefaultCommands {
+        Start(u8),
+        Help,
+    }
+
+    assert_eq!(DefaultCommands::Start(10), DefaultCommands::parse("/start:10", "").unwrap());
 }
 
 #[test]
@@ -200,16 +289,66 @@ fn parse_named_fields() {
 
 #[test]
 #[cfg(feature = "macros")]
+#[allow(deprecated)]
 fn descriptions_off() {
     #[derive(BotCommands, Debug, PartialEq)]
     #[command(rename_rule = "lowercase")]
     enum DefaultCommands {
-        #[command(description = "off")]
+        #[command(hide)]
         Start,
+        #[command(description = "off")]
+        Username,
+        /// off
         Help,
     }
 
-    assert_eq!(DefaultCommands::descriptions().to_string(), "/help".to_owned());
+    assert_eq!(DefaultCommands::descriptions().to_string(), "/help — off".to_owned());
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn description_with_doc_attr() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "lowercase")]
+    enum DefaultCommands {
+        /// Start command
+        Start,
+        /// Help command\nwithout replace the `\n`
+        Help,
+        /// Foo command
+        /// with new line
+        Foo,
+    }
+
+    assert_eq!(
+        DefaultCommands::descriptions().to_string(),
+        "/start — Start command\n/help — Help command\\nwithout replace the `\\n`\n/foo — Foo \
+         command\nwith new line"
+    );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn description_with_doc_attr_and_command() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "lowercase")]
+    enum DefaultCommands {
+        /// Start command
+        #[command(description = "Start command")]
+        Start,
+        #[command(description = "Help command\nwith new line")]
+        Help,
+        /// Foo command
+        /// with new line
+        #[command(description = "Foo command\nwith new line")]
+        Foo,
+    }
+
+    assert_eq!(
+        DefaultCommands::descriptions().to_string(),
+        "/start — Start command\nStart command\n/help — Help command\nwith new line\n/foo — Foo \
+         command\nwith new line\nFoo command\nwith new line"
+    );
 }
 
 #[test]
@@ -255,10 +394,195 @@ fn rename_rules() {
 
 #[test]
 #[cfg(feature = "macros")]
+fn alias() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "snake_case")]
+    enum DefaultCommands {
+        #[command(alias = "s")]
+        Start,
+        #[command(alias = "h")]
+        Help,
+        #[command(alias = "привет_мир")]
+        HelloWorld(String),
+    }
+
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/start", "").unwrap());
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/s", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/help", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/h", "").unwrap());
+    assert_eq!(
+        DefaultCommands::HelloWorld("username".to_owned()),
+        DefaultCommands::parse("/hello_world username", "").unwrap()
+    );
+    assert_eq!(
+        DefaultCommands::HelloWorld("username".to_owned()),
+        DefaultCommands::parse("/привет_мир username", "").unwrap()
+    );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn alias_help_message() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "snake_case")]
+    enum DefaultCommands {
+        /// Start command
+        Start,
+        /// Help command
+        #[command(alias = "h")]
+        Help,
+        #[command(alias = "привет_мир")]
+        HelloWorld(String),
+    }
+
+    assert_eq!(
+        "/start — Start command\n/help, /h — Help command\n/hello_world, /привет_мир",
+        DefaultCommands::descriptions().to_string()
+    );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn aliases() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "snake_case")]
+    enum DefaultCommands {
+        Start,
+        #[command(aliases = ["h", "помощь"])]
+        Help,
+        #[command(aliases = ["привет_мир"])]
+        HelloWorld(String),
+    }
+
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/start", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/help", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/h", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/помощь", "").unwrap());
+    assert_eq!(
+        DefaultCommands::HelloWorld("username".to_owned()),
+        DefaultCommands::parse("/hello_world username", "").unwrap()
+    );
+    assert_eq!(
+        DefaultCommands::HelloWorld("username".to_owned()),
+        DefaultCommands::parse("/привет_мир username", "").unwrap()
+    );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn aliases_help_message() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "snake_case")]
+    enum DefaultCommands {
+        /// Start command
+        Start,
+        /// Help command
+        #[command(aliases = ["h", "помощь"])]
+        Help,
+        #[command(aliases = ["привет_мир"])]
+        HelloWorld(String),
+    }
+
+    assert_eq!(
+        "/start — Start command\n/help, /h, /помощь — Help command\n/hello_world, /привет_мир",
+        DefaultCommands::descriptions().to_string()
+    );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn hide_aliases_for_unaliases_command() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "snake_case")]
+    enum DefaultCommands {
+        /// Start command.
+        Start,
+        /// Show help message.
+        #[command(hide_aliases)]
+        Help,
+    }
+
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/start", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/help", "").unwrap());
+
+    assert_eq!(
+        "/start — Start command.\n/help — Show help message.",
+        DefaultCommands::descriptions().to_string()
+    );
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn hide_aliases_with_alias() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "snake_case")]
+    enum DefaultCommands {
+        /// Start.
+        #[command(alias = "s")]
+        Start,
+        /// Help.
+        #[command(alias = "h", hide_aliases)]
+        Help,
+    }
+
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/start", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/help", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/h", "").unwrap());
+
+    assert_eq!("/start, /s — Start.\n/help — Help.", DefaultCommands::descriptions().to_string());
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn hide_command_with_aliases() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "snake_case")]
+    enum DefaultCommands {
+        /// Start.
+        #[command(alias = "s", hide)]
+        Start,
+        /// Help.
+        #[command(alias = "h")]
+        Help,
+    }
+
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/start", "").unwrap());
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/s", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/help", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/h", "").unwrap());
+
+    assert_eq!("/help, /h — Help.", DefaultCommands::descriptions().to_string());
+}
+
+#[test]
+#[cfg(feature = "macros")]
+fn hide_aliases_with_aliases() {
+    #[derive(BotCommands, Debug, PartialEq)]
+    #[command(rename_rule = "snake_case")]
+    enum DefaultCommands {
+        #[command(aliases = ["s", "старт"])]
+        Start,
+        #[command(aliases = ["h", "помощь"], hide_aliases)]
+        Help,
+    }
+
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/start", "").unwrap());
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/s", "").unwrap());
+    assert_eq!(DefaultCommands::Start, DefaultCommands::parse("/старт", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/help", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/h", "").unwrap());
+    assert_eq!(DefaultCommands::Help, DefaultCommands::parse("/помощь", "").unwrap());
+
+    assert_eq!("/start, /s, /старт\n/help", DefaultCommands::descriptions().to_string());
+}
+
+#[test]
+#[cfg(feature = "macros")]
 fn custom_result() {
     #[allow(dead_code)]
     type Result = ();
 
     #[derive(BotCommands, Debug, PartialEq)]
+    #[allow(dead_code)]
     enum DefaultCommands {}
 }
