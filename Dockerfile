@@ -1,4 +1,4 @@
-FROM rust:1.75-slim-buster as builder
+FROM rust:1.80-slim-bullseye AS builder
 
 ARG TARGET=x86_64-unknown-linux-gnu
 
