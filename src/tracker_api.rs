@@ -14,7 +14,7 @@ pub struct RepeatItem {
     completed_at: String,
     last_repeated_at: Option<String>,
     priority_days: i32,
-    pub priority_months: i32
+    pub priority_months: f32
 }
 
 pub async fn get_repeat_queue(tracker_url: &str) -> Result<Vec<RepeatItem>, String> {

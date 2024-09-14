@@ -149,7 +149,7 @@ async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str, tracker_web_
                              It's time to <a href=\"{}/materials/repeat-view\">repeat</a>!",
                       repeat_q.len(),
                       repeat_q.iter().filter(|&r| r.is_outlined).count(),
-                      repeat_q.iter().map(|r| r.priority_months).max().unwrap_or(0),
+                      repeat_q.iter().map(|r| r.priority_months).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(0.0),
                       tracker_web_url);
 
     bot.send_message(ChatId(chat_id), msg).await?;
