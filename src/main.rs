@@ -145,7 +145,7 @@ async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str, tracker_web_
         return Ok(());
     }
 
-    let msg = format!("You have {} materials to repeat, including {} outlined. Max priority is {}.\n\n\
+    let msg = format!("You have {} materials to repeat, including {} outlined. Max priority is {:.1}.\n\n\
                              It's time to <a href=\"{}/materials/repeat-view\">repeat</a>!",
                       repeat_q.len(),
                       repeat_q.iter().filter(|&r| r.is_outlined).count(),
