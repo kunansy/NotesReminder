@@ -15,4 +15,4 @@ IMAGE_LINE := $(shell cat docker-compose.yml | grep -n "image: kunansy/notes_rem
 
 deploy:
 	@echo "${LAST_TAG} -> ${CURRENT_TAG}"
-	@ssh tracker "cd notes_reminder; sed -i -E '${IMAGE_LINE} s/:[0-9]+/:${CURRENT_TAG}/' docker-compose.yml; docker-compose up -d --build --force-recreate; sleep 2; docker ps --filter name=notes-reminder --format json | jq '.Image,.State,.Status'"
+	@ssh tracker "cd notes_reminder; sed -i -E '${IMAGE_LINE} s/:[0-9.]+/:${CURRENT_TAG}/' docker-compose.yml; docker-compose up -d --build --force-recreate; sleep 2; docker ps --filter name=notes-reminder --format json | jq '.Image,.State,.Status'"
