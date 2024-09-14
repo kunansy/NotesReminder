@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
@@ -19,7 +18,7 @@ mod support {
 
 macro_rules! cfg_metrics {
     ($($t:tt)*) => {
-        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+        #[cfg(tokio_unstable)]
         {
             $( $t )*
         }

@@ -4,8 +4,7 @@ use crate::{
 };
 use futures_core::future::BoxFuture;
 use futures_core::stream::BoxStream;
-use futures_util::{stream, StreamExt, TryFutureExt, TryStreamExt};
-use std::future;
+use futures_util::{StreamExt, TryFutureExt, TryStreamExt};
 
 pub use sqlx_core::any::*;
 
@@ -74,19 +73,13 @@ impl AnyConnectionBackend for PgConnection {
     fn fetch_many<'q>(
         &'q mut self,
         query: &'q str,
-        persistent: bool,
         arguments: Option<AnyArguments<'q>>,
     ) -> BoxStream<'q, sqlx_core::Result<Either<AnyQueryResult, AnyRow>>> {
-        let persistent = persistent && arguments.is_some();
-        let arguments = match arguments.as_ref().map(AnyArguments::convert_to).transpose() {
-            Ok(arguments) => arguments,
-            Err(error) => {
-                return stream::once(future::ready(Err(sqlx_core::Error::Encode(error)))).boxed()
-            }
-        };
+        let persistent = arguments.is_some();
+        let args = arguments.as_ref().map(AnyArguments::convert_to);
 
         Box::pin(
-            self.run(query, arguments, 0, persistent, None)
+            self.run(query, args, 0, persistent, None)
                 .try_flatten_stream()
                 .map(
                     move |res: sqlx_core::Result<Either<PgQueryResult, PgRow>>| match res? {
@@ -100,19 +93,13 @@ impl AnyConnectionBackend for PgConnection {
     fn fetch_optional<'q>(
         &'q mut self,
         query: &'q str,
-        persistent: bool,
         arguments: Option<AnyArguments<'q>>,
     ) -> BoxFuture<'q, sqlx_core::Result<Option<AnyRow>>> {
-        let persistent = persistent && arguments.is_some();
-        let arguments = arguments
-            .as_ref()
-            .map(AnyArguments::convert_to)
-            .transpose()
-            .map_err(sqlx_core::Error::Encode);
+        let persistent = arguments.is_some();
+        let args = arguments.as_ref().map(AnyArguments::convert_to);
 
         Box::pin(async move {
-            let arguments = arguments?;
-            let stream = self.run(query, arguments, 1, persistent, None).await?;
+            let stream = self.run(query, args, 1, persistent, None).await?;
             futures_util::pin_mut!(stream);
 
             if let Some(Either::Right(row)) = stream.try_next().await? {
@@ -184,7 +171,6 @@ impl<'a> TryFrom<&'a PgTypeInfo> for AnyTypeInfo {
     fn try_from(pg_type: &'a PgTypeInfo) -> Result<Self, Self::Error> {
         Ok(AnyTypeInfo {
             kind: match &pg_type.0 {
-                PgType::Bool => AnyTypeInfoKind::Bool,
                 PgType::Void => AnyTypeInfoKind::Null,
                 PgType::Int2 => AnyTypeInfoKind::SmallInt,
                 PgType::Int4 => AnyTypeInfoKind::Integer,
@@ -192,7 +178,7 @@ impl<'a> TryFrom<&'a PgTypeInfo> for AnyTypeInfo {
                 PgType::Float4 => AnyTypeInfoKind::Real,
                 PgType::Float8 => AnyTypeInfoKind::Double,
                 PgType::Bytea => AnyTypeInfoKind::Blob,
-                PgType::Text | PgType::Varchar => AnyTypeInfoKind::Text,
+                PgType::Text => AnyTypeInfoKind::Text,
                 PgType::DeclareWithName(UStr::Static("citext")) => AnyTypeInfoKind::Text,
                 _ => {
                     return Err(sqlx_core::Error::AnyDriverError(

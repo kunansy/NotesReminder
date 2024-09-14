@@ -1,14 +1,12 @@
-#![cfg(sqlite_test_sqlcipher)]
-
 use std::str::FromStr;
 
 use sqlx::sqlite::SqliteQueryResult;
 use sqlx::{query, Connection, SqliteConnection};
 use sqlx::{sqlite::SqliteConnectOptions, ConnectOptions};
-use tempfile::TempDir;
+use tempdir::TempDir;
 
 async fn new_db_url() -> anyhow::Result<(String, TempDir)> {
-    let dir = TempDir::new()?;
+    let dir = TempDir::new("sqlcipher_test")?;
     let filepath = dir.path().join("database.sqlite3");
 
     Ok((format!("sqlite://{}", filepath.display()), dir))

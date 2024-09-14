@@ -52,14 +52,8 @@ where
     let stop_token = update_listener.stop_token();
 
     tokio::spawn(async move {
-        let tcp_listener = tokio::net::TcpListener::bind(address)
-            .await
-            .map_err(|err| {
-                stop_token.stop();
-                err
-            })
-            .expect("Couldn't bind to the address");
-        axum::serve(tcp_listener, app)
+        axum::Server::bind(&address)
+            .serve(app.into_make_service())
             .with_graceful_shutdown(stop_flag)
             .await
             .map_err(|err| {
@@ -96,7 +90,7 @@ where
 /// [`delete_webhook`]: crate::payloads::DeleteWebhook
 /// [`stop`]: crate::stop::StopToken::stop
 /// [`options.address`]: Options::address
-/// [`with_graceful_shutdown`]: axum::serve::Serve::with_graceful_shutdown
+/// [`with_graceful_shutdown`]: axum::Server::with_graceful_shutdown
 ///
 /// ## Returns
 ///
@@ -219,7 +213,7 @@ pub fn axum_no_setup(
     let (stop_token, stop_flag) = mk_stop_token();
 
     let app = axum::Router::new()
-        .route(&options.path, post(telegram_request))
+        .route(options.url.path(), post(telegram_request))
         .layer(TraceLayer::new_for_http())
         .with_state(WebhookState {
             tx: ClosableSender::new(tx),

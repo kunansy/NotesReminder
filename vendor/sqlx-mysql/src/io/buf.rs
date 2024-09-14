@@ -11,11 +11,10 @@ pub trait MySqlBufExt: Buf {
     fn get_uint_lenenc(&mut self) -> u64;
 
     // Read a length-encoded string.
-    #[allow(dead_code)]
     fn get_str_lenenc(&mut self) -> Result<String, Error>;
 
     // Read a length-encoded byte sequence.
-    fn get_bytes_lenenc(&mut self) -> Result<Bytes, Error>;
+    fn get_bytes_lenenc(&mut self) -> Bytes;
 }
 
 impl MySqlBufExt for Bytes {
@@ -31,17 +30,11 @@ impl MySqlBufExt for Bytes {
 
     fn get_str_lenenc(&mut self) -> Result<String, Error> {
         let size = self.get_uint_lenenc();
-        let size = usize::try_from(size)
-            .map_err(|_| err_protocol!("string length overflows usize: {size}"))?;
-
-        self.get_str(size)
+        self.get_str(size as usize)
     }
 
-    fn get_bytes_lenenc(&mut self) -> Result<Bytes, Error> {
+    fn get_bytes_lenenc(&mut self) -> Bytes {
         let size = self.get_uint_lenenc();
-        let size = usize::try_from(size)
-            .map_err(|_| err_protocol!("string length overflows usize: {size}"))?;
-
-        Ok(self.split_to(size))
+        self.split_to(size as usize)
     }
 }

@@ -11,7 +11,7 @@ use url::Url;
 
 /// Represents a single database connection.
 pub trait Connection: Send {
-    type Database: Database<Connection = Self>;
+    type Database: Database;
 
     type Options: ConnectOptions<Connection = Self>;
 
@@ -143,7 +143,7 @@ pub trait Connection: Send {
     {
         let options = url.parse();
 
-        Box::pin(async move { Self::connect_with(&options?).await })
+        Box::pin(async move { Ok(Self::connect_with(&options?).await?) })
     }
 
     /// Establish a new database connection with the provided options.
@@ -184,39 +184,10 @@ impl LogSettings {
 }
 
 pub trait ConnectOptions: 'static + Send + Sync + FromStr<Err = Error> + Debug + Clone {
-    type Connection: Connection<Options = Self> + ?Sized;
+    type Connection: Connection + ?Sized;
 
     /// Parse the `ConnectOptions` from a URL.
     fn from_url(url: &Url) -> Result<Self, Error>;
-
-    /// Get a connection URL that may be used to connect to the same database as this `ConnectOptions`.
-    ///
-    /// ### Note: Lossy
-    /// Any flags or settings which do not have a representation in the URL format will be lost.
-    /// They will fall back to their default settings when the URL is parsed.
-    ///
-    /// The only settings guaranteed to be preserved are:
-    /// * Username
-    /// * Password
-    /// * Hostname
-    /// * Port
-    /// * Database name
-    /// * Unix socket or SQLite database file path
-    /// * SSL mode (if applicable)
-    /// * SSL CA certificate path
-    /// * SSL client certificate path
-    /// * SSL client key path
-    ///
-    /// Additional settings are driver-specific. Refer to the source of a given implementation
-    /// to see which options are preserved in the URL.
-    ///
-    /// ### Panics
-    /// This defaults to `unimplemented!()`.
-    ///
-    /// Individual drivers should override this to implement the intended behavior.
-    fn to_url_lossy(&self) -> Url {
-        unimplemented!()
-    }
 
     /// Establish a new database connection with the options specified by `self`.
     fn connect(&self) -> BoxFuture<'_, Result<Self::Connection, Error>>

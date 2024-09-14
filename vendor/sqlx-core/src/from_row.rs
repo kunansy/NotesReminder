@@ -91,7 +91,7 @@ use crate::{error::Error, row::Row};
 /// will set the value of the field `location` to the default value of `Option<String>`,
 /// which is `None`.
 ///
-/// Moreover, if the struct has an implementation for [`Default`], you can use the `default`
+/// Moreover, if the struct has an implementation for [`Default`], you can use the `default``
 /// attribute at the struct level rather than for each single field. If a field does not appear in the result,
 /// its value is taken from the `Default` implementation for the struct.
 /// For example:
@@ -173,7 +173,7 @@ use crate::{error::Error, row::Row};
 ///    .fetch_one(&mut some_connection)
 ///    .await?;
 ///
-/// // `Default` for `Vec<Address>` is an empty vector.
+/// `Default` for `Vec<Address>` is an empty vector.
 /// assert!(user.addresses.is_empty());
 /// ```
 ///

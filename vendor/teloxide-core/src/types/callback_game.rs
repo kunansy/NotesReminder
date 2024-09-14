@@ -8,6 +8,5 @@ use serde::{Deserialize, Serialize};
 /// Use [@Botfather] to set up your game.
 ///
 /// [@Botfather]:  https://t.me/botfather
-#[serde_with::skip_serializing_none]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub struct CallbackGame {}
+pub struct CallbackGame;

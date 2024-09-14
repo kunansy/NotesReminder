@@ -2,9 +2,9 @@ use super::{Diagnostic, PackageId, Target};
 use camino::Utf8PathBuf;
 #[cfg(feature = "builder")]
 use derive_builder::Builder;
-use serde::{de, ser, Deserialize, Serialize};
-use std::fmt::{self, Write};
-use std::io::{self, BufRead, Read};
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::io::{self, BufRead, Lines, Read};
 
 /// Profile settings used to determine which compiler flags to use for a
 /// target.
@@ -15,9 +15,8 @@ use std::io::{self, BufRead, Read};
 pub struct ArtifactProfile {
     /// Optimization level. Possible values are 0-3, s or z.
     pub opt_level: String,
-    /// The kind of debug information.
-    #[serde(default)]
-    pub debuginfo: ArtifactDebuginfo,
+    /// The amount of debug info. 0 for none, 1 for limited, 2 for full
+    pub debuginfo: Option<u32>,
     /// State of the `cfg(debug_assertions)` directive, enabling macros like
     /// `debug_assert!`
     pub debug_assertions: bool,
@@ -25,132 +24,6 @@ pub struct ArtifactProfile {
     pub overflow_checks: bool,
     /// Whether this profile is a test
     pub test: bool,
-}
-
-/// The kind of debug information included in the artifact.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ArtifactDebuginfo {
-    /// No debug information.
-    None,
-    /// Line directives only.
-    LineDirectivesOnly,
-    /// Line tables only.
-    LineTablesOnly,
-    /// Debug information without type or variable-level information.
-    Limited,
-    /// Full debug information.
-    Full,
-    /// An unknown integer level.
-    ///
-    /// This may be produced by a version of rustc in the future that has
-    /// additional levels represented by an integer that are not known by this
-    /// version of `cargo_metadata`.
-    UnknownInt(i64),
-    /// An unknown string level.
-    ///
-    /// This may be produced by a version of rustc in the future that has
-    /// additional levels represented by a string that are not known by this
-    /// version of `cargo_metadata`.
-    UnknownString(String),
-}
-
-impl Default for ArtifactDebuginfo {
-    fn default() -> Self {
-        ArtifactDebuginfo::None
-    }
-}
-
-impl ser::Serialize for ArtifactDebuginfo {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        match self {
-            Self::None => 0.serialize(serializer),
-            Self::LineDirectivesOnly => "line-directives-only".serialize(serializer),
-            Self::LineTablesOnly => "line-tables-only".serialize(serializer),
-            Self::Limited => 1.serialize(serializer),
-            Self::Full => 2.serialize(serializer),
-            Self::UnknownInt(n) => n.serialize(serializer),
-            Self::UnknownString(s) => s.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> de::Deserialize<'de> for ArtifactDebuginfo {
-    fn deserialize<D>(d: D) -> Result<ArtifactDebuginfo, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl<'de> de::Visitor<'de> for Visitor {
-            type Value = ArtifactDebuginfo;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("an integer or string")
-            }
-
-            fn visit_i64<E>(self, value: i64) -> Result<ArtifactDebuginfo, E>
-            where
-                E: de::Error,
-            {
-                let debuginfo = match value {
-                    0 => ArtifactDebuginfo::None,
-                    1 => ArtifactDebuginfo::Limited,
-                    2 => ArtifactDebuginfo::Full,
-                    n => ArtifactDebuginfo::UnknownInt(n),
-                };
-                Ok(debuginfo)
-            }
-
-            fn visit_u64<E>(self, value: u64) -> Result<ArtifactDebuginfo, E>
-            where
-                E: de::Error,
-            {
-                self.visit_i64(value as i64)
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<ArtifactDebuginfo, E>
-            where
-                E: de::Error,
-            {
-                let debuginfo = match value {
-                    "none" => ArtifactDebuginfo::None,
-                    "limited" => ArtifactDebuginfo::Limited,
-                    "full" => ArtifactDebuginfo::Full,
-                    "line-directives-only" => ArtifactDebuginfo::LineDirectivesOnly,
-                    "line-tables-only" => ArtifactDebuginfo::LineTablesOnly,
-                    s => ArtifactDebuginfo::UnknownString(s.to_string()),
-                };
-                Ok(debuginfo)
-            }
-
-            fn visit_unit<E>(self) -> Result<ArtifactDebuginfo, E>
-            where
-                E: de::Error,
-            {
-                Ok(ArtifactDebuginfo::None)
-            }
-        }
-
-        d.deserialize_any(Visitor)
-    }
-}
-
-impl fmt::Display for ArtifactDebuginfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ArtifactDebuginfo::None => f.write_char('0'),
-            ArtifactDebuginfo::Limited => f.write_char('1'),
-            ArtifactDebuginfo::Full => f.write_char('2'),
-            ArtifactDebuginfo::LineDirectivesOnly => f.write_str("line-directives-only"),
-            ArtifactDebuginfo::LineTablesOnly => f.write_str("line-tables-only"),
-            ArtifactDebuginfo::UnknownInt(n) => write!(f, "{}", n),
-            ArtifactDebuginfo::UnknownString(s) => f.write_str(s),
-        }
-    }
 }
 
 /// A compiler-generated file.
@@ -161,9 +34,6 @@ impl fmt::Display for ArtifactDebuginfo {
 pub struct Artifact {
     /// The package this artifact belongs to
     pub package_id: PackageId,
-    /// Path to the `Cargo.toml` file
-    #[serde(default)]
-    pub manifest_path: Utf8PathBuf,
     /// The target this artifact was compiled for
     pub target: Target,
     /// The profile this artifact was compiled with
@@ -252,8 +122,10 @@ pub enum Message {
 impl Message {
     /// Creates an iterator of Message from a Read outputting a stream of JSON
     /// messages. For usage information, look at the top-level documentation.
-    pub fn parse_stream<R: Read>(input: R) -> MessageIter<R> {
-        MessageIter { input }
+    pub fn parse_stream<R: BufRead>(input: R) -> MessageIter<R> {
+        MessageIter {
+            lines: input.lines(),
+        }
     }
 }
 
@@ -265,28 +137,19 @@ impl fmt::Display for CompilerMessage {
 
 /// An iterator of Messages.
 pub struct MessageIter<R> {
-    input: R,
+    lines: Lines<R>,
 }
 
 impl<R: BufRead> Iterator for MessageIter<R> {
     type Item = io::Result<Message>;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut line = String::new();
-        self.input
-            .read_line(&mut line)
-            .map(|n| {
-                if n == 0 {
-                    None
-                } else {
-                    if line.ends_with('\n') {
-                        line.truncate(line.len() - 1);
-                    }
-                    let mut deserializer = serde_json::Deserializer::from_str(&line);
-                    deserializer.disable_recursion_limit();
-                    Some(Message::deserialize(&mut deserializer).unwrap_or(Message::TextLine(line)))
-                }
-            })
-            .transpose()
+        let line = self.lines.next()?;
+        let message = line.map(|it| {
+            let mut deserializer = serde_json::Deserializer::from_str(&it);
+            deserializer.disable_recursion_limit();
+            Message::deserialize(&mut deserializer).unwrap_or(Message::TextLine(it))
+        });
+        Some(message)
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::any::error::mismatched_types;
 use crate::any::{Any, AnyColumn, AnyTypeInfo, AnyTypeInfoKind, AnyValue, AnyValueKind};
 use crate::column::{Column, ColumnIndex};
-use crate::database::Database;
+use crate::database::{Database, HasValueRef};
 use crate::decode::Decode;
 use crate::error::Error;
 use crate::ext::ustr::UStr;
@@ -28,7 +28,10 @@ impl Row for AnyRow {
         &self.columns
     }
 
-    fn try_get_raw<I>(&self, index: I) -> Result<<Self::Database as Database>::ValueRef<'_>, Error>
+    fn try_get_raw<I>(
+        &self,
+        index: I,
+    ) -> Result<<Self::Database as HasValueRef<'_>>::ValueRef, Error>
     where
         I: ColumnIndex<Self>,
     {
@@ -117,8 +120,8 @@ impl AnyRow {
                 })?;
 
             let value_kind = match type_info.kind {
-                k if value.is_null() => AnyValueKind::Null(k),
-                AnyTypeInfoKind::Null => AnyValueKind::Null(AnyTypeInfoKind::Null),
+                _ if value.is_null() => AnyValueKind::Null,
+                AnyTypeInfoKind::Null => AnyValueKind::Null,
                 AnyTypeInfoKind::Bool => AnyValueKind::Bool(decode(value)?),
                 AnyTypeInfoKind::SmallInt => AnyValueKind::SmallInt(decode(value)?),
                 AnyTypeInfoKind::Integer => AnyValueKind::Integer(decode(value)?),
@@ -138,7 +141,7 @@ impl AnyRow {
 }
 
 fn decode<'r, DB: Database, T: Decode<'r, DB>>(
-    valueref: <DB as Database>::ValueRef<'r>,
+    valueref: <DB as HasValueRef<'r>>::ValueRef,
 ) -> crate::Result<T> {
     Decode::decode(valueref).map_err(Error::decode)
 }

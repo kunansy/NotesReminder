@@ -1,8 +1,8 @@
 use bytes::{Buf, Bytes};
 
 use crate::error::Error;
-use crate::io::ProtocolEncode;
-use crate::io::{BufExt, ProtocolDecode};
+use crate::io::Encode;
+use crate::io::{BufExt, Decode};
 use crate::protocol::auth::AuthPlugin;
 use crate::protocol::Capabilities;
 
@@ -14,7 +14,7 @@ pub struct AuthSwitchRequest {
     pub data: Bytes,
 }
 
-impl ProtocolDecode<'_, bool> for AuthSwitchRequest {
+impl Decode<'_, bool> for AuthSwitchRequest {
     fn decode_with(mut buf: Bytes, enable_cleartext_plugin: bool) -> Result<Self, Error> {
         let header = buf.get_u8();
         if header != 0xfe {
@@ -58,10 +58,9 @@ impl ProtocolDecode<'_, bool> for AuthSwitchRequest {
 #[derive(Debug)]
 pub struct AuthSwitchResponse(pub Vec<u8>);
 
-impl ProtocolEncode<'_, Capabilities> for AuthSwitchResponse {
-    fn encode_with(&self, buf: &mut Vec<u8>, _: Capabilities) -> Result<(), Error> {
+impl Encode<'_, Capabilities> for AuthSwitchResponse {
+    fn encode_with(&self, buf: &mut Vec<u8>, _: Capabilities) {
         buf.extend_from_slice(&self.0);
-        Ok(())
     }
 }
 
@@ -81,14 +80,9 @@ fn test_decode_auth_switch_cleartext_disabled() {
 
     let e = AuthSwitchRequest::decode_with(AUTH_SWITCH_CLEARTEXT.into(), false).unwrap_err();
 
-    let e_str = e.to_string();
-
-    let expected = "encountered unexpected or invalid data: mysql_cleartext_plugin disabled";
-
-    assert!(
-        // Don't want to assert the full string since it contains the module path now.
-        e_str.starts_with(expected),
-        "expected error string to start with {expected:?}, got {e_str:?}"
+    assert_eq!(
+        e.to_string(),
+        "encountered unexpected or invalid data: mysql_cleartext_plugin disabled"
     );
 }
 

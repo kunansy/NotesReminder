@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Animation, MessageEntity, PhotoSize, User};
+use crate::types::{Animation, MessageEntity, PhotoSize};
 
 /// This object represents a game.
 ///
@@ -8,7 +8,7 @@ use crate::types::{Animation, MessageEntity, PhotoSize, User};
 /// unique identifiers.
 ///
 /// [@Botfather]: https://t.me/botfather
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Game {
     /// Title of the game.
@@ -38,18 +38,4 @@ pub struct Game {
     ///
     /// [@Botfather]: https://t.me/botfather
     pub animation: Option<Animation>,
-}
-
-impl Game {
-    /// Returns all users that are "contained" in this `Game`
-    /// structure.
-    ///
-    /// This might be useful to track information about users.
-    ///
-    /// Note that this function can return duplicate users.
-    pub fn mentioned_users(&self) -> impl Iterator<Item = &User> {
-        use crate::util::{flatten, mentioned_users_from_entities};
-
-        flatten(self.text_entities.as_deref().map(mentioned_users_from_entities))
-    }
 }

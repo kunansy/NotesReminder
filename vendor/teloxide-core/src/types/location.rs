@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::Seconds;
-
 /// This object represents a point on the map.
-#[serde_with::skip_serializing_none]
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Location {
     /// Longitude as defined by sender.
@@ -17,7 +14,7 @@ pub struct Location {
 
     /// Time relative to the message sending date, during which the location can
     /// be updated, in seconds. For active live locations only.
-    pub live_period: Option<Seconds>,
+    pub live_period: Option<u32>,
 
     /// The direction in which user is moving, in degrees; 1-360. For active
     /// live locations only.

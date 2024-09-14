@@ -75,15 +75,14 @@ impl AnyConnectionBackend for SqliteConnection {
     fn fetch_many<'q>(
         &'q mut self,
         query: &'q str,
-        persistent: bool,
         arguments: Option<AnyArguments<'q>>,
     ) -> BoxStream<'q, sqlx_core::Result<Either<AnyQueryResult, AnyRow>>> {
-        let persistent = persistent && arguments.is_some();
+        let persistent = arguments.is_some();
         let args = arguments.map(map_arguments);
 
         Box::pin(
             self.worker
-                .execute(query, args, self.row_channel_size, persistent, None)
+                .execute(query, args, self.row_channel_size, persistent)
                 .map_ok(flume::Receiver::into_stream)
                 .try_flatten_stream()
                 .map(
@@ -98,16 +97,15 @@ impl AnyConnectionBackend for SqliteConnection {
     fn fetch_optional<'q>(
         &'q mut self,
         query: &'q str,
-        persistent: bool,
         arguments: Option<AnyArguments<'q>>,
     ) -> BoxFuture<'q, sqlx_core::Result<Option<AnyRow>>> {
-        let persistent = persistent && arguments.is_some();
+        let persistent = arguments.is_some();
         let args = arguments.map(map_arguments);
 
         Box::pin(async move {
             let stream = self
                 .worker
-                .execute(query, args, self.row_channel_size, persistent, Some(1))
+                .execute(query, args, self.row_channel_size, persistent)
                 .map_ok(flume::Receiver::into_stream)
                 .await?;
             futures_util::pin_mut!(stream);
@@ -143,8 +141,8 @@ impl<'a> TryFrom<&'a SqliteTypeInfo> for AnyTypeInfo {
         Ok(AnyTypeInfo {
             kind: match &sqlite_type.0 {
                 DataType::Null => AnyTypeInfoKind::Null,
-                DataType::Int4 => AnyTypeInfoKind::Integer,
-                DataType::Integer => AnyTypeInfoKind::BigInt,
+                DataType::Int => AnyTypeInfoKind::Integer,
+                DataType::Int64 => AnyTypeInfoKind::BigInt,
                 DataType::Float => AnyTypeInfoKind::Double,
                 DataType::Blob => AnyTypeInfoKind::Blob,
                 DataType::Text => AnyTypeInfoKind::Text,
@@ -203,7 +201,7 @@ fn map_arguments(args: AnyArguments<'_>) -> SqliteArguments<'_> {
             .0
             .into_iter()
             .map(|val| match val {
-                AnyValueKind::Null(_) => SqliteArgumentValue::Null,
+                AnyValueKind::Null => SqliteArgumentValue::Null,
                 AnyValueKind::Bool(b) => SqliteArgumentValue::Int(b as i32),
                 AnyValueKind::SmallInt(i) => SqliteArgumentValue::Int(i as i32),
                 AnyValueKind::Integer(i) => SqliteArgumentValue::Int(i),

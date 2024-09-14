@@ -8,12 +8,12 @@ use syn::Expr;
 
 #[test]
 fn test_grouping() {
-    let tokens: TokenStream = TokenStream::from_iter([
+    let tokens: TokenStream = TokenStream::from_iter(vec![
         TokenTree::Literal(Literal::i32_suffixed(1)),
         TokenTree::Punct(Punct::new('+', Spacing::Alone)),
         TokenTree::Group(Group::new(
             Delimiter::None,
-            TokenStream::from_iter([
+            TokenStream::from_iter(vec![
                 TokenTree::Literal(Literal::i32_suffixed(2)),
                 TokenTree::Punct(Punct::new('+', Spacing::Alone)),
                 TokenTree::Literal(Literal::i32_suffixed(3)),

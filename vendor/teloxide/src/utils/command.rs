@@ -55,6 +55,7 @@ use std::{
     fmt::{Display, Formatter, Write},
 };
 
+use std::marker::PhantomData;
 use teloxide_core::types::{BotCommand, Me};
 #[cfg(feature = "macros")]
 pub use teloxide_macros::BotCommands;
@@ -81,22 +82,22 @@ pub use teloxide_macros::BotCommands;
 /// ```
 ///
 /// # Enum attributes
-///  1. `#[command(rename_rule = "rule")]` Rename all commands by `rule`.
-///     Allowed rules are `lowercase`, `UPPERCASE`, `PascalCase`, `camelCase`,
-///     `snake_case`, `SCREAMING_SNAKE_CASE`, `kebab-case`, and
-///     `SCREAMING-KEBAB-CASE`.
+///  1. `#[command(rename_rule = "rule")]`
+/// Rename all commands by `rule`. Allowed rules are `lowercase`, `UPPERCASE`,
+/// `PascalCase`, `camelCase`, `snake_case`, `SCREAMING_SNAKE_CASE`,
+/// `kebab-case`, and `SCREAMING-KEBAB-CASE`.
 ///
-///  2. `#[command(prefix = "prefix")]` Change a prefix for all commands (the
-///     default is `/`).
+///  2. `#[command(prefix = "prefix")]`
+/// Change a prefix for all commands (the default is `/`).
 ///
-///  3. `#[command(description = "description")]` and `/// description` Add a
-///     summary description of commands before all commands.
+///  3. `#[command(description = "description")]`
+/// Add a summary description of commands before all commands.
 ///
-///  4. `#[command(parse_with = "parser")]` Change the parser of arguments.
-///     Possible values:
-///       - `default` - the same as the unspecified parser. It only puts all
-///         text after the first space into the first argument, which must
-///         implement [`FromStr`].
+///  4. `#[command(parse_with = "parser")]`
+/// Change the parser of arguments. Possible values:
+///    - `default` - the same as the unspecified parser. It only puts all text
+///    after the first space into the first argument, which must implement
+///    [`FromStr`].
 ///
 /// ## Example
 /// ```
@@ -134,8 +135,9 @@ pub use teloxide_macros::BotCommands;
 /// # }
 /// ```
 ///
-/// 5. `#[command(separator = "sep")]` Specify separator used by the `split`
-///    parser. It will be ignored when accompanied by another type of parsers.
+/// 5. `#[command(separator = "sep")]`
+/// Specify separator used by the `split` parser. It will be ignored when
+/// accompanied by another type of parsers.
 ///
 /// ## Example
 /// ```
@@ -153,60 +155,26 @@ pub use teloxide_macros::BotCommands;
 /// # }
 /// ```
 ///
-/// 6. `#[command(command_separator = "sep")]` Specify separator between command
-///    and args. Default is a space character.
-///
-/// ## Example
-/// ```
-/// # #[cfg(feature = "macros")] {
-/// use teloxide::utils::command::BotCommands;
-///
-/// #[derive(BotCommands, PartialEq, Debug)]
-/// #[command(
-///     rename_rule = "lowercase",
-///     parse_with = "split",
-///     separator = "_",
-///     command_separator = "_"
-/// )]
-/// enum Command {
-///     Nums(u8, u16, i32),
-/// }
-///
-/// let command = Command::parse("/nums_1_32_5", "").unwrap();
-/// assert_eq!(command, Command::Nums(1, 32, 5));
-/// # }
-/// ```
-///
 /// # Variant attributes
 /// All variant attributes override the corresponding `enum` attributes.
 ///
-///  1. `#[command(rename_rule = "rule")]` Rename one command by a rule. Allowed
-///     rules are `lowercase`, `UPPERCASE`, `PascalCase`, `camelCase`,
-///     `snake_case`, `SCREAMING_SNAKE_CASE`, `kebab-case`,
-///     `SCREAMING-KEBAB-CASE`.
+///  1. `#[command(rename_rule = "rule")]`
+/// Rename one command by a rule. Allowed rules are `lowercase`, `UPPERCASE`,
+/// `PascalCase`, `camelCase`, `snake_case`, `SCREAMING_SNAKE_CASE`,
+/// `kebab-case`, `SCREAMING-KEBAB-CASE`.
 ///
-///  2. `#[command(rename = "name")]` Rename one command to `name` (literal
-///     renaming; do not confuse with `rename_rule`).
+///  2. `#[command(rename = "name")]`
+/// Rename one command to `name` (literal renaming; do not confuse with
+/// `rename_rule`).
 ///
-///  3. `#[command(description = "description")]` and `/// description` Give
-///     your command a description. It will be shown in the help message.
+///  3. `#[command(description = "description")]`
+/// Give your command a description. Write `"off"` for `"description"` to hide a
+/// command.
 ///
-///  4. `#[command(parse_with = "parser")]` Parse arguments of one command with
-///     a given parser. `parser` must be a function of the signature `fn(String)
-///     -> Result<Tuple, ParseError>`, where `Tuple` corresponds to the
-///     variant's arguments.
-///
-///  5. `#[command(hide)]` Hide a command from the help message. It will still
-///     be parsed.
-///
-/// 6. `#[command(alias = "alias")]` Add an alias to a command. It will be shown
-///    in the help message.
-///
-/// 7. `#[command(aliases = ["alias1", "alias2"])]` Add multiple aliases to a
-///    command. They will be shown in the help message.
-///
-/// 8. `#[command(hide_aliases)]` Hide all aliases of a command from the help
-///    message.
+///  4. `#[command(parse_with = "parser")]`
+/// Parse arguments of one command with a given parser. `parser` must be a
+/// function of the signature `fn(String) -> Result<Tuple, ParseError>`, where
+/// `Tuple` corresponds to the variant's arguments.
 ///
 /// ## Example
 /// ```
@@ -262,6 +230,15 @@ pub trait BotCommands: Sized {
     /// [`BotCommand`]: crate::types::BotCommand
     /// [`set_my_commands`]: crate::requests::Requester::set_my_commands
     fn bot_commands() -> Vec<BotCommand>;
+
+    /// Returns `PhantomData<Self>` that is used as a param of [`commands_repl`]
+    ///
+    /// [`commands_repl`]: (crate::repls::commands_repl)
+    #[must_use]
+    #[deprecated(note = "Use `CommandReplExt` instead")]
+    fn ty() -> PhantomData<Self> {
+        PhantomData
+    }
 }
 
 pub type PrefixedBotCommand = String;
@@ -314,8 +291,6 @@ pub struct CommandDescription<'a> {
     pub prefix: &'a str,
     /// The command itself, e.g. `start`.
     pub command: &'a str,
-    /// The command aliases, e.g. `["help", "h"]`.
-    pub aliases: &'a [&'a str],
     /// Human-readable description of the command.
     pub description: &'a str,
 }
@@ -345,18 +320,8 @@ impl<'a> CommandDescriptions<'a> {
     /// use teloxide::utils::command::{CommandDescription, CommandDescriptions};
     ///
     /// let descriptions = CommandDescriptions::new(&[
-    ///     CommandDescription {
-    ///         prefix: "/",
-    ///         command: "start",
-    ///         description: "start this bot",
-    ///         aliases: &[],
-    ///     },
-    ///     CommandDescription {
-    ///         prefix: "/",
-    ///         command: "help",
-    ///         description: "show this message",
-    ///         aliases: &[],
-    ///     },
+    ///     CommandDescription { prefix: "/", command: "start", description: "start this bot" },
+    ///     CommandDescription { prefix: "/", command: "help", description: "show this message" },
     /// ]);
     ///
     /// assert_eq!(descriptions.to_string(), "/start — start this bot\n/help — show this message");
@@ -487,25 +452,17 @@ impl Display for CommandDescriptions<'_> {
             f.write_str("\n\n")?;
         }
 
-        let format_command = |command: &str, prefix: &str, formater: &mut fmt::Formatter<'_>| {
-            formater.write_str(prefix)?;
-            formater.write_str(command)?;
-            if let Some(username) = self.bot_username {
-                formater.write_char('@')?;
-                formater.write_str(username)?;
-            }
-            fmt::Result::Ok(())
-        };
-
-        let mut write = |&CommandDescription { prefix, command, aliases, description }, nls| {
+        let mut write = |&CommandDescription { prefix, command, description }, nls| {
             if nls {
                 f.write_char('\n')?;
             }
 
-            format_command(command, prefix, f)?;
-            for alias in aliases {
-                f.write_str(", ")?;
-                format_command(alias, prefix, f)?;
+            f.write_str(prefix)?;
+            f.write_str(command)?;
+
+            if let Some(username) = self.bot_username {
+                f.write_char('@')?;
+                f.write_str(username)?;
             }
 
             if !description.is_empty() {

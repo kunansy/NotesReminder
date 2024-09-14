@@ -4,7 +4,7 @@ use futures_core::future::BoxFuture;
 
 use crate::collation::{CharSet, Collation};
 use crate::common::StatementCache;
-use crate::connection::{tls, MySqlConnectionInner, MySqlStream, MAX_PACKET_SIZE};
+use crate::connection::{tls, MySqlStream, MAX_PACKET_SIZE};
 use crate::error::Error;
 use crate::net::{Socket, WithSocket};
 use crate::protocol::connect::{
@@ -25,12 +25,10 @@ impl MySqlConnection {
         let stream = handshake.await?;
 
         Ok(Self {
-            inner: Box::new(MySqlConnectionInner {
-                stream,
-                transaction_depth: 0,
-                cache_statement: StatementCache::new(options.statement_cache_capacity),
-                log_settings: options.log_settings.clone(),
-            }),
+            stream,
+            transaction_depth: 0,
+            cache_statement: StatementCache::new(options.statement_cache_capacity),
+            log_settings: options.log_settings.clone(),
         })
     }
 }
@@ -131,7 +129,7 @@ impl<'a> DoHandshake<'a> {
             database: options.database.as_deref(),
             auth_plugin: plugin,
             auth_response: auth_response.as_deref(),
-        })?;
+        });
 
         stream.flush().await?;
 
@@ -160,7 +158,7 @@ impl<'a> DoHandshake<'a> {
                         )
                         .await?;
 
-                    stream.write_packet(AuthSwitchResponse(response))?;
+                    stream.write_packet(AuthSwitchResponse(response));
                     stream.flush().await?;
                 }
 

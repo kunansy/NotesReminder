@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::types::{InputFile, Message, Recipient, ReplyMarkup, ReplyParameters, ThreadId};
+use crate::types::{InputFile, Message, Recipient, ReplyMarkup};
 
 impl_payload! {
     @[multipart = sticker]
@@ -21,17 +21,17 @@ impl_payload! {
         }
         optional {
             /// Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
-            pub message_thread_id: ThreadId,
-            /// Emoji associated with the sticker; only for just uploaded stickers
-            pub emoji: String [into],
+            pub message_thread_id: i32,
             /// Sends the message [silently]. Users will receive a notification with no sound.
             ///
             /// [silently]: https://telegram.org/blog/channels-2-0#silent-messages
             pub disable_notification: bool,
             /// Protects the contents of sent messages from forwarding and saving
             pub protect_content: bool,
-            /// Description of the message to reply to
-            pub reply_parameters: ReplyParameters,
+            /// If the message is a reply, ID of the original message
+            pub reply_to_message_id: i32,
+            /// Pass _True_, if the message should be sent even if the specified replied-to message is not found
+            pub allow_sending_without_reply: bool,
             /// Additional interface options. A JSON-serialized object for an [inline keyboard], [custom reply keyboard], instructions to remove reply keyboard or to force a reply from the user.
             ///
             /// [inline keyboard]: https://core.telegram.org/bots#inline-keyboards-and-on-the-fly-updating

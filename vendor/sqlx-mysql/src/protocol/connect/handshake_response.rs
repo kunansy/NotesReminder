@@ -1,5 +1,5 @@
 use crate::io::MySqlBufMutExt;
-use crate::io::{BufMutExt, ProtocolEncode};
+use crate::io::{BufMutExt, Encode};
 use crate::protocol::auth::AuthPlugin;
 use crate::protocol::connect::ssl_request::SslRequest;
 use crate::protocol::Capabilities;
@@ -27,15 +27,11 @@ pub struct HandshakeResponse<'a> {
     pub auth_response: Option<&'a [u8]>,
 }
 
-impl ProtocolEncode<'_, Capabilities> for HandshakeResponse<'_> {
-    fn encode_with(
-        &self,
-        buf: &mut Vec<u8>,
-        mut context: Capabilities,
-    ) -> Result<(), crate::Error> {
+impl Encode<'_, Capabilities> for HandshakeResponse<'_> {
+    fn encode_with(&self, buf: &mut Vec<u8>, mut capabilities: Capabilities) {
         if self.auth_plugin.is_none() {
             // ensure PLUGIN_AUTH is set *only* if we have a defined plugin
-            context.remove(Capabilities::PLUGIN_AUTH);
+            capabilities.remove(Capabilities::PLUGIN_AUTH);
         }
 
         // NOTE: Half of this packet is identical to the SSL Request packet
@@ -43,25 +39,22 @@ impl ProtocolEncode<'_, Capabilities> for HandshakeResponse<'_> {
             max_packet_size: self.max_packet_size,
             collation: self.collation,
         }
-        .encode_with(buf, context)?;
+        .encode_with(buf, capabilities);
 
         buf.put_str_nul(self.username);
 
-        if context.contains(Capabilities::PLUGIN_AUTH_LENENC_DATA) {
+        if capabilities.contains(Capabilities::PLUGIN_AUTH_LENENC_DATA) {
             buf.put_bytes_lenenc(self.auth_response.unwrap_or_default());
-        } else if context.contains(Capabilities::SECURE_CONNECTION) {
+        } else if capabilities.contains(Capabilities::SECURE_CONNECTION) {
             let response = self.auth_response.unwrap_or_default();
 
-            let response_len = u8::try_from(response.len())
-                .map_err(|_| err_protocol!("auth_response.len() too long: {}", response.len()))?;
-
-            buf.push(response_len);
+            buf.push(response.len() as u8);
             buf.extend(response);
         } else {
             buf.push(0);
         }
 
-        if context.contains(Capabilities::CONNECT_WITH_DB) {
+        if capabilities.contains(Capabilities::CONNECT_WITH_DB) {
             if let Some(database) = &self.database {
                 buf.put_str_nul(database);
             } else {
@@ -69,14 +62,12 @@ impl ProtocolEncode<'_, Capabilities> for HandshakeResponse<'_> {
             }
         }
 
-        if context.contains(Capabilities::PLUGIN_AUTH) {
+        if capabilities.contains(Capabilities::PLUGIN_AUTH) {
             if let Some(plugin) = &self.auth_plugin {
                 buf.put_str_nul(plugin.name());
             } else {
                 buf.push(0);
             }
         }
-
-        Ok(())
     }
 }

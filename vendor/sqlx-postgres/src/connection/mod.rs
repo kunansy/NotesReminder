@@ -8,10 +8,9 @@ use futures_util::FutureExt;
 use crate::common::StatementCache;
 use crate::error::Error;
 use crate::ext::ustr::UStr;
-use crate::io::StatementId;
+use crate::io::Decode;
 use crate::message::{
-    BackendMessageFormat, Close, Query, ReadyForQuery, ReceivedMessage, Terminate,
-    TransactionStatus,
+    Close, Message, MessageFormat, Query, ReadyForQuery, Terminate, TransactionStatus,
 };
 use crate::statement::PgStatementMetadata;
 use crate::transaction::Transaction;
@@ -48,15 +47,14 @@ pub struct PgConnection {
 
     // sequence of statement IDs for use in preparing statements
     // in PostgreSQL, the statement is prepared to a user-supplied identifier
-    next_statement_id: StatementId,
+    next_statement_id: Oid,
 
     // cache statement by query string to the id and columns
-    cache_statement: StatementCache<(StatementId, Arc<PgStatementMetadata>)>,
+    cache_statement: StatementCache<(Oid, Arc<PgStatementMetadata>)>,
 
     // cache user-defined types by id <-> info
     cache_type_info: HashMap<Oid, PgTypeInfo>,
     cache_type_oid: HashMap<UStr, Oid>,
-    cache_elem_type_to_array: HashMap<Oid, Oid>,
 
     // number of ReadyForQuery messages that we are currently expecting
     pub(crate) pending_ready_for_query_count: usize,
@@ -83,7 +81,7 @@ impl PgConnection {
         while self.pending_ready_for_query_count > 0 {
             let message = self.stream.recv().await?;
 
-            if let BackendMessageFormat::ReadyForQuery = message.format {
+            if let MessageFormat::ReadyForQuery = message.format {
                 self.handle_ready_for_query(message)?;
             }
         }
@@ -92,7 +90,10 @@ impl PgConnection {
     }
 
     async fn recv_ready_for_query(&mut self) -> Result<(), Error> {
-        let r: ReadyForQuery = self.stream.recv_expect().await?;
+        let r: ReadyForQuery = self
+            .stream
+            .recv_expect(MessageFormat::ReadyForQuery)
+            .await?;
 
         self.pending_ready_for_query_count -= 1;
         self.transaction_status = r.transaction_status;
@@ -100,14 +101,9 @@ impl PgConnection {
         Ok(())
     }
 
-    #[inline(always)]
-    fn handle_ready_for_query(&mut self, message: ReceivedMessage) -> Result<(), Error> {
-        self.pending_ready_for_query_count = self
-            .pending_ready_for_query_count
-            .checked_sub(1)
-            .ok_or_else(|| err_protocol!("received more ReadyForQuery messages than expected"))?;
-
-        self.transaction_status = message.decode::<ReadyForQuery>()?.transaction_status;
+    fn handle_ready_for_query(&mut self, message: Message) -> Result<(), Error> {
+        self.pending_ready_for_query_count -= 1;
+        self.transaction_status = ReadyForQuery::decode(message.contents)?.transaction_status;
 
         Ok(())
     }
@@ -115,12 +111,9 @@ impl PgConnection {
     /// Queue a simple query (not prepared) to execute the next time this connection is used.
     ///
     /// Used for rolling back transactions and releasing advisory locks.
-    #[inline(always)]
-    pub(crate) fn queue_simple_query(&mut self, query: &str) -> Result<(), Error> {
-        self.stream.write_msg(Query(query))?;
+    pub(crate) fn queue_simple_query(&mut self, query: &str) {
         self.pending_ready_for_query_count += 1;
-
-        Ok(())
+        self.stream.write(Query(query));
     }
 }
 
@@ -190,7 +183,7 @@ impl Connection for PgConnection {
             self.wait_until_ready().await?;
 
             while let Some((id, _)) = self.cache_statement.remove_lru() {
-                self.stream.write_msg(Close::Statement(id))?;
+                self.stream.write(Close::Statement(id));
                 cleared += 1;
             }
 

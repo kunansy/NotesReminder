@@ -1,9 +1,7 @@
+use crate::loom::sync::atomic::Ordering::Relaxed;
+use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
 use crate::runtime::metrics::Histogram;
 use crate::runtime::Config;
-use crate::util::metric_atomics::{MetricAtomicU64, MetricAtomicUsize};
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::Mutex;
-use std::thread::ThreadId;
 
 /// Retrieve runtime worker metrics.
 ///
@@ -12,48 +10,42 @@ use std::thread::ThreadId;
 /// features][unstable] for details.
 ///
 /// [unstable]: crate#unstable-features
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[repr(align(128))]
 pub(crate) struct WorkerMetrics {
     ///  Number of times the worker parked.
-    pub(crate) park_count: MetricAtomicU64,
-
-    ///  Number of times the worker parked and unparked.
-    pub(crate) park_unpark_count: MetricAtomicU64,
+    pub(crate) park_count: AtomicU64,
 
     /// Number of times the worker woke then parked again without doing work.
-    pub(crate) noop_count: MetricAtomicU64,
+    pub(crate) noop_count: AtomicU64,
 
     /// Number of tasks the worker stole.
-    pub(crate) steal_count: MetricAtomicU64,
+    pub(crate) steal_count: AtomicU64,
 
     /// Number of times the worker stole
-    pub(crate) steal_operations: MetricAtomicU64,
+    pub(crate) steal_operations: AtomicU64,
 
     /// Number of tasks the worker polled.
-    pub(crate) poll_count: MetricAtomicU64,
+    pub(crate) poll_count: AtomicU64,
 
     /// EWMA task poll time, in nanoseconds.
-    pub(crate) mean_poll_time: MetricAtomicU64,
+    pub(crate) mean_poll_time: AtomicU64,
 
     /// Amount of time the worker spent doing work vs. parking.
-    pub(crate) busy_duration_total: MetricAtomicU64,
+    pub(crate) busy_duration_total: AtomicU64,
 
     /// Number of tasks scheduled for execution on the worker's local queue.
-    pub(crate) local_schedule_count: MetricAtomicU64,
+    pub(crate) local_schedule_count: AtomicU64,
 
     /// Number of tasks moved from the local queue to the global queue to free space.
-    pub(crate) overflow_count: MetricAtomicU64,
+    pub(crate) overflow_count: AtomicU64,
 
     /// Number of tasks currently in the local queue. Used only by the
     /// current-thread scheduler.
-    pub(crate) queue_depth: MetricAtomicUsize,
+    pub(crate) queue_depth: AtomicUsize,
 
-    /// If `Some`, tracks the number of polls by duration range.
+    /// If `Some`, tracks the the number of polls by duration range.
     pub(super) poll_count_histogram: Option<Histogram>,
-
-    /// Thread id of worker thread.
-    thread_id: Mutex<Option<ThreadId>>,
 }
 
 impl WorkerMetrics {
@@ -67,7 +59,19 @@ impl WorkerMetrics {
     }
 
     pub(crate) fn new() -> WorkerMetrics {
-        WorkerMetrics::default()
+        WorkerMetrics {
+            park_count: AtomicU64::new(0),
+            noop_count: AtomicU64::new(0),
+            steal_count: AtomicU64::new(0),
+            steal_operations: AtomicU64::new(0),
+            poll_count: AtomicU64::new(0),
+            mean_poll_time: AtomicU64::new(0),
+            overflow_count: AtomicU64::new(0),
+            busy_duration_total: AtomicU64::new(0),
+            local_schedule_count: AtomicU64::new(0),
+            queue_depth: AtomicUsize::new(0),
+            poll_count_histogram: None,
+        }
     }
 
     pub(crate) fn queue_depth(&self) -> usize {
@@ -76,13 +80,5 @@ impl WorkerMetrics {
 
     pub(crate) fn set_queue_depth(&self, len: usize) {
         self.queue_depth.store(len, Relaxed);
-    }
-
-    pub(crate) fn thread_id(&self) -> Option<ThreadId> {
-        *self.thread_id.lock().unwrap()
-    }
-
-    pub(crate) fn set_thread_id(&self, thread_id: ThreadId) {
-        *self.thread_id.lock().unwrap() = Some(thread_id);
     }
 }

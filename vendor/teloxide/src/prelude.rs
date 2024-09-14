@@ -2,6 +2,7 @@
 
 pub use crate::error_handlers::{LoggingErrorHandler, OnError};
 
+#[allow(deprecated)]
 pub use crate::respond;
 
 pub use crate::dispatching::{
@@ -18,6 +19,10 @@ pub use teloxide_core::{
         PollAnswer, PreCheckoutQuery, ShippingQuery, Update,
     },
 };
+
+#[cfg(feature = "auto-send")]
+#[allow(deprecated)]
+pub use crate::adaptors::AutoSend;
 
 #[doc(no_inline)]
 pub use teloxide_core::prelude::*;

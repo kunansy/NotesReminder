@@ -9,7 +9,7 @@ use crate::util::RngSeedGenerator;
 
 use std::fmt;
 
-cfg_unstable_metrics! {
+cfg_metrics! {
     mod metrics;
 }
 

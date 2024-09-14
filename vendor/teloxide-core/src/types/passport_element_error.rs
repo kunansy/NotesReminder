@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 /// submitted that should be resolved by the user.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerror).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementError {
     /// Error message.
@@ -74,7 +73,6 @@ pub enum PassportElementErrorKind {
 /// The error is considered resolved when the field's value changes.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrordatafield).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorDataField {
     /// The section of the user's Telegram Passport which has the error.
@@ -129,7 +127,6 @@ impl PassportElementErrorDataField {
 /// document changes.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrorfrontside).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorFrontSide {
     /// The section of the user's Telegram Passport which has the issue.
@@ -169,7 +166,6 @@ impl PassportElementErrorFrontSide {
 /// document changes.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrorreverseside).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorReverseSide {
     /// The section of the user's Telegram Passport which has the issue.
@@ -203,12 +199,11 @@ impl PassportElementErrorReverseSide {
     }
 }
 
-/// Represents an issue with the selfie with a document.
-///
+//// Represents an issue with the selfie with a document.
+//
 /// The error is considered resolved when the file with the selfie changes.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrorselfie).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorSelfie {
     /// The section of the user's Telegram Passport which has the issue.
@@ -247,7 +242,6 @@ impl PassportElementErrorSelfie {
 /// changes.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrorfile).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorFile {
     /// The section of the user's Telegram Passport which has the issue.
@@ -286,7 +280,6 @@ impl PassportElementErrorFile {
 /// changes.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrorfiles).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorFiles {
     /// The section of the user's Telegram Passport which has the issue.
@@ -325,7 +318,6 @@ impl PassportElementErrorFiles {
 /// The error is considered resolved when the file changes.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrortranslationfile).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorTranslationFile {
     /// Type of element of the user's Telegram Passport which has the
@@ -365,7 +357,6 @@ impl PassportElementErrorTranslationFile {
 /// change.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrortranslationfiles).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorTranslationFiles {
     /// Type of element of the user's Telegram Passport which has the issue
@@ -403,7 +394,6 @@ impl PassportElementErrorTranslationFiles {
 /// The error is considered resolved when new data is added.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#passportelementerrorunspecified).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PassportElementErrorUnspecified {
     /// Type of element of the user's Telegram Passport which has the

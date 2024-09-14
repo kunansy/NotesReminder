@@ -12,7 +12,7 @@ use crate::types::True;
 /// [The official docs](https://core.telegram.org/bots/api#replykeyboardremove).
 ///
 /// [`KeyboardMarkup`]: crate::types::KeyboardMarkup
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 #[derive(Eq, Hash, PartialEq)]
 pub struct KeyboardRemove {
@@ -34,21 +34,18 @@ pub struct KeyboardRemove {
     /// showing the keyboard with poll options to users who haven't voted yet.
     ///
     /// [`Message`]: crate::types::Message
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub selective: bool,
+    pub selective: Option<bool>,
 }
 
 impl KeyboardRemove {
     #[must_use]
     pub const fn new() -> Self {
-        Self { remove_keyboard: True, selective: false }
+        Self { remove_keyboard: True, selective: None }
     }
 
-    /// Sets [`selective`] to `true`.
-    ///
-    /// [`selective`]: KeyboardRemove::selective
     #[must_use]
-    pub const fn selective(self) -> Self {
-        Self { selective: true, ..self }
+    pub const fn selective(mut self, val: bool) -> Self {
+        self.selective = Some(val);
+        self
     }
 }

@@ -86,17 +86,16 @@
 //! a different thread.
 
 // Proc-macro2 types in rustdoc of other crates get linked to here.
-#![doc(html_root_url = "https://docs.rs/proc-macro2/1.0.86")]
+#![doc(html_root_url = "https://docs.rs/proc-macro2/1.0.78")]
 #![cfg_attr(any(proc_macro_span, super_unstable), feature(proc_macro_span))]
 #![cfg_attr(super_unstable, feature(proc_macro_def_site))]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![allow(
     clippy::cast_lossless,
     clippy::cast_possible_truncation,
     clippy::checked_conversions,
     clippy::doc_markdown,
-    clippy::incompatible_msrv,
     clippy::items_after_statements,
     clippy::iter_without_into_iter,
     clippy::let_underscore_untyped,
@@ -170,12 +169,11 @@ use core::ops::Range;
 use core::ops::RangeBounds;
 use core::str::FromStr;
 use std::error::Error;
-use std::ffi::CStr;
 #[cfg(procmacro2_semver_exempt)]
 use std::path::PathBuf;
 
 #[cfg(span_locations)]
-#[cfg_attr(docsrs, doc(cfg(feature = "span-locations")))]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "span-locations")))]
 pub use crate::location::LineColumn;
 
 /// An abstract stream of tokens, or more concretely a sequence of token trees.
@@ -252,7 +250,7 @@ impl FromStr for TokenStream {
 }
 
 #[cfg(feature = "proc-macro")]
-#[cfg_attr(docsrs, doc(cfg(feature = "proc-macro")))]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "proc-macro")))]
 impl From<proc_macro::TokenStream> for TokenStream {
     fn from(inner: proc_macro::TokenStream) -> Self {
         TokenStream::_new(inner.into())
@@ -260,7 +258,7 @@ impl From<proc_macro::TokenStream> for TokenStream {
 }
 
 #[cfg(feature = "proc-macro")]
-#[cfg_attr(docsrs, doc(cfg(feature = "proc-macro")))]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "proc-macro")))]
 impl From<TokenStream> for proc_macro::TokenStream {
     fn from(inner: TokenStream) -> Self {
         inner.inner.into()
@@ -339,7 +337,7 @@ impl Error for LexError {}
 ///
 /// This type is semver exempt and not exposed by default.
 #[cfg(all(procmacro2_semver_exempt, any(not(wrap_proc_macro), super_unstable)))]
-#[cfg_attr(docsrs, doc(cfg(procmacro2_semver_exempt)))]
+#[cfg_attr(doc_cfg, doc(cfg(procmacro2_semver_exempt)))]
 #[derive(Clone, PartialEq, Eq)]
 pub struct SourceFile {
     inner: imp::SourceFile,
@@ -428,7 +426,7 @@ impl Span {
     ///
     /// This method is semver exempt and not exposed by default.
     #[cfg(procmacro2_semver_exempt)]
-    #[cfg_attr(docsrs, doc(cfg(procmacro2_semver_exempt)))]
+    #[cfg_attr(doc_cfg, doc(cfg(procmacro2_semver_exempt)))]
     pub fn def_site() -> Self {
         Span::_new(imp::Span::def_site())
     }
@@ -471,7 +469,7 @@ impl Span {
     ///
     /// This method is semver exempt and not exposed by default.
     #[cfg(all(procmacro2_semver_exempt, any(not(wrap_proc_macro), super_unstable)))]
-    #[cfg_attr(docsrs, doc(cfg(procmacro2_semver_exempt)))]
+    #[cfg_attr(doc_cfg, doc(cfg(procmacro2_semver_exempt)))]
     pub fn source_file(&self) -> SourceFile {
         SourceFile::_new(self.inner.source_file())
     }
@@ -486,7 +484,7 @@ impl Span {
     /// procedural macro, such as main.rs or build.rs, the byte range is always
     /// accurate regardless of toolchain.
     #[cfg(span_locations)]
-    #[cfg_attr(docsrs, doc(cfg(feature = "span-locations")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "span-locations")))]
     pub fn byte_range(&self) -> Range<usize> {
         self.inner.byte_range()
     }
@@ -501,7 +499,7 @@ impl Span {
     /// outside of a procedural macro, such as main.rs or build.rs, the
     /// line/column are always meaningful regardless of toolchain.
     #[cfg(span_locations)]
-    #[cfg_attr(docsrs, doc(cfg(feature = "span-locations")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "span-locations")))]
     pub fn start(&self) -> LineColumn {
         self.inner.start()
     }
@@ -516,7 +514,7 @@ impl Span {
     /// outside of a procedural macro, such as main.rs or build.rs, the
     /// line/column are always meaningful regardless of toolchain.
     #[cfg(span_locations)]
-    #[cfg_attr(docsrs, doc(cfg(feature = "span-locations")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "span-locations")))]
     pub fn end(&self) -> LineColumn {
         self.inner.end()
     }
@@ -538,7 +536,7 @@ impl Span {
     ///
     /// This method is semver exempt and not exposed by default.
     #[cfg(procmacro2_semver_exempt)]
-    #[cfg_attr(docsrs, doc(cfg(procmacro2_semver_exempt)))]
+    #[cfg_attr(doc_cfg, doc(cfg(procmacro2_semver_exempt)))]
     pub fn eq(&self, other: &Span) -> bool {
         self.inner.eq(&other.inner)
     }
@@ -678,25 +676,13 @@ pub enum Delimiter {
     Brace,
     /// `[ ... ]`
     Bracket,
-    /// `∅ ... ∅`
+    /// `Ø ... Ø`
     ///
-    /// An invisible delimiter, that may, for example, appear around tokens
+    /// An implicit delimiter, that may, for example, appear around tokens
     /// coming from a "macro variable" `$var`. It is important to preserve
     /// operator priorities in cases like `$var * 3` where `$var` is `1 + 2`.
-    /// Invisible delimiters may not survive roundtrip of a token stream through
+    /// Implicit delimiters may not survive roundtrip of a token stream through
     /// a string.
-    ///
-    /// <div class="warning">
-    ///
-    /// Note: rustc currently can ignore the grouping of tokens delimited by `None` in the output
-    /// of a proc_macro. Only `None`-delimited groups created by a macro_rules macro in the input
-    /// of a proc_macro macro are preserved, and only in very specific circumstances.
-    /// Any `None`-delimited groups (re)created by a proc_macro will therefore not preserve
-    /// operator priorities as indicated above. The other `Delimiter` variants should be used
-    /// instead in this context. This is a rustc bug. For details, see
-    /// [rust-lang/rust#67062](https://github.com/rust-lang/rust/issues/67062).
-    ///
-    /// </div>
     None,
 }
 
@@ -1247,19 +1233,9 @@ impl Literal {
         Literal::_new(imp::Literal::character(ch))
     }
 
-    /// Byte character literal.
-    pub fn byte_character(byte: u8) -> Literal {
-        Literal::_new(imp::Literal::byte_character(byte))
-    }
-
     /// Byte string literal.
-    pub fn byte_string(bytes: &[u8]) -> Literal {
-        Literal::_new(imp::Literal::byte_string(bytes))
-    }
-
-    /// C string literal.
-    pub fn c_string(string: &CStr) -> Literal {
-        Literal::_new(imp::Literal::c_string(string))
+    pub fn byte_string(s: &[u8]) -> Literal {
+        Literal::_new(imp::Literal::byte_string(s))
     }
 
     /// Returns the span encompassing this literal.

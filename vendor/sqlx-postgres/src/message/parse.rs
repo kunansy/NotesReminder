@@ -1,14 +1,13 @@
-use crate::io::BufMutExt;
-use crate::io::{PgBufMutExt, StatementId};
-use crate::message::{FrontendMessage, FrontendMessageFormat};
+use std::i16;
+
+use crate::io::PgBufMutExt;
+use crate::io::{BufMutExt, Encode};
 use crate::types::Oid;
-use sqlx_core::Error;
-use std::num::Saturating;
 
 #[derive(Debug)]
 pub struct Parse<'a> {
     /// The ID of the destination prepared statement.
-    pub statement: StatementId,
+    pub statement: Oid,
 
     /// The query string to be parsed.
     pub query: &'a str,
@@ -19,59 +18,39 @@ pub struct Parse<'a> {
     pub param_types: &'a [Oid],
 }
 
-impl FrontendMessage for Parse<'_> {
-    const FORMAT: FrontendMessageFormat = FrontendMessageFormat::Parse;
+impl Encode<'_> for Parse<'_> {
+    fn encode_with(&self, buf: &mut Vec<u8>, _: ()) {
+        buf.push(b'P');
 
-    fn body_size_hint(&self) -> Saturating<usize> {
-        let mut size = Saturating(0);
+        buf.put_length_prefixed(|buf| {
+            buf.put_statement_name(self.statement);
 
-        size += self.statement.name_len();
+            buf.put_str_nul(self.query);
 
-        size += self.query.len();
-        size += 1; // NUL terminator
+            // TODO: Return an error here instead
+            assert!(self.param_types.len() <= (u16::MAX as usize));
 
-        size += 2; // param_types_len
+            buf.extend(&(self.param_types.len() as i16).to_be_bytes());
 
-        // `param_types`
-        size += self.param_types.len().saturating_mul(4);
-
-        size
-    }
-
-    fn encode_body(&self, buf: &mut Vec<u8>) -> Result<(), Error> {
-        buf.put_statement_name(self.statement);
-
-        buf.put_str_nul(self.query);
-
-        let param_types_len = i16::try_from(self.param_types.len()).map_err(|_| {
-            err_protocol!(
-                "param_types.len() too large for binary protocol: {}",
-                self.param_types.len()
-            )
-        })?;
-
-        buf.extend(param_types_len.to_be_bytes());
-
-        for &oid in self.param_types {
-            buf.extend(oid.0.to_be_bytes());
-        }
-
-        Ok(())
+            for &oid in self.param_types {
+                buf.extend(&oid.0.to_be_bytes());
+            }
+        })
     }
 }
 
 #[test]
 fn test_encode_parse() {
-    const EXPECTED: &[u8] = b"P\0\0\0\x26sqlx_s_1234567890\0SELECT $1\0\0\x01\0\0\0\x19";
+    const EXPECTED: &[u8] = b"P\0\0\0\x1dsqlx_s_1\0SELECT $1\0\0\x01\0\0\0\x19";
 
     let mut buf = Vec::new();
     let m = Parse {
-        statement: StatementId::TEST_VAL,
+        statement: Oid(1),
         query: "SELECT $1",
         param_types: &[Oid(25)],
     };
 
-    m.encode_msg(&mut buf).unwrap();
+    m.encode(&mut buf);
 
     assert_eq!(buf, EXPECTED);
 }

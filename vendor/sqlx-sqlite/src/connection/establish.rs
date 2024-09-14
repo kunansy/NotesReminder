@@ -9,9 +9,7 @@ use libsqlite3_sys::{
     SQLITE_OPEN_CREATE, SQLITE_OPEN_FULLMUTEX, SQLITE_OPEN_MEMORY, SQLITE_OPEN_NOMUTEX,
     SQLITE_OPEN_PRIVATECACHE, SQLITE_OPEN_READONLY, SQLITE_OPEN_READWRITE, SQLITE_OPEN_SHAREDCACHE,
 };
-use percent_encoding::NON_ALPHANUMERIC;
 use sqlx_core::IndexMap;
-use std::collections::BTreeMap;
 use std::ffi::{c_void, CStr, CString};
 use std::io;
 use std::os::raw::c_int;
@@ -24,7 +22,6 @@ use std::time::Duration;
 // https://doc.rust-lang.org/stable/std/sync/atomic/index.html#portability
 static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
 
-#[derive(Copy, Clone)]
 enum SqliteLoadExtensionMode {
     /// Enables only the C-API, leaving the SQL function disabled.
     Enable,
@@ -33,7 +30,7 @@ enum SqliteLoadExtensionMode {
 }
 
 impl SqliteLoadExtensionMode {
-    fn to_int(self) -> c_int {
+    fn as_int(self) -> c_int {
         match self {
             SqliteLoadExtensionMode::Enable => 1,
             SqliteLoadExtensionMode::DisableAll => 0,
@@ -95,21 +92,21 @@ impl EstablishParams {
             SQLITE_OPEN_PRIVATECACHE
         };
 
-        let mut query_params = BTreeMap::new();
+        let mut query_params: Vec<String> = vec![];
 
         if options.immutable {
-            query_params.insert("immutable", "true");
+            query_params.push("immutable=true".into())
         }
 
-        if let Some(vfs) = options.vfs.as_deref() {
-            query_params.insert("vfs", vfs);
+        if let Some(vfs) = &options.vfs {
+            query_params.push(format!("vfs={vfs}"))
         }
 
         if !query_params.is_empty() {
             filename = format!(
                 "file:{}?{}",
-                percent_encoding::percent_encode(filename.as_bytes(), NON_ALPHANUMERIC),
-                serde_urlencoded::to_string(&query_params).unwrap()
+                urlencoding::encode(&filename),
+                query_params.join("&")
             );
             flags |= libsqlite3_sys::SQLITE_OPEN_URI;
         }
@@ -175,7 +172,7 @@ impl EstablishParams {
         let status = sqlite3_db_config(
             db,
             SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION,
-            mode.to_int(),
+            mode.as_int(),
             null::<i32>(),
         );
 
@@ -295,7 +292,6 @@ impl EstablishParams {
             transaction_depth: 0,
             log_settings: self.log_settings.clone(),
             progress_handler_callback: None,
-            update_hook_callback: None,
         })
     }
 }

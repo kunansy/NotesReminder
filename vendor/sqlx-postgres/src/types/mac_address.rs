@@ -23,9 +23,9 @@ impl PgHasArrayType for MacAddress {
 }
 
 impl Encode<'_, Postgres> for MacAddress {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         buf.extend_from_slice(&self.bytes()); // write just the address
-        Ok(IsNull::No)
+        IsNull::No
     }
 
     fn size_hint(&self) -> usize {

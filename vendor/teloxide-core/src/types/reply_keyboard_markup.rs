@@ -1,4 +1,3 @@
-// FIXME: rename module (s/reply_//)
 use serde::{Deserialize, Serialize};
 
 use crate::types::KeyboardButton;
@@ -10,8 +9,9 @@ use crate::types::KeyboardButton;
 ///
 /// [custom keyboard]: https://core.telegram.org/bots#keyboards
 /// [Introduction to bots]: https://core.telegram.org/bots#keyboards
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
+// FIXME: unoption bools?
 pub struct KeyboardMarkup {
     /// Array of button rows, each represented by an Array of
     /// [`KeyboardButton`] objects
@@ -29,21 +29,18 @@ pub struct KeyboardMarkup {
     /// (e.g., make the keyboard smaller if there are just two rows of
     /// buttons). Defaults to `false`, in which case the custom keyboard is
     /// always of the same height as the app's standard keyboard.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub resize_keyboard: bool,
+    pub resize_keyboard: Option<bool>,
 
     /// Requests clients to hide the keyboard as soon as it's been used. The
     /// keyboard will still be available, but clients will automatically
     /// display the usual letter-keyboard in the chat – the user can press a
     /// special button in the input field to see the custom keyboard again.
     /// Defaults to `false`.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub one_time_keyboard: bool,
+    pub one_time_keyboard: Option<bool>,
 
     /// The placeholder to be shown in the input field when the keyboard is
     /// active; 1-64 characters.
-    #[serde(skip_serializing_if = "str::is_empty")]
-    pub input_field_placeholder: String,
+    pub input_field_placeholder: Option<String>,
 
     /// Use this parameter if you want to show the keyboard to specific users
     /// only. Targets: 1) users that are `@mentioned` in the `text` of the
@@ -55,12 +52,10 @@ pub struct KeyboardMarkup {
     /// in the group don’t see the keyboard.
     ///
     /// [`Message`]: crate::types::Message
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub selective: bool,
+    pub selective: Option<bool>,
 }
 
 impl KeyboardMarkup {
-    // FIXME: Re-think the interface of building keyboard markups
     pub fn new<K>(keyboard: K) -> Self
     where
         K: IntoIterator,
@@ -69,10 +64,10 @@ impl KeyboardMarkup {
         Self {
             keyboard: keyboard.into_iter().map(<_>::into_iter).map(<_>::collect).collect(),
             is_persistent: false,
-            resize_keyboard: false,
-            one_time_keyboard: false,
-            input_field_placeholder: String::new(),
-            selective: false,
+            resize_keyboard: None,
+            one_time_keyboard: None,
+            input_field_placeholder: None,
+            selective: None,
         }
     }
 
@@ -96,36 +91,40 @@ impl KeyboardMarkup {
     /// Sets [`is_persistent`] to `true`.
     ///
     /// [`is_persistent`]: KeyboardMarkup::is_persistent
-    pub fn persistent(self) -> Self {
-        Self { is_persistent: true, ..self }
+    pub fn persistent(mut self) -> Self {
+        self.is_persistent = true;
+        self
     }
 
-    /// Sets [`resize_keyboard`] to `true`.
-    ///
-    /// [`resize_keyboard`]: KeyboardMarkup::resize_keyboard
-    pub fn resize_keyboard(self) -> Self {
-        Self { resize_keyboard: true, ..self }
-    }
-
-    /// Sets [`one_time_keyboard`] to `true`.
-    ///
-    /// [`one_time_keyboard`]: KeyboardMarkup::one_time_keyboard
-    pub fn one_time_keyboard(self) -> Self {
-        Self { one_time_keyboard: true, ..self }
-    }
-
-    // FIXME: document
-    pub fn input_field_placeholder<T>(self, val: T) -> Self
+    pub fn resize_keyboard<T>(mut self, val: T) -> Self
     where
-        T: Into<String>,
+        T: Into<Option<bool>>,
     {
-        Self { input_field_placeholder: val.into(), ..self }
+        self.resize_keyboard = val.into();
+        self
     }
 
-    /// Sets [`selective`] to `true`.
-    ///
-    /// [`selective`]: KeyboardMarkup::selective
-    pub fn selective<T>(self) -> Self {
-        Self { selective: true, ..self }
+    pub fn one_time_keyboard<T>(mut self, val: T) -> Self
+    where
+        T: Into<Option<bool>>,
+    {
+        self.one_time_keyboard = val.into();
+        self
+    }
+
+    pub fn input_field_placeholder<T>(mut self, val: T) -> Self
+    where
+        T: Into<Option<String>>,
+    {
+        self.input_field_placeholder = val.into();
+        self
+    }
+
+    pub fn selective<T>(mut self, val: T) -> Self
+    where
+        T: Into<Option<bool>>,
+    {
+        self.selective = val.into();
+        self
     }
 }

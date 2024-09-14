@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, ParseMode, Seconds};
+use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, ParseMode};
 
 /// Represents a link to a voice recording in an .ogg container encoded with
 /// OPUS.
@@ -10,7 +10,7 @@ use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, Par
 /// content instead of the the voice message.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#inlinequeryresultvoice).
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InlineQueryResultVoice {
     /// Unique identifier for this result, 1-64 bytes.
@@ -38,7 +38,7 @@ pub struct InlineQueryResultVoice {
     pub caption_entities: Option<Vec<MessageEntity>>,
 
     /// Recording duration in seconds.
-    pub voice_duration: Option<Seconds>,
+    pub voice_duration: Option<i32>,
 
     /// [Inline keyboard] attached to the message.
     ///
@@ -113,7 +113,7 @@ impl InlineQueryResultVoice {
     }
 
     #[must_use]
-    pub fn voice_duration(mut self, value: Seconds) -> Self {
+    pub fn voice_duration(mut self, value: i32) -> Self {
         self.voice_duration = Some(value);
         self
     }

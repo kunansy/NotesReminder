@@ -6,7 +6,7 @@ use crate::{
     requests::{JsonRequest, MultipartRequest},
     types::{
         BotCommand, ChatId, ChatPermissions, InlineQueryResult, InputFile, InputMedia,
-        InputSticker, LabeledPrice, MessageId, Recipient, StickerFormat, ThreadId, UserId,
+        InputSticker, LabeledPrice, MessageId, Recipient, UserId,
     },
     Bot,
 };
@@ -69,24 +69,6 @@ impl Requester for Bot {
         Self::ForwardMessage::new(
             self.clone(),
             payloads::ForwardMessage::new(chat_id, from_chat_id, message_id),
-        )
-    }
-
-    type ForwardMessages = JsonRequest<payloads::ForwardMessages>;
-    fn forward_messages<C, F, M>(
-        &self,
-        chat_id: C,
-        from_chat_id: F,
-        message_ids: M,
-    ) -> Self::ForwardMessages
-    where
-        C: Into<Recipient>,
-        F: Into<Recipient>,
-        M: IntoIterator<Item = MessageId>,
-    {
-        Self::ForwardMessages::new(
-            self.clone(),
-            payloads::ForwardMessages::new(chat_id, from_chat_id, message_ids),
         )
     }
 
@@ -216,13 +198,15 @@ impl Requester for Bot {
         &self,
         chat_id: C,
         message_id: MessageId,
+        latitude: f64,
+        longitude: f64,
     ) -> Self::StopMessageLiveLocation
     where
         C: Into<Recipient>,
     {
         Self::StopMessageLiveLocation::new(
             self.clone(),
-            payloads::StopMessageLiveLocation::new(chat_id, message_id),
+            payloads::StopMessageLiveLocation::new(chat_id, message_id, latitude, longitude),
         )
     }
 
@@ -231,13 +215,15 @@ impl Requester for Bot {
     fn stop_message_live_location_inline<I>(
         &self,
         inline_message_id: I,
+        latitude: f64,
+        longitude: f64,
     ) -> Self::StopMessageLiveLocationInline
     where
         I: Into<String>,
     {
         Self::StopMessageLiveLocationInline::new(
             self.clone(),
-            payloads::StopMessageLiveLocationInline::new(inline_message_id),
+            payloads::StopMessageLiveLocationInline::new(inline_message_id, latitude, longitude),
         )
     }
 
@@ -307,18 +293,6 @@ impl Requester for Bot {
         C: Into<Recipient>,
     {
         Self::SendChatAction::new(self.clone(), payloads::SendChatAction::new(chat_id, action))
-    }
-
-    type SetMessageReaction = JsonRequest<payloads::SetMessageReaction>;
-
-    fn set_message_reaction<C>(&self, chat_id: C, message_id: MessageId) -> Self::SetMessageReaction
-    where
-        C: Into<Recipient>,
-    {
-        Self::SetMessageReaction::new(
-            self.clone(),
-            payloads::SetMessageReaction::new(chat_id, message_id),
-        )
     }
 
     type GetUserProfilePhotos = JsonRequest<payloads::GetUserProfilePhotos>;
@@ -701,7 +675,7 @@ impl Requester for Bot {
 
     type EditForumTopic = JsonRequest<payloads::EditForumTopic>;
 
-    fn edit_forum_topic<C>(&self, chat_id: C, message_thread_id: ThreadId) -> Self::EditForumTopic
+    fn edit_forum_topic<C>(&self, chat_id: C, message_thread_id: i32) -> Self::EditForumTopic
     where
         C: Into<Recipient>,
     {
@@ -713,7 +687,7 @@ impl Requester for Bot {
 
     type CloseForumTopic = JsonRequest<payloads::CloseForumTopic>;
 
-    fn close_forum_topic<C>(&self, chat_id: C, message_thread_id: ThreadId) -> Self::CloseForumTopic
+    fn close_forum_topic<C>(&self, chat_id: C, message_thread_id: i32) -> Self::CloseForumTopic
     where
         C: Into<Recipient>,
     {
@@ -725,11 +699,7 @@ impl Requester for Bot {
 
     type ReopenForumTopic = JsonRequest<payloads::ReopenForumTopic>;
 
-    fn reopen_forum_topic<C>(
-        &self,
-        chat_id: C,
-        message_thread_id: ThreadId,
-    ) -> Self::ReopenForumTopic
+    fn reopen_forum_topic<C>(&self, chat_id: C, message_thread_id: i32) -> Self::ReopenForumTopic
     where
         C: Into<Recipient>,
     {
@@ -741,11 +711,7 @@ impl Requester for Bot {
 
     type DeleteForumTopic = JsonRequest<payloads::DeleteForumTopic>;
 
-    fn delete_forum_topic<C>(
-        &self,
-        chat_id: C,
-        message_thread_id: ThreadId,
-    ) -> Self::DeleteForumTopic
+    fn delete_forum_topic<C>(&self, chat_id: C, message_thread_id: i32) -> Self::DeleteForumTopic
     where
         C: Into<Recipient>,
     {
@@ -760,7 +726,7 @@ impl Requester for Bot {
     fn unpin_all_forum_topic_messages<C>(
         &self,
         chat_id: C,
-        message_thread_id: ThreadId,
+        message_thread_id: i32,
     ) -> Self::UnpinAllForumTopicMessages
     where
         C: Into<Recipient>,
@@ -832,22 +798,6 @@ impl Requester for Bot {
         )
     }
 
-    type UnpinAllGeneralForumTopicMessages =
-        JsonRequest<payloads::UnpinAllGeneralForumTopicMessages>;
-
-    fn unpin_all_general_forum_topic_messages<C>(
-        &self,
-        chat_id: C,
-    ) -> Self::UnpinAllGeneralForumTopicMessages
-    where
-        C: Into<Recipient>,
-    {
-        Self::UnpinAllGeneralForumTopicMessages::new(
-            self.clone(),
-            payloads::UnpinAllGeneralForumTopicMessages::new(chat_id),
-        )
-    }
-
     type AnswerCallbackQuery = JsonRequest<payloads::AnswerCallbackQuery>;
 
     fn answer_callback_query<C>(&self, callback_query_id: C) -> Self::AnswerCallbackQuery
@@ -857,18 +807,6 @@ impl Requester for Bot {
         Self::AnswerCallbackQuery::new(
             self.clone(),
             payloads::AnswerCallbackQuery::new(callback_query_id),
-        )
-    }
-
-    type GetUserChatBoosts = JsonRequest<payloads::GetUserChatBoosts>;
-
-    fn get_user_chat_boosts<C>(&self, chat_id: C, user_id: UserId) -> Self::GetUserChatBoosts
-    where
-        C: Into<Recipient>,
-    {
-        Self::GetUserChatBoosts::new(
-            self.clone(),
-            payloads::GetUserChatBoosts::new(chat_id, user_id),
         )
     }
 
@@ -885,41 +823,6 @@ impl Requester for Bot {
 
     fn get_my_commands(&self) -> Self::GetMyCommands {
         Self::GetMyCommands::new(self.clone(), payloads::GetMyCommands::new())
-    }
-
-    type SetMyName = JsonRequest<payloads::SetMyName>;
-
-    fn set_my_name(&self) -> Self::SetMyName {
-        Self::SetMyName::new(self.clone(), payloads::SetMyName::new())
-    }
-
-    type GetMyName = JsonRequest<payloads::GetMyName>;
-
-    fn get_my_name(&self) -> Self::GetMyName {
-        Self::GetMyName::new(self.clone(), payloads::GetMyName::new())
-    }
-
-    type SetMyDescription = JsonRequest<payloads::SetMyDescription>;
-
-    fn set_my_description(&self) -> Self::SetMyDescription {
-        Self::SetMyDescription::new(self.clone(), payloads::SetMyDescription::new())
-    }
-
-    type GetMyDescription = JsonRequest<payloads::GetMyDescription>;
-
-    fn get_my_description(&self) -> Self::GetMyDescription {
-        Self::GetMyDescription::new(self.clone(), payloads::GetMyDescription::new())
-    }
-
-    type SetMyShortDescription = JsonRequest<payloads::SetMyShortDescription>;
-
-    fn set_my_short_description(&self) -> Self::SetMyShortDescription {
-        Self::SetMyShortDescription::new(self.clone(), payloads::SetMyShortDescription::new())
-    }
-
-    type GetMyShortDescription = JsonRequest<payloads::GetMyShortDescription>;
-    fn get_my_short_description(&self) -> Self::GetMyShortDescription {
-        Self::GetMyShortDescription::new(self.clone(), payloads::GetMyShortDescription::new())
     }
 
     type SetChatMenuButton = JsonRequest<payloads::SetChatMenuButton>;
@@ -1128,15 +1031,6 @@ impl Requester for Bot {
         Self::DeleteMessage::new(self.clone(), payloads::DeleteMessage::new(chat_id, message_id))
     }
 
-    type DeleteMessages = JsonRequest<payloads::DeleteMessages>;
-    fn delete_messages<C, M>(&self, chat_id: C, message_ids: M) -> Self::DeleteMessages
-    where
-        C: Into<Recipient>,
-        M: IntoIterator<Item = MessageId>,
-    {
-        Self::DeleteMessages::new(self.clone(), payloads::DeleteMessages::new(chat_id, message_ids))
-    }
-
     type SendSticker = MultipartRequest<payloads::SendSticker>;
 
     fn send_sticker<C>(&self, chat_id: C, sticker: InputFile) -> Self::SendSticker
@@ -1172,50 +1066,51 @@ impl Requester for Bot {
     fn upload_sticker_file(
         &self,
         user_id: UserId,
-        sticker: InputFile,
-        sticker_format: crate::types::StickerFormat,
-    ) -> Self::UploadStickerFile {
+        png_sticker: InputFile,
+    ) -> Self::UploadStickerFile where {
         Self::UploadStickerFile::new(
             self.clone(),
-            payloads::UploadStickerFile::new(user_id, sticker, sticker_format),
+            payloads::UploadStickerFile::new(user_id, png_sticker),
         )
     }
 
     type CreateNewStickerSet = MultipartRequest<payloads::CreateNewStickerSet>;
 
-    fn create_new_sticker_set<N, T, S>(
+    fn create_new_sticker_set<N, T, E>(
         &self,
         user_id: UserId,
         name: N,
         title: T,
-        stickers: S,
-        sticker_format: StickerFormat,
+        sticker: InputSticker,
+        emojis: E,
     ) -> Self::CreateNewStickerSet
     where
         N: Into<String>,
         T: Into<String>,
-        S: IntoIterator<Item = InputSticker>,
+        E: Into<String>,
     {
         Self::CreateNewStickerSet::new(
             self.clone(),
-            payloads::CreateNewStickerSet::new(user_id, name, title, stickers, sticker_format),
+            payloads::CreateNewStickerSet::new(user_id, name, title, sticker, emojis),
         )
     }
 
     type AddStickerToSet = MultipartRequest<payloads::AddStickerToSet>;
 
-    fn add_sticker_to_set<N>(
+    fn add_sticker_to_set<N, E>(
         &self,
         user_id: UserId,
         name: N,
         sticker: InputSticker,
+        emojis: E,
     ) -> Self::AddStickerToSet
     where
         N: Into<String>,
+        E: Into<String>,
     {
         Self::AddStickerToSet::new(
             self.clone(),
-            payloads::AddStickerToSet::new(user_id, name, sticker),
+            payloads::AddStickerToSet::new(user_id, name, sticker, emojis),
         )
     }
 
@@ -1244,84 +1139,15 @@ impl Requester for Bot {
         Self::DeleteStickerFromSet::new(self.clone(), payloads::DeleteStickerFromSet::new(sticker))
     }
 
-    type SetStickerSetThumbnail = MultipartRequest<payloads::SetStickerSetThumbnail>;
+    type SetStickerSetThumb = MultipartRequest<payloads::SetStickerSetThumb>;
 
-    fn set_sticker_set_thumbnail<N>(&self, name: N, user_id: UserId) -> Self::SetStickerSetThumbnail
+    fn set_sticker_set_thumb<N>(&self, name: N, user_id: UserId) -> Self::SetStickerSetThumb
     where
         N: Into<String>,
     {
-        Self::SetStickerSetThumbnail::new(
+        Self::SetStickerSetThumb::new(
             self.clone(),
-            payloads::SetStickerSetThumbnail::new(name, user_id),
-        )
-    }
-
-    type SetCustomEmojiStickerSetThumbnail =
-        JsonRequest<payloads::SetCustomEmojiStickerSetThumbnail>;
-
-    fn set_custom_emoji_sticker_set_thumbnail<N>(
-        &self,
-        name: N,
-    ) -> Self::SetCustomEmojiStickerSetThumbnail
-    where
-        N: Into<String>,
-    {
-        Self::SetCustomEmojiStickerSetThumbnail::new(
-            self.clone(),
-            payloads::SetCustomEmojiStickerSetThumbnail::new(name),
-        )
-    }
-
-    type SetStickerSetTitle = JsonRequest<payloads::SetStickerSetTitle>;
-
-    fn set_sticker_set_title<N, T>(&self, name: N, title: T) -> Self::SetStickerSetTitle
-    where
-        N: Into<String>,
-        T: Into<String>,
-    {
-        Self::SetStickerSetTitle::new(self.clone(), payloads::SetStickerSetTitle::new(name, title))
-    }
-
-    type DeleteStickerSet = JsonRequest<payloads::DeleteStickerSet>;
-
-    fn delete_sticker_set<N>(&self, name: N) -> Self::DeleteStickerSet
-    where
-        N: Into<String>,
-    {
-        Self::DeleteStickerSet::new(self.clone(), payloads::DeleteStickerSet::new(name))
-    }
-
-    type SetStickerEmojiList = JsonRequest<payloads::SetStickerEmojiList>;
-
-    fn set_sticker_emoji_list<S, E>(&self, sticker: S, emoji_list: E) -> Self::SetStickerEmojiList
-    where
-        S: Into<String>,
-        E: IntoIterator<Item = String>,
-    {
-        Self::SetStickerEmojiList::new(
-            self.clone(),
-            payloads::SetStickerEmojiList::new(sticker, emoji_list),
-        )
-    }
-
-    type SetStickerKeywords = JsonRequest<payloads::SetStickerKeywords>;
-
-    fn set_sticker_keywords<S>(&self, sticker: S) -> Self::SetStickerKeywords
-    where
-        S: Into<String>,
-    {
-        Self::SetStickerKeywords::new(self.clone(), payloads::SetStickerKeywords::new(sticker))
-    }
-
-    type SetStickerMaskPosition = JsonRequest<payloads::SetStickerMaskPosition>;
-
-    fn set_sticker_mask_position<S>(&self, sticker: S) -> Self::SetStickerMaskPosition
-    where
-        S: Into<String>,
-    {
-        Self::SetStickerMaskPosition::new(
-            self.clone(),
-            payloads::SetStickerMaskPosition::new(sticker),
+            payloads::SetStickerSetThumb::new(name, user_id),
         )
     }
 
@@ -1434,9 +1260,8 @@ impl Requester for Bot {
 
     type SendGame = JsonRequest<payloads::SendGame>;
 
-    fn send_game<C, G>(&self, chat_id: C, game_short_name: G) -> Self::SendGame
+    fn send_game<G>(&self, chat_id: u32, game_short_name: G) -> Self::SendGame
     where
-        C: Into<ChatId>,
         G: Into<String>,
     {
         Self::SendGame::new(self.clone(), payloads::SendGame::new(chat_id, game_short_name))
@@ -1513,24 +1338,6 @@ impl Requester for Bot {
         Self::CopyMessage::new(
             self.clone(),
             payloads::CopyMessage::new(chat_id, from_chat_id, message_id),
-        )
-    }
-
-    type CopyMessages = JsonRequest<payloads::CopyMessages>;
-    fn copy_messages<C, F, M>(
-        &self,
-        chat_id: C,
-        from_chat_id: F,
-        message_ids: M,
-    ) -> Self::CopyMessages
-    where
-        C: Into<Recipient>,
-        F: Into<Recipient>,
-        M: IntoIterator<Item = MessageId>,
-    {
-        Self::CopyMessages::new(
-            self.clone(),
-            payloads::CopyMessages::new(chat_id, from_chat_id, message_ids),
         )
     }
 

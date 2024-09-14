@@ -3,6 +3,7 @@ use teloxide::{
     types::{
         InlineQueryResult, InlineQueryResultArticle, InputMessageContent, InputMessageContentText,
     },
+    Bot,
 };
 
 #[tokio::main]
@@ -41,7 +42,7 @@ async fn main() {
                 ))),
             )
             .description("DuckDuckGo Search")
-            .thumbnail_url("https://duckduckgo.com/assets/logo_header.v108.png".parse().unwrap())
+            .thumb_url("https://duckduckgo.com/assets/logo_header.v108.png".parse().unwrap())
             .url("https://duckduckgo.com/about".parse().unwrap()); // Note: This is the url that will open if they click the thumbnail
 
             let results = vec![

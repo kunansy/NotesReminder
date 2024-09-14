@@ -1,15 +1,12 @@
-use futures::{Stream, StreamExt, TryStreamExt};
-
+use futures::{StreamExt, TryStreamExt};
 use sqlx::postgres::types::Oid;
 use sqlx::postgres::{
     PgAdvisoryLock, PgConnectOptions, PgConnection, PgDatabaseError, PgErrorPosition, PgListener,
     PgPoolOptions, PgRow, PgSeverity, Postgres,
 };
 use sqlx::{Column, Connection, Executor, Row, Statement, TypeInfo};
-use sqlx_core::{bytes::Bytes, error::BoxDynError};
 use sqlx_test::{new, pool, setup_if_needed};
 use std::env;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -52,8 +49,7 @@ async fn it_pings() -> anyhow::Result<()> {
 async fn it_pings_after_suspended_query() -> anyhow::Result<()> {
     let mut conn = new::<Postgres>().await?;
 
-    sqlx::raw_sql("create temporary table processed_row(val int4 primary key)")
-        .execute(&mut conn)
+    conn.execute("create temporary table processed_row(val int4 primary key)")
         .await?;
 
     // This query wants to return 50 rows but we only read the first one.
@@ -381,68 +377,6 @@ async fn it_can_query_all_scalar() -> anyhow::Result<()> {
         .fetch_all(&mut conn)
         .await?;
     assert_eq!(scalar, vec![Some(42), None]);
-
-    Ok(())
-}
-
-#[ignore]
-#[sqlx_macros::test]
-async fn copy_can_work_with_failed_transactions() -> anyhow::Result<()> {
-    let mut conn = new::<Postgres>().await?;
-
-    // We're using a (local) statement_timeout to simulate a runtime failure, as opposed to
-    // a parse/plan failure.
-    let mut tx = conn.begin().await?;
-    let _ = sqlx::query("SELECT pg_catalog.set_config($1, $2, true)")
-        .bind("statement_timeout")
-        .bind("1ms")
-        .execute(tx.as_mut())
-        .await?;
-
-    let mut copy_out: Pin<
-        Box<dyn Stream<Item = Result<Bytes, sqlx::Error>> + Send>,
-    > = (&mut tx)
-        .copy_out_raw("COPY (SELECT nspname FROM pg_catalog.pg_namespace WHERE pg_sleep(0.001) IS NULL) TO STDOUT")
-        .await?;
-
-    while copy_out.try_next().await.is_ok() {}
-    drop(copy_out);
-
-    tx.rollback().await?;
-
-    // conn should be usable again, as we explictly rolled back the transaction
-    let got: i32 = sqlx::query_scalar("SELECT 1")
-        .fetch_one(conn.as_mut())
-        .await?;
-    assert_eq!(1, got);
-
-    Ok(())
-}
-
-#[sqlx_macros::test]
-async fn it_can_work_with_failed_transactions() -> anyhow::Result<()> {
-    let mut conn = new::<Postgres>().await?;
-
-    // We're using a (local) statement_timeout to simulate a runtime failure, as opposed to
-    // a parse/plan failure.
-    let mut tx = conn.begin().await?;
-    let _ = sqlx::query("SELECT pg_catalog.set_config($1, $2, true)")
-        .bind("statement_timeout")
-        .bind("1ms")
-        .execute(tx.as_mut())
-        .await?;
-
-    assert!(sqlx::query("SELECT 1 WHERE pg_sleep(0.30) IS NULL")
-        .fetch_one(tx.as_mut())
-        .await
-        .is_err());
-    tx.rollback().await?;
-
-    // conn should be usable again, as we explictly rolled back the transaction
-    let got: i32 = sqlx::query_scalar("SELECT 1")
-        .fetch_one(conn.as_mut())
-        .await?;
-    assert_eq!(1, got);
 
     Ok(())
 }
@@ -998,7 +932,11 @@ from (values (null)) vals(val)
 
 #[sqlx_macros::test]
 async fn test_listener_cleanup() -> anyhow::Result<()> {
-    use sqlx_core::rt::timeout;
+    #[cfg(feature = "_rt-tokio")]
+    use tokio::time::timeout;
+
+    #[cfg(feature = "_rt-async-std")]
+    use async_std::future::timeout;
 
     use sqlx::pool::PoolOptions;
     use sqlx::postgres::PgListener;
@@ -1125,7 +1063,7 @@ CREATE TABLE heating_bills (
         fn encode_by_ref(
             &self,
             buf: &mut sqlx::postgres::PgArgumentBuffer,
-        ) -> Result<sqlx::encode::IsNull, BoxDynError> {
+        ) -> sqlx::encode::IsNull {
             <i16 as sqlx::Encode<Postgres>>::encode(self.0, buf)
         }
     }
@@ -1163,12 +1101,12 @@ CREATE TABLE heating_bills (
         fn encode_by_ref(
             &self,
             buf: &mut sqlx::postgres::PgArgumentBuffer,
-        ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        ) -> sqlx::encode::IsNull {
             let mut encoder = sqlx::postgres::types::PgRecordEncoder::new(buf);
-            encoder.encode(self.year)?;
-            encoder.encode(self.month)?;
+            encoder.encode(self.year);
+            encoder.encode(self.month);
             encoder.finish();
-            Ok(sqlx::encode::IsNull::No)
+            sqlx::encode::IsNull::No
         }
     }
     let mut conn = new::<Postgres>().await?;
@@ -1485,7 +1423,7 @@ CREATE TYPE another.some_enum_type AS ENUM ('d', 'e', 'f');
         fn encode_by_ref(
             &self,
             buf: &mut sqlx::postgres::PgArgumentBuffer,
-        ) -> Result<sqlx::encode::IsNull, BoxDynError> {
+        ) -> sqlx::encode::IsNull {
             <String as sqlx::Encode<Postgres>>::encode_by_ref(&self.0, buf)
         }
     }
@@ -1674,7 +1612,7 @@ async fn it_encodes_custom_array_issue_1504() -> anyhow::Result<()> {
             }
         }
 
-        fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+        fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
             match self {
                 Value::String(s) => <String as Encode<'_, Postgres>>::encode_by_ref(s, buf),
                 Value::Number(n) => <i32 as Encode<'_, Postgres>>::encode_by_ref(n, buf),
@@ -1874,63 +1812,4 @@ async fn test_shrink_buffers() -> anyhow::Result<()> {
     assert_eq!(ret, 12345678i64);
 
     Ok(())
-}
-
-#[sqlx_macros::test]
-async fn test_error_handling_with_deferred_constraints() -> anyhow::Result<()> {
-    let mut conn = new::<Postgres>().await?;
-
-    sqlx::query("CREATE TABLE IF NOT EXISTS deferred_constraint ( id INTEGER PRIMARY KEY )")
-        .execute(&mut conn)
-        .await?;
-
-    sqlx::query("CREATE TABLE IF NOT EXISTS deferred_constraint_fk ( fk INTEGER CONSTRAINT deferred_fk REFERENCES deferred_constraint(id) DEFERRABLE INITIALLY DEFERRED )")
-            .execute(&mut conn)
-            .await?;
-
-    let result: sqlx::Result<i32> =
-        sqlx::query_scalar("INSERT INTO deferred_constraint_fk VALUES (1) RETURNING fk")
-            .fetch_one(&mut conn)
-            .await;
-
-    let err = result.unwrap_err();
-    let db_err = err.as_database_error().unwrap();
-    assert_eq!(db_err.constraint(), Some("deferred_fk"));
-
-    Ok(())
-}
-
-#[sqlx_macros::test]
-#[cfg(feature = "bigdecimal")]
-async fn test_issue_3052() {
-    use sqlx::types::BigDecimal;
-
-    // https://github.com/launchbadge/sqlx/issues/3052
-    // Previously, attempting to bind a `BigDecimal` would panic if the value was out of range.
-    // Now, we rewrite it to a sentinel value so that Postgres will return a range error.
-    let too_small: BigDecimal = "1E-65536".parse().unwrap();
-    let too_large: BigDecimal = "1E262144".parse().unwrap();
-
-    let mut conn = new::<Postgres>().await.unwrap();
-
-    let too_small_error = sqlx::query_scalar::<_, BigDecimal>("SELECT $1::numeric")
-        .bind(&too_small)
-        .fetch_one(&mut conn)
-        .await
-        .expect_err("Too small number should have failed");
-    assert!(
-        matches!(&too_small_error, sqlx::Error::Encode(_)),
-        "expected encode error, got {too_small_error:?}"
-    );
-
-    let too_large_error = sqlx::query_scalar::<_, BigDecimal>("SELECT $1::numeric")
-        .bind(&too_large)
-        .fetch_one(&mut conn)
-        .await
-        .expect_err("Too large number should have failed");
-
-    assert!(
-        matches!(&too_large_error, sqlx::Error::Encode(_)),
-        "expected encode error, got {too_large_error:?}",
-    );
 }

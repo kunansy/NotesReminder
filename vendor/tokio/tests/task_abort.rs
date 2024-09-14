@@ -7,10 +7,8 @@ use tokio::time::Duration;
 
 use tokio::runtime::Builder;
 
-#[cfg(panic = "unwind")]
 struct PanicOnDrop;
 
-#[cfg(panic = "unwind")]
 impl Drop for PanicOnDrop {
     fn drop(&mut self) {
         panic!("Well what did you expect would happen...");

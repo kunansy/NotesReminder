@@ -42,10 +42,6 @@ pub enum Error {
     /// The certificate, or one of its issuers, has been revoked.
     CertRevoked,
 
-    /// The CRL is expired; i.e. the verification time is not before the time
-    /// in the CRL nextUpdate field.
-    CrlExpired,
-
     /// An end-entity certificate is being used as a CA certificate.
     EndEntityUsedAsCa,
 
@@ -124,14 +120,8 @@ pub enum Error {
     /// does not match the algorithm in the signature of the certificate.
     SignatureAlgorithmMismatch,
 
-    /// Trailing data was found while parsing DER-encoded input for the named type.
-    TrailingData(DerTypeId),
-
     /// A valid issuer for the certificate could not be found.
     UnknownIssuer,
-
-    /// The certificate's revocation status could not be determined.
-    UnknownRevocationStatus,
 
     /// The certificate is not a v3 X.509 certificate.
     ///
@@ -141,10 +131,6 @@ pub enum Error {
 
     /// The certificate contains an unsupported critical extension.
     UnsupportedCriticalExtension,
-
-    /// The CRL contains an issuing distribution point with no distribution point name,
-    /// or a distribution point name relative to an issuer.
-    UnsupportedCrlIssuingDistributionPoint,
 
     /// The CRL is not a v2 X.509 CRL.
     ///
@@ -160,14 +146,8 @@ pub enum Error {
     /// The CRL contains unsupported "indirect" entries.
     UnsupportedIndirectCrl,
 
-    /// The `ServerName` contained an unsupported type of value.
-    UnsupportedNameType,
-
     /// The revocation reason is not in the set of supported revocation reasons.
     UnsupportedRevocationReason,
-
-    /// The CRL is partitioned by revocation reasons.
-    UnsupportedRevocationReasonsPartitioning,
 
     /// The signature algorithm for a signature over a CRL is not in the set of supported
     /// signature algorithms given.
@@ -199,7 +179,7 @@ pub enum Error {
 impl Error {
     // Compare the Error with the new error by rank, returning the higher rank of the two as
     // the most specific error.
-    pub(crate) fn most_specific(self, new: Self) -> Self {
+    pub(crate) fn most_specific(self, new: Error) -> Error {
         // Assign an error a numeric value ranking it by specificity.
         if self.rank() >= new.rank() {
             self
@@ -215,55 +195,55 @@ impl Error {
     pub(crate) fn rank(&self) -> u32 {
         match &self {
             // Errors related to certificate validity
-            Self::CertNotValidYet | Self::CertExpired => 290,
-            Self::CertNotValidForName => 280,
-            Self::CertRevoked | Self::UnknownRevocationStatus | Self::CrlExpired => 270,
-            Self::InvalidCrlSignatureForPublicKey | Self::InvalidSignatureForPublicKey => 260,
-            Self::SignatureAlgorithmMismatch => 250,
-            Self::RequiredEkuNotFound => 240,
-            Self::NameConstraintViolation => 230,
-            Self::PathLenConstraintViolated => 220,
-            Self::CaUsedAsEndEntity | Self::EndEntityUsedAsCa => 210,
-            Self::IssuerNotCrlSigner => 200,
+            Error::CertNotValidYet | Error::CertExpired => 290,
+            Error::CertNotValidForName => 280,
+            Error::CertRevoked => 270,
+            Error::InvalidCrlSignatureForPublicKey | Error::InvalidSignatureForPublicKey => 260,
+            Error::SignatureAlgorithmMismatch => 250,
+            Error::RequiredEkuNotFound => 240,
+            Error::NameConstraintViolation => 230,
+            Error::PathLenConstraintViolated => 220,
+            Error::CaUsedAsEndEntity | Error::EndEntityUsedAsCa => 210,
+            Error::IssuerNotCrlSigner => 200,
 
             // Errors related to supported features used in an invalid way.
-            Self::InvalidCertValidity => 190,
-            Self::InvalidNetworkMaskConstraint => 180,
-            Self::InvalidSerialNumber => 170,
-            Self::InvalidCrlNumber => 160,
+            Error::InvalidCertValidity => 190,
+            Error::InvalidNetworkMaskConstraint => 180,
+            Error::InvalidSerialNumber => 170,
+            Error::InvalidCrlNumber => 160,
 
             // Errors related to unsupported features.
-            Self::UnsupportedCrlSignatureAlgorithmForPublicKey
-            | Self::UnsupportedSignatureAlgorithmForPublicKey => 150,
-            Self::UnsupportedCrlSignatureAlgorithm | Self::UnsupportedSignatureAlgorithm => 140,
-            Self::UnsupportedCriticalExtension => 130,
-            Self::UnsupportedCertVersion => 130,
-            Self::UnsupportedCrlVersion => 120,
-            Self::UnsupportedDeltaCrl => 110,
-            Self::UnsupportedIndirectCrl => 100,
-            Self::UnsupportedNameType => 95,
-            Self::UnsupportedRevocationReason => 90,
-            Self::UnsupportedRevocationReasonsPartitioning => 80,
-            Self::UnsupportedCrlIssuingDistributionPoint => 70,
-            Self::MaximumPathDepthExceeded => 61,
+            Error::UnsupportedCrlSignatureAlgorithmForPublicKey
+            | Error::UnsupportedSignatureAlgorithmForPublicKey => 150,
+            Error::UnsupportedCrlSignatureAlgorithm | Error::UnsupportedSignatureAlgorithm => 140,
+            Error::UnsupportedCriticalExtension => 130,
+            Error::UnsupportedCertVersion => 130,
+            Error::UnsupportedCrlVersion => 120,
+            Error::UnsupportedDeltaCrl => 110,
+            Error::UnsupportedIndirectCrl => 100,
+            Error::UnsupportedRevocationReason => 90,
+            // Reserved for webpki 0.102.0+ usages:
+            // Error::UnsupportedRevocationReasonsPartitioning => 80,
+            // Error::UnsupportedCrlIssuingDistributionPoint => 70,
+            Error::MaximumPathDepthExceeded => 61,
 
             // Errors related to malformed data.
-            Self::MalformedDnsIdentifier => 60,
-            Self::MalformedNameConstraint => 50,
-            Self::MalformedExtensions | Self::TrailingData(_) => 40,
-            Self::ExtensionValueInvalid => 30,
+            Error::MalformedDnsIdentifier => 60,
+            Error::MalformedNameConstraint => 50,
+            Error::MalformedExtensions => 40,
+            Error::ExtensionValueInvalid => 30,
 
             // Generic DER errors.
-            Self::BadDerTime => 20,
-            Self::BadDer => 10,
+            Error::BadDerTime => 20,
+            Error::BadDer => 10,
 
             // Special case errors - not subject to ranking.
-            Self::MaximumSignatureChecksExceeded => 0,
-            Self::MaximumPathBuildCallsExceeded => 0,
-            Self::MaximumNameConstraintComparisonsExceeded => 0,
+            Error::MaximumSignatureChecksExceeded => 0,
+            Error::MaximumPathBuildCallsExceeded => 0,
+            Error::MaximumNameConstraintComparisonsExceeded => 0,
 
             // Default catch all error - should be renamed in the future.
-            Self::UnknownIssuer => 0,
+            Error::UnknownIssuer => 0,
         }
     }
 
@@ -273,9 +253,9 @@ impl Error {
     pub(crate) fn is_fatal(&self) -> bool {
         matches!(
             self,
-            Self::MaximumSignatureChecksExceeded
-                | Self::MaximumPathBuildCallsExceeded
-                | Self::MaximumNameConstraintComparisonsExceeded
+            Error::MaximumSignatureChecksExceeded
+                | Error::MaximumPathBuildCallsExceeded
+                | Error::MaximumNameConstraintComparisonsExceeded
         )
     }
 }
@@ -292,43 +272,17 @@ impl From<Error> for ControlFlow<Error, Error> {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl ::std::error::Error for Error {}
 
-/// Trailing data was found while parsing DER-encoded input for the named type.
-#[allow(missing_docs)]
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum DerTypeId {
-    BitString,
-    Bool,
-    Certificate,
-    CertificateExtensions,
-    CertificateTbsCertificate,
-    CertRevocationList,
-    CertRevocationListExtension,
-    CrlDistributionPoint,
-    CommonNameInner,
-    CommonNameOuter,
-    DistributionPointName,
-    Extension,
-    GeneralName,
-    RevocationReason,
-    Signature,
-    SignatureAlgorithm,
-    SignedData,
-    SubjectPublicKeyInfo,
-    Time,
-    TrustAnchorV1,
-    TrustAnchorV1TbsCertificate,
-    U8,
-    RevokedCertificate,
-    RevokedCertificateExtension,
-    RevokedCertEntry,
-    IssuingDistributionPoint,
+impl From<untrusted::EndOfInput> for Error {
+    fn from(_: untrusted::EndOfInput) -> Self {
+        Error::BadDer
+    }
 }

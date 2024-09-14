@@ -1,4 +1,4 @@
-use crate::types::{MessageEntity, PollType, Seconds, User};
+use crate::types::{MessageEntity, PollType};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -6,13 +6,13 @@ use serde::{Deserialize, Serialize};
 /// This object contains information about a poll.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#poll).
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Poll {
     /// Unique poll identifier.
     pub id: String,
 
-    /// Poll question, 1-300 characters.
+    /// Poll question, 1-255 characters.
     pub question: String,
 
     /// List of poll options.
@@ -22,7 +22,7 @@ pub struct Poll {
     pub is_closed: bool,
 
     /// Total number of users that voted in the poll
-    pub total_voter_count: u32,
+    pub total_voter_count: i32,
 
     /// True, if the poll is anonymous
     pub is_anonymous: bool,
@@ -48,7 +48,7 @@ pub struct Poll {
     pub explanation_entities: Option<Vec<MessageEntity>>,
 
     /// Amount of time in seconds the poll will be active after creation.
-    pub open_period: Option<Seconds>,
+    pub open_period: Option<u16>,
 
     /// Point in time when the poll will be automatically closed.
     #[serde(default, with = "crate::types::serde_opt_date_from_unix_timestamp")]
@@ -64,21 +64,7 @@ pub struct PollOption {
     pub text: String,
 
     /// Number of users that voted for this option.
-    pub voter_count: u32,
-}
-
-impl Poll {
-    /// Returns all users that are "contained" in this `Poll`
-    /// structure.
-    ///
-    /// This might be useful to track information about users.
-    ///
-    /// Note that this function can return duplicate users.
-    pub fn mentioned_users(&self) -> impl Iterator<Item = &User> {
-        use crate::util::{flatten, mentioned_users_from_entities};
-
-        flatten(self.explanation_entities.as_deref().map(mentioned_users_from_entities))
-    }
+    pub voter_count: i32,
 }
 
 #[cfg(test)]

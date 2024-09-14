@@ -1,19 +1,10 @@
-use crate::message::{FrontendMessage, FrontendMessageFormat};
-use sqlx_core::Error;
-use std::num::Saturating;
+use crate::io::Encode;
 
 pub struct Terminate;
 
-impl FrontendMessage for Terminate {
-    const FORMAT: FrontendMessageFormat = FrontendMessageFormat::Terminate;
-
-    #[inline(always)]
-    fn body_size_hint(&self) -> Saturating<usize> {
-        Saturating(0)
-    }
-
-    #[inline(always)]
-    fn encode_body(&self, _buf: &mut Vec<u8>) -> Result<(), Error> {
-        Ok(())
+impl Encode<'_> for Terminate {
+    fn encode_with(&self, buf: &mut Vec<u8>, _: ()) {
+        buf.push(b'X');
+        buf.extend(&4_u32.to_be_bytes());
     }
 }

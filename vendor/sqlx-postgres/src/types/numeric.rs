@@ -1,5 +1,4 @@
 use sqlx_core::bytes::Buf;
-use std::num::Saturating;
 
 use crate::error::BoxDynError;
 use crate::PgArgumentBuffer;
@@ -76,35 +75,6 @@ impl PgNumericSign {
 }
 
 impl PgNumeric {
-    /// Equivalent value of `0::numeric`.
-    pub const ZERO: Self = PgNumeric::Number {
-        sign: PgNumericSign::Positive,
-        digits: vec![],
-        weight: 0,
-        scale: 0,
-    };
-
-    pub(crate) fn is_valid_digit(digit: i16) -> bool {
-        (0..10_000).contains(&digit)
-    }
-
-    pub(crate) fn size_hint(decimal_digits: u64) -> usize {
-        let mut size_hint = Saturating(decimal_digits);
-
-        // BigDecimal::digits() gives us base-10 digits, so we divide by 4 to get base-10000 digits
-        // and since this is just a hint we just always round up
-        size_hint /= 4;
-        size_hint += 1;
-
-        // Times two bytes for each base-10000 digit
-        size_hint *= 2;
-
-        // Plus `weight` and `scale`
-        size_hint += 8;
-
-        usize::try_from(size_hint.0).unwrap_or(usize::MAX)
-    }
-
     pub(crate) fn decode(mut buf: &[u8]) -> Result<Self, BoxDynError> {
         // https://github.com/postgres/postgres/blob/bcd1c3630095e48bc3b1eb0fc8e8c8a7c851eba1/src/backend/utils/adt/numeric.c#L874
         let num_digits = buf.get_u16();
@@ -126,11 +96,11 @@ impl PgNumeric {
         }
     }
 
-    /// ### Errors
+    /// ### Panics
     ///
     /// * If `digits.len()` overflows `i16`
     /// * If any element in `digits` is greater than or equal to 10000
-    pub(crate) fn encode(&self, buf: &mut PgArgumentBuffer) -> Result<(), String> {
+    pub(crate) fn encode(&self, buf: &mut PgArgumentBuffer) {
         match *self {
             PgNumeric::Number {
                 ref digits,
@@ -138,22 +108,18 @@ impl PgNumeric {
                 scale,
                 weight,
             } => {
-                let digits_len = i16::try_from(digits.len()).map_err(|_| {
-                    format!(
-                        "PgNumeric digits.len() ({}) should not overflow i16",
-                        digits.len()
-                    )
-                })?;
+                let digits_len: i16 = digits
+                    .len()
+                    .try_into()
+                    .expect("PgNumeric.digits.len() should not overflow i16");
 
                 buf.extend(&digits_len.to_be_bytes());
                 buf.extend(&weight.to_be_bytes());
                 buf.extend(&(sign as i16).to_be_bytes());
                 buf.extend(&scale.to_be_bytes());
 
-                for (i, &digit) in digits.iter().enumerate() {
-                    if !Self::is_valid_digit(digit) {
-                        return Err(format!("{i}th PgNumeric digit out of range: {digit}"));
-                    }
+                for digit in digits {
+                    debug_assert!(*digit < 10000, "PgNumeric digits must be in base-10000");
 
                     buf.extend(&digit.to_be_bytes());
                 }
@@ -166,7 +132,5 @@ impl PgNumeric {
                 buf.extend(&0_i16.to_be_bytes());
             }
         }
-
-        Ok(())
     }
 }

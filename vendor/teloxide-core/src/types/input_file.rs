@@ -15,8 +15,15 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 
 use std::{
-    borrow::Cow, convert::Infallible, fmt, future::Future, io, iter, mem, path::PathBuf, pin::Pin,
-    sync::Arc, task,
+    borrow::Cow,
+    convert::{Infallible, TryFrom},
+    fmt,
+    future::Future,
+    io, iter, mem,
+    path::PathBuf,
+    pin::Pin,
+    sync::Arc,
+    task,
 };
 
 use crate::types::InputSticker;
@@ -107,7 +114,7 @@ impl InputFile {
     }
 
     /// Shorthand for `Self { file_name: None, inner, id: default() }`
-    /// (private because `InnerFile` is private implementation detail)
+    /// (private because `InnerFile` iы private implementation detail)
     fn new(inner: InnerFile) -> Self {
         Self { file_name: None, inner, id: OnceCell::new() }
     }
@@ -251,7 +258,7 @@ impl Read {
             let res = ArcBox::<TakeCell<dyn AsyncRead + Send + Unpin>>::try_from(self.inner);
             match res {
                 // Fast/easy path: this is the only file copy, so we can just forward the underlying
-                // `dyn AsyncRead` via some adaptors to reqwest.
+                // `dyn AsynсRead` via some adaptors to reqwest.
                 Ok(arc_box) => {
                     let fr = FramedRead::new(ExclusiveArcAsyncRead(arc_box), BytesDecoder);
 
@@ -263,7 +270,7 @@ impl Read {
             }
         }
 
-        // Slow path: either wait until someone will read the whole `dyn AsyncRead` into
+        // Slow path: either wait until someone will read the whole `dyn AsynсRead` into
         // a buffer, or be the one who reads
         let body = self.into_shared_body().await;
 
@@ -314,7 +321,7 @@ impl Read {
                 let _ = self.notify.send(());
             }
 
-            // Wait until `dyn AsyncRead` is read into a buffer, if it hasn't been read yet
+            // Wait until `dyn AsynсRead` is read into a buffer, if it hasn't been read yet
             None if self.buf.get().is_none() => {
                 // Error indicates that the sender was dropped, by we hold `Arc<Sender>`, so
                 // this can't happen
@@ -418,10 +425,14 @@ impl InputFileLike for Option<InputFile> {
 
 impl InputFileLike for InputSticker {
     fn copy_into(&self, into: &mut dyn FnMut(InputFile)) {
-        self.sticker.copy_into(into)
+        let (Self::Png(input_file) | Self::Tgs(input_file) | Self::Webm(input_file)) = self;
+
+        input_file.copy_into(into)
     }
 
     fn move_into(&mut self, into: &mut dyn FnMut(InputFile)) {
-        self.sticker.move_into(into)
+        let (Self::Png(input_file) | Self::Tgs(input_file) | Self::Webm(input_file)) = self;
+
+        input_file.move_into(into)
     }
 }

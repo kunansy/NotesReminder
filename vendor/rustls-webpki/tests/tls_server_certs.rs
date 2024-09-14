@@ -11,12 +11,21 @@
 // WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-#![cfg(all(feature = "alloc", any(feature = "ring", feature = "aws_lc_rs")))]
+#![cfg(feature = "alloc")]
 
-use core::time::Duration;
+use webpki::KeyUsage;
 
-use pki_types::{CertificateDer, ServerName, UnixTime};
-use webpki::{anchor_from_trusted_cert, KeyUsage};
+static ALL_SIGALGS: &[&webpki::SignatureAlgorithm] = &[
+    &webpki::ECDSA_P256_SHA256,
+    &webpki::ECDSA_P256_SHA384,
+    &webpki::ECDSA_P384_SHA256,
+    &webpki::ECDSA_P384_SHA384,
+    &webpki::ED25519,
+    &webpki::RSA_PKCS1_2048_8192_SHA256,
+    &webpki::RSA_PKCS1_2048_8192_SHA384,
+    &webpki::RSA_PKCS1_2048_8192_SHA512,
+    &webpki::RSA_PKCS1_3072_8192_SHA384,
+];
 
 fn check_cert(
     ee: &[u8],
@@ -24,31 +33,28 @@ fn check_cert(
     valid_names: &[&str],
     invalid_names: &[&str],
 ) -> Result<(), webpki::Error> {
-    let ca_cert_der = CertificateDer::from(ca);
-    let anchors = [anchor_from_trusted_cert(&ca_cert_der).unwrap()];
+    let anchors = [webpki::TrustAnchor::try_from_cert_der(ca).unwrap()];
 
-    let ee_der = CertificateDer::from(ee);
-    let time = UnixTime::since_unix_epoch(Duration::from_secs(0x1fed_f00d));
-    let cert = webpki::EndEntityCert::try_from(&ee_der).unwrap();
+    let time = webpki::Time::from_seconds_since_unix_epoch(0x1fed_f00d);
+    let cert = webpki::EndEntityCert::try_from(ee).unwrap();
     cert.verify_for_usage(
-        webpki::ALL_VERIFICATION_ALGS,
+        ALL_SIGALGS,
         &anchors,
         &[],
         time,
         KeyUsage::server_auth(),
-        None,
-        None,
+        &[],
     )?;
 
     for valid in valid_names {
-        let name = ServerName::try_from(*valid).unwrap();
-        assert_eq!(cert.verify_is_valid_for_subject_name(&name), Ok(()));
+        let name = webpki::SubjectNameRef::try_from_ascii_str(valid).unwrap();
+        assert_eq!(cert.verify_is_valid_for_subject_name(name), Ok(()));
     }
 
     for invalid in invalid_names {
-        let name = ServerName::try_from(*invalid).unwrap();
+        let name = webpki::SubjectNameRef::try_from_ascii_str(invalid).unwrap();
         assert_eq!(
-            cert.verify_is_valid_for_subject_name(&name),
+            cert.verify_is_valid_for_subject_name(name),
             Err(webpki::Error::CertNotValidForName)
         );
     }

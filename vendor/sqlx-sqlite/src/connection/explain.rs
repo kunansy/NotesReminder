@@ -1,19 +1,11 @@
-// Bad casts in this module SHOULD NOT result in a SQL injection
-// https://github.com/launchbadge/sqlx/issues/3440
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss
-)]
 use crate::connection::intmap::IntMap;
 use crate::connection::{execute, ConnectionState};
 use crate::error::Error;
 use crate::from_row::FromRow;
-use crate::logger::{BranchParent, BranchResult, DebugDiff};
 use crate::type_info::DataType;
 use crate::SqliteTypeInfo;
-use sqlx_core::{hash_map, HashMap};
-use std::fmt::Debug;
+use sqlx_core::HashMap;
+use std::collections::HashSet;
 use std::str::from_utf8;
 
 // affinity
@@ -140,7 +132,7 @@ const OP_HALT_IF_NULL: &str = "HaltIfNull";
 const MAX_LOOP_COUNT: u8 = 2;
 const MAX_TOTAL_INSTRUCTION_COUNT: u32 = 100_000;
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum ColumnType {
     Single {
         datatype: DataType,
@@ -167,7 +159,7 @@ impl ColumnType {
     }
     fn map_to_datatype(&self) -> DataType {
         match self {
-            Self::Single { datatype, .. } => *datatype,
+            Self::Single { datatype, .. } => datatype.clone(),
             Self::Record(_) => DataType::Null, //If we're trying to coerce to a regular Datatype, we can assume a Record is invalid for the context
         }
     }
@@ -175,32 +167,6 @@ impl ColumnType {
         match self {
             Self::Single { nullable, .. } => *nullable,
             Self::Record(_) => None, //If we're trying to coerce to a regular Datatype, we can assume a Record is invalid for the context
-        }
-    }
-}
-
-impl core::fmt::Debug for ColumnType {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Single { datatype, nullable } => {
-                let nullable_str = match nullable {
-                    Some(true) => "NULL",
-                    Some(false) => "NOT NULL",
-                    None => "NULL?",
-                };
-                write!(f, "{:?} {}", datatype, nullable_str)
-            }
-            Self::Record(columns) => {
-                f.write_str("Record(")?;
-                let mut column_iter = columns.iter();
-                if let Some(item) = column_iter.next() {
-                    write!(f, "{:?}", item)?;
-                    for item in column_iter {
-                        write!(f, ", {:?}", item)?;
-                    }
-                }
-                f.write_str(")")
-            }
         }
     }
 }
@@ -215,7 +181,7 @@ impl RegDataType {
     fn map_to_datatype(&self) -> DataType {
         match self {
             RegDataType::Single(d) => d.map_to_datatype(),
-            RegDataType::Int(_) => DataType::Integer,
+            RegDataType::Int(_) => DataType::Int,
         }
     }
     fn map_to_nullable(&self) -> Option<bool> {
@@ -228,7 +194,7 @@ impl RegDataType {
         match self {
             RegDataType::Single(d) => d.clone(),
             RegDataType::Int(_) => ColumnType::Single {
-                datatype: DataType::Integer,
+                datatype: DataType::Int,
                 nullable: Some(false),
             },
         }
@@ -345,7 +311,7 @@ impl CursorDataType {
 fn affinity_to_type(affinity: u8) -> DataType {
     match affinity {
         SQLITE_AFF_BLOB => DataType::Blob,
-        SQLITE_AFF_INTEGER => DataType::Integer,
+        SQLITE_AFF_INTEGER => DataType::Int64,
         SQLITE_AFF_NUMERIC => DataType::Numeric,
         SQLITE_AFF_REAL => DataType::Float,
         SQLITE_AFF_TEXT => DataType::Text,
@@ -360,7 +326,7 @@ fn opcode_to_type(op: &str) -> DataType {
         OP_REAL => DataType::Float,
         OP_BLOB => DataType::Blob,
         OP_AND | OP_OR => DataType::Bool,
-        OP_NEWROWID | OP_ROWID | OP_COUNT | OP_INT64 | OP_INTEGER => DataType::Integer,
+        OP_ROWID | OP_COUNT | OP_INT64 | OP_INTEGER => DataType::Int64,
         OP_STRING8 => DataType::Text,
         OP_COLUMN | _ => DataType::Null,
     }
@@ -407,79 +373,19 @@ fn root_block_columns(
         );
     }
 
-    Ok(row_info)
+    return Ok(row_info);
 }
 
-struct Sequence(i64);
-
-impl Sequence {
-    pub fn new() -> Self {
-        Self(0)
-    }
-    pub fn next(&mut self) -> i64 {
-        let curr = self.0;
-        self.0 += 1;
-        curr
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 struct QueryState {
     // The number of times each instruction has been visited
     pub visited: Vec<u8>,
-    // A unique identifier of the query branch
-    pub branch_id: i64,
-    // How many instructions have been executed on this branch (NOT the same as program_i, which is the currently executing instruction of the program)
-    pub instruction_counter: i64,
-    // Parent branch this branch was forked from (if any)
-    pub branch_parent: Option<BranchParent>,
+    // A log of the order of execution of each instruction
+    pub history: Vec<usize>,
     // State of the virtual machine
     pub mem: MemoryState,
     // Results published by the execution
     pub result: Option<Vec<(Option<SqliteTypeInfo>, Option<bool>)>>,
-}
-
-impl From<&QueryState> for MemoryState {
-    fn from(val: &QueryState) -> Self {
-        val.mem.clone()
-    }
-}
-
-impl From<QueryState> for MemoryState {
-    fn from(val: QueryState) -> Self {
-        val.mem
-    }
-}
-
-impl From<&QueryState> for BranchParent {
-    fn from(val: &QueryState) -> Self {
-        Self {
-            id: val.branch_id,
-            idx: val.instruction_counter,
-        }
-    }
-}
-
-impl QueryState {
-    fn get_reference(&self) -> BranchParent {
-        BranchParent {
-            id: self.branch_id,
-            idx: self.instruction_counter,
-        }
-    }
-    fn new_branch(&self, branch_seq: &mut Sequence) -> Self {
-        Self {
-            visited: self.visited.clone(),
-            branch_id: branch_seq.next(),
-            instruction_counter: 0,
-            branch_parent: Some(BranchParent {
-                id: self.branch_id,
-                idx: self.instruction_counter - 1, //instruction counter is incremented at the start of processing an instruction, so need to subtract 1 to get the 'current' instruction
-            }),
-            mem: self.mem.clone(),
-            result: self.result.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -494,65 +400,22 @@ struct MemoryState {
     pub t: IntMap<TableDataType>,
 }
 
-impl DebugDiff for MemoryState {
-    fn diff(&self, prev: &Self) -> String {
-        let r_diff = self.r.diff(&prev.r);
-        let p_diff = self.p.diff(&prev.p);
-        let t_diff = self.t.diff(&prev.t);
-
-        let mut differences = String::new();
-        for (i, v) in r_diff {
-            if !differences.is_empty() {
-                differences.push('\n');
-            }
-            differences.push_str(&format!("r[{}]={:?}", i, v))
-        }
-        for (i, v) in p_diff {
-            if !differences.is_empty() {
-                differences.push('\n');
-            }
-            differences.push_str(&format!("p[{}]={:?}", i, v))
-        }
-        for (i, v) in t_diff {
-            if !differences.is_empty() {
-                differences.push('\n');
-            }
-            differences.push_str(&format!("t[{}]={:?}", i, v))
-        }
-        differences
-    }
-}
-
 struct BranchList {
     states: Vec<QueryState>,
-    visited_branch_state: HashMap<MemoryState, BranchParent>,
+    visited_branch_state: HashSet<MemoryState>,
 }
 
 impl BranchList {
     pub fn new(state: QueryState) -> Self {
         Self {
             states: vec![state],
-            visited_branch_state: HashMap::new(),
+            visited_branch_state: HashSet::new(),
         }
     }
-    pub fn push<R: Debug, P: Debug>(
-        &mut self,
-        mut state: QueryState,
-        logger: &mut crate::logger::QueryPlanLogger<'_, R, MemoryState, P>,
-    ) {
-        logger.add_branch(&state, &state.branch_parent.unwrap());
-        match self.visited_branch_state.entry(state.mem) {
-            hash_map::Entry::Vacant(entry) => {
-                //this state is not identical to another state, so it will need to be processed
-                state.mem = entry.key().clone(); //replace state.mem since .entry() moved it
-                entry.insert(state.get_reference());
-                self.states.push(state);
-            }
-            hash_map::Entry::Occupied(entry) => {
-                //already saw a state identical to this one, so no point in processing it
-                state.mem = entry.key().clone(); //replace state.mem since .entry() moved it
-                logger.add_result(state, BranchResult::Dedup(*entry.get()));
-            }
+    pub fn push(&mut self, state: QueryState) {
+        if !self.visited_branch_state.contains(&state.mem) {
+            self.visited_branch_state.insert(state.mem.clone());
+            self.states.push(state);
         }
     }
     pub fn pop(&mut self) -> Option<QueryState> {
@@ -573,13 +436,12 @@ pub(super) fn explain(
             .collect::<Result<Vec<_>, Error>>()?;
     let program_size = program.len();
 
-    let mut logger = crate::logger::QueryPlanLogger::new(query, &program);
-    let mut branch_seq = Sequence::new();
+    let mut logger =
+        crate::logger::QueryPlanLogger::new(query, &program, conn.log_settings.clone());
+
     let mut states = BranchList::new(QueryState {
         visited: vec![0; program_size],
-        branch_id: branch_seq.next(),
-        branch_parent: None,
-        instruction_counter: 0,
+        history: Vec::new(),
         result: None,
         mem: MemoryState {
             program_i: 0,
@@ -595,20 +457,22 @@ pub(super) fn explain(
     while let Some(mut state) = states.pop() {
         while state.mem.program_i < program_size {
             let (_, ref opcode, p1, p2, p3, ref p4) = program[state.mem.program_i];
-
-            logger.add_operation(state.mem.program_i, &state);
-            state.instruction_counter += 1;
+            state.history.push(state.mem.program_i);
 
             //limit the number of 'instructions' that can be evaluated
             if gas > 0 {
                 gas -= 1;
             } else {
-                logger.add_result(state, BranchResult::GasLimit);
                 break;
             }
 
             if state.visited[state.mem.program_i] > MAX_LOOP_COUNT {
-                logger.add_result(state, BranchResult::LoopLimit);
+                if logger.log_enabled() {
+                    let program_history: Vec<&(i64, String, i64, i64, i64, Vec<u8>)> =
+                        state.history.iter().map(|i| &program[*i]).collect();
+                    logger.add_result((program_history, None));
+                }
+
                 //avoid (infinite) loops by breaking if we ever hit the same instruction twice
                 break;
             }
@@ -649,63 +513,23 @@ pub(super) fn explain(
                 OP_DECR_JUMP_ZERO | OP_ELSE_EQ | OP_EQ | OP_FILTER | OP_FOUND | OP_GE | OP_GT
                 | OP_IDX_GE | OP_IDX_GT | OP_IDX_LE | OP_IDX_LT | OP_IF_NO_HOPE | OP_IF_NOT
                 | OP_IF_NOT_OPEN | OP_IF_NOT_ZERO | OP_IF_NULL_ROW | OP_IF_SMALLER
-                | OP_INCR_VACUUM | OP_IS_NULL_OR_TYPE | OP_LE | OP_LT | OP_NE | OP_NEXT
-                | OP_NO_CONFLICT | OP_NOT_EXISTS | OP_ONCE | OP_PREV | OP_PROGRAM
+                | OP_INCR_VACUUM | OP_IS_NULL | OP_IS_NULL_OR_TYPE | OP_LE | OP_LT | OP_NE
+                | OP_NEXT | OP_NO_CONFLICT | OP_NOT_EXISTS | OP_ONCE | OP_PREV | OP_PROGRAM
                 | OP_ROW_SET_READ | OP_ROW_SET_TEST | OP_SEEK_GE | OP_SEEK_GT | OP_SEEK_LE
                 | OP_SEEK_LT | OP_SEEK_ROW_ID | OP_SEEK_SCAN | OP_SEQUENCE_TEST
                 | OP_SORTER_NEXT | OP_V_FILTER | OP_V_NEXT => {
                     // goto <p2> or next instruction (depending on actual values)
 
-                    let mut branch_state = state.new_branch(&mut branch_seq);
+                    let mut branch_state = state.clone();
                     branch_state.mem.program_i = p2 as usize;
-                    states.push(branch_state, &mut logger);
+                    states.push(branch_state);
 
                     state.mem.program_i += 1;
                     continue;
                 }
 
-                OP_IS_NULL => {
-                    // goto <p2> if p1 is null
-
-                    //branch if maybe null
-                    let might_branch = match state.mem.r.get(&p1) {
-                        Some(r_p1) => !matches!(r_p1.map_to_nullable(), Some(false)),
-                        _ => false,
-                    };
-
-                    //nobranch if maybe not null
-                    let might_not_branch = match state.mem.r.get(&p1) {
-                        Some(r_p1) => !matches!(r_p1.map_to_datatype(), DataType::Null),
-                        _ => false,
-                    };
-
-                    if might_branch {
-                        let mut branch_state = state.new_branch(&mut branch_seq);
-                        branch_state.mem.program_i = p2 as usize;
-                        branch_state
-                            .mem
-                            .r
-                            .insert(p1, RegDataType::Single(ColumnType::default()));
-
-                        states.push(branch_state, &mut logger);
-                    }
-
-                    if might_not_branch {
-                        state.mem.program_i += 1;
-                        if let Some(RegDataType::Single(ColumnType::Single { nullable, .. })) =
-                            state.mem.r.get_mut(&p1)
-                        {
-                            *nullable = Some(false);
-                        }
-                        continue;
-                    } else {
-                        logger.add_result(state, BranchResult::Branched);
-                        break;
-                    }
-                }
-
                 OP_NOT_NULL => {
-                    // goto <p2> if p1 is not null
+                    // goto <p2> or next instruction (depending on actual values)
 
                     let might_branch = match state.mem.r.get(&p1) {
                         Some(r_p1) => !matches!(r_p1.map_to_datatype(), DataType::Null),
@@ -718,7 +542,7 @@ pub(super) fn explain(
                     };
 
                     if might_branch {
-                        let mut branch_state = state.new_branch(&mut branch_seq);
+                        let mut branch_state = state.clone();
                         branch_state.mem.program_i = p2 as usize;
                         if let Some(RegDataType::Single(ColumnType::Single { nullable, .. })) =
                             branch_state.mem.r.get_mut(&p1)
@@ -726,7 +550,7 @@ pub(super) fn explain(
                             *nullable = Some(false);
                         }
 
-                        states.push(branch_state, &mut logger);
+                        states.push(branch_state);
                     }
 
                     if might_not_branch {
@@ -737,7 +561,6 @@ pub(super) fn explain(
                             .insert(p1, RegDataType::Single(ColumnType::default()));
                         continue;
                     } else {
-                        logger.add_result(state, BranchResult::Branched);
                         break;
                     }
                 }
@@ -748,9 +571,9 @@ pub(super) fn explain(
 
                     //don't bother checking actual types, just don't branch to instruction 0
                     if p2 != 0 {
-                        let mut branch_state = state.new_branch(&mut branch_seq);
+                        let mut branch_state = state.clone();
                         branch_state.mem.program_i = p2 as usize;
-                        states.push(branch_state, &mut logger);
+                        states.push(branch_state);
                     }
 
                     state.mem.program_i += 1;
@@ -771,13 +594,13 @@ pub(super) fn explain(
                     };
 
                     if might_branch {
-                        let mut branch_state = state.new_branch(&mut branch_seq);
+                        let mut branch_state = state.clone();
                         branch_state.mem.program_i = p2 as usize;
                         if p3 == 0 {
                             branch_state.mem.r.insert(p1, RegDataType::Int(1));
                         }
 
-                        states.push(branch_state, &mut logger);
+                        states.push(branch_state);
                     }
 
                     if might_not_branch {
@@ -787,7 +610,6 @@ pub(super) fn explain(
                         }
                         continue;
                     } else {
-                        logger.add_result(state, BranchResult::Branched);
                         break;
                     }
                 }
@@ -809,12 +631,12 @@ pub(super) fn explain(
 
                     let loop_detected = state.visited[state.mem.program_i] > 1;
                     if might_branch || loop_detected {
-                        let mut branch_state = state.new_branch(&mut branch_seq);
+                        let mut branch_state = state.clone();
                         branch_state.mem.program_i = p2 as usize;
                         if let Some(RegDataType::Int(r_p1)) = branch_state.mem.r.get_mut(&p1) {
                             *r_p1 -= 1;
                         }
-                        states.push(branch_state, &mut logger);
+                        states.push(branch_state);
                     }
 
                     if might_not_branch {
@@ -827,14 +649,13 @@ pub(super) fn explain(
                             state.mem.r.insert(
                                 p1,
                                 RegDataType::Single(ColumnType::Single {
-                                    datatype: DataType::Integer,
+                                    datatype: DataType::Int64,
                                     nullable: Some(false),
                                 }),
                             );
                         }
                         continue;
                     } else {
-                        logger.add_result(state, BranchResult::Branched);
                         break;
                     }
                 }
@@ -851,7 +672,7 @@ pub(super) fn explain(
                         if matches!(cursor.is_empty(&state.mem.t), None | Some(true)) {
                             //only take this branch if the cursor is empty
 
-                            let mut branch_state = state.new_branch(&mut branch_seq);
+                            let mut branch_state = state.clone();
                             branch_state.mem.program_i = p2 as usize;
 
                             if let Some(cur) = branch_state.mem.p.get(&p1) {
@@ -859,7 +680,7 @@ pub(super) fn explain(
                                     tab.is_empty = Some(true);
                                 }
                             }
-                            states.push(branch_state, &mut logger);
+                            states.push(branch_state);
                         }
 
                         if matches!(cursor.is_empty(&state.mem.t), None | Some(false)) {
@@ -867,12 +688,16 @@ pub(super) fn explain(
                             state.mem.program_i += 1;
                             continue;
                         } else {
-                            logger.add_result(state, BranchResult::Branched);
                             break;
                         }
                     }
 
-                    logger.add_result(state, BranchResult::Branched);
+                    if logger.log_enabled() {
+                        let program_history: Vec<&(i64, String, i64, i64, i64, Vec<u8>)> =
+                            state.history.iter().map(|i| &program[*i]).collect();
+                        logger.add_result((program_history, None));
+                    }
+
                     break;
                 }
 
@@ -901,15 +726,34 @@ pub(super) fn explain(
                                 state.mem.r.remove(&p1);
                                 continue;
                             } else {
-                                logger.add_result(state, BranchResult::Error);
+                                if logger.log_enabled() {
+                                    let program_history: Vec<&(
+                                        i64,
+                                        String,
+                                        i64,
+                                        i64,
+                                        i64,
+                                        Vec<u8>,
+                                    )> = state.history.iter().map(|i| &program[*i]).collect();
+                                    logger.add_result((program_history, None));
+                                }
+
                                 break;
                             }
                         } else {
-                            logger.add_result(state, BranchResult::Error);
+                            if logger.log_enabled() {
+                                let program_history: Vec<&(i64, String, i64, i64, i64, Vec<u8>)> =
+                                    state.history.iter().map(|i| &program[*i]).collect();
+                                logger.add_result((program_history, None));
+                            }
                             break;
                         }
                     } else {
-                        logger.add_result(state, BranchResult::Error);
+                        if logger.log_enabled() {
+                            let program_history: Vec<&(i64, String, i64, i64, i64, Vec<u8>)> =
+                                state.history.iter().map(|i| &program[*i]).collect();
+                            logger.add_result((program_history, None));
+                        }
                         break;
                     }
                 }
@@ -921,11 +765,12 @@ pub(super) fn explain(
                         state.mem.program_i = (*return_i + 1) as usize;
                         state.mem.r.remove(&p1);
                         continue;
-                    } else if p3 == 1 {
-                        state.mem.program_i += 1;
-                        continue;
                     } else {
-                        logger.add_result(state, BranchResult::Error);
+                        if logger.log_enabled() {
+                            let program_history: Vec<&(i64, String, i64, i64, i64, Vec<u8>)> =
+                                state.history.iter().map(|i| &program[*i]).collect();
+                            logger.add_result((program_history, None));
+                        }
                         break;
                     }
                 }
@@ -951,7 +796,11 @@ pub(super) fn explain(
                             continue;
                         }
                     } else {
-                        logger.add_result(state, BranchResult::Error);
+                        if logger.log_enabled() {
+                            let program_history: Vec<&(i64, String, i64, i64, i64, Vec<u8>)> =
+                                state.history.iter().map(|i| &program[*i]).collect();
+                            logger.add_result((program_history, None));
+                        }
                         break;
                     }
                 }
@@ -959,17 +808,17 @@ pub(super) fn explain(
                 OP_JUMP => {
                     // goto one of <p1>, <p2>, or <p3> based on the result of a prior compare
 
-                    let mut branch_state = state.new_branch(&mut branch_seq);
+                    let mut branch_state = state.clone();
                     branch_state.mem.program_i = p1 as usize;
-                    states.push(branch_state, &mut logger);
+                    states.push(branch_state);
 
-                    let mut branch_state = state.new_branch(&mut branch_seq);
+                    let mut branch_state = state.clone();
                     branch_state.mem.program_i = p2 as usize;
-                    states.push(branch_state, &mut logger);
+                    states.push(branch_state);
 
-                    let mut branch_state = state.new_branch(&mut branch_seq);
+                    let mut branch_state = state.clone();
                     branch_state.mem.program_i = p3 as usize;
-                    states.push(branch_state, &mut logger);
+                    states.push(branch_state);
                 }
 
                 OP_COLUMN => {
@@ -981,7 +830,7 @@ pub(super) fn explain(
                         .and_then(|c| c.columns_ref(&state.mem.t, &state.mem.r))
                         .and_then(|cc| cc.get(&p2))
                         .cloned()
-                        .unwrap_or_default();
+                        .unwrap_or_else(|| ColumnType::default());
 
                     // insert into p3 the datatype of the col
                     state.mem.r.insert(p3, RegDataType::Single(value));
@@ -994,7 +843,7 @@ pub(super) fn explain(
                     state.mem.r.insert(
                         p2,
                         RegDataType::Single(ColumnType::Single {
-                            datatype: DataType::Integer,
+                            datatype: DataType::Int64,
                             nullable: Some(false),
                         }),
                     );
@@ -1040,35 +889,18 @@ pub(super) fn explain(
                 }
 
                 OP_INSERT | OP_IDX_INSERT | OP_SORTER_INSERT => {
-                    if let Some(RegDataType::Single(columntype)) = state.mem.r.get(&p2) {
-                        match columntype {
-                            ColumnType::Record(record) => {
-                                if let Some(TableDataType { cols, is_empty }) = state
-                                    .mem
-                                    .p
-                                    .get(&p1)
-                                    .and_then(|cur| cur.table_mut(&mut state.mem.t))
-                                {
-                                    // Insert the record into wherever pointer p1 is
-                                    *cols = record.clone();
-                                    *is_empty = Some(false);
-                                }
-                            }
-                            ColumnType::Single {
-                                datatype: DataType::Null,
-                                nullable: _,
-                            } => {
-                                if let Some(TableDataType { is_empty, .. }) = state
-                                    .mem
-                                    .p
-                                    .get(&p1)
-                                    .and_then(|cur| cur.table_mut(&mut state.mem.t))
-                                {
-                                    // Insert a null record into wherever pointer p1 is
-                                    *is_empty = Some(false);
-                                }
-                            }
-                            _ => {}
+                    if let Some(RegDataType::Single(ColumnType::Record(record))) =
+                        state.mem.r.get(&p2)
+                    {
+                        if let Some(TableDataType { cols, is_empty }) = state
+                            .mem
+                            .p
+                            .get(&p1)
+                            .and_then(|cur| cur.table_mut(&mut state.mem.t))
+                        {
+                            // Insert the record into wherever pointer p1 is
+                            *cols = record.clone();
+                            *is_empty = Some(false);
                         }
                     }
                     //Noop if the register p2 isn't a record, or if pointer p1 does not exist
@@ -1130,7 +962,7 @@ pub(super) fn explain(
                 OP_OPEN_EPHEMERAL | OP_OPEN_AUTOINDEX | OP_SORTER_OPEN => {
                     //Create a new pointer which is referenced by p1
                     let table_info = TableDataType {
-                        cols: IntMap::from_elem(ColumnType::null(), p2 as usize),
+                        cols: IntMap::from_dense_record(&vec![ColumnType::null(); p2 as usize]),
                         is_empty: Some(true),
                     };
 
@@ -1167,7 +999,7 @@ pub(super) fn explain(
                             state.mem.r.insert(
                                 p3,
                                 RegDataType::Single(ColumnType::Single {
-                                    datatype: DataType::Integer,
+                                    datatype: DataType::Int64,
                                     nullable: Some(false),
                                 }),
                             );
@@ -1197,13 +1029,13 @@ pub(super) fn explain(
                             state.mem.r.insert(
                                 p3,
                                 RegDataType::Single(ColumnType::Single {
-                                    datatype: DataType::Integer,
+                                    datatype: DataType::Int64,
                                     nullable: Some(p2 != 0), //never a null result if no argument provided
                                 }),
                             );
                         }
 
-                        _ => logger.add_unknown_operation(state.mem.program_i),
+                        _ => logger.add_unknown_operation(&program[state.mem.program_i]),
                     }
                 }
 
@@ -1241,7 +1073,7 @@ pub(super) fn explain(
                         state.mem.r.insert(
                             p3,
                             RegDataType::Single(ColumnType::Single {
-                                datatype: DataType::Integer,
+                                datatype: DataType::Int64,
                                 nullable: Some(false),
                             }),
                         );
@@ -1257,10 +1089,9 @@ pub(super) fn explain(
                     } else if p4.starts_with("sum(") {
                         if let Some(r_p2) = state.mem.r.get(&p2) {
                             let datatype = match r_p2.map_to_datatype() {
-                                // The result of a `SUM()` can be arbitrarily large
-                                DataType::Integer | DataType::Int4 | DataType::Bool => {
-                                    DataType::Integer
-                                }
+                                DataType::Int64 => DataType::Int64,
+                                DataType::Int => DataType::Int,
+                                DataType::Bool => DataType::Int,
                                 _ => DataType::Float,
                             };
                             let nullable = r_p2.map_to_nullable();
@@ -1299,7 +1130,7 @@ pub(super) fn explain(
                         state.mem.r.insert(
                             p1,
                             RegDataType::Single(ColumnType::Single {
-                                datatype: DataType::Integer,
+                                datatype: DataType::Int64,
                                 nullable: Some(false),
                             }),
                         );
@@ -1383,7 +1214,7 @@ pub(super) fn explain(
                     state.mem.r.insert(
                         p2,
                         RegDataType::Single(ColumnType::Single {
-                            datatype: opcode_to_type(opcode),
+                            datatype: opcode_to_type(&opcode),
                             nullable: Some(false),
                         }),
                     );
@@ -1444,7 +1275,7 @@ pub(super) fn explain(
                     state.mem.r.insert(
                         p2,
                         RegDataType::Single(ColumnType::Single {
-                            datatype: DataType::Integer,
+                            datatype: DataType::Int64,
                             nullable: Some(false),
                         }),
                     );
@@ -1452,39 +1283,44 @@ pub(super) fn explain(
 
                 OP_RESULT_ROW => {
                     // output = r[p1 .. p1 + p2]
-                    let result: Vec<_> = (p1..p1 + p2)
-                        .map(|i| {
-                            state
-                                .mem
-                                .r
-                                .get(&i)
-                                .map(RegDataType::map_to_columntype)
-                                .unwrap_or_default()
-                        })
-                        .collect();
 
-                    let mut branch_state = state.new_branch(&mut branch_seq);
-                    branch_state.mem.program_i += 1;
-                    states.push(branch_state, &mut logger);
+                    state.result = Some(
+                        (p1..p1 + p2)
+                            .map(|i| {
+                                let coltype = state.mem.r.get(&i);
 
-                    logger.add_result(
-                        state,
-                        BranchResult::Result(IntMap::from_dense_record(&result)),
+                                let sqltype =
+                                    coltype.map(|d| d.map_to_datatype()).map(SqliteTypeInfo);
+                                let nullable =
+                                    coltype.map(|d| d.map_to_nullable()).unwrap_or_default();
+
+                                (sqltype, nullable)
+                            })
+                            .collect(),
                     );
 
-                    result_states.push(result);
-                    break;
+                    if logger.log_enabled() {
+                        let program_history: Vec<&(i64, String, i64, i64, i64, Vec<u8>)> =
+                            state.history.iter().map(|i| &program[*i]).collect();
+                        logger.add_result((program_history, Some(state.result.clone())));
+                    }
+
+                    result_states.push(state.clone());
                 }
 
                 OP_HALT => {
-                    logger.add_result(state, BranchResult::Halt);
+                    if logger.log_enabled() {
+                        let program_history: Vec<&(i64, String, i64, i64, i64, Vec<u8>)> =
+                            state.history.iter().map(|i| &program[*i]).collect();
+                        logger.add_result((program_history, None));
+                    }
                     break;
                 }
 
                 _ => {
                     // ignore unsupported operations
                     // if we fail to find an r later, we just give up
-                    logger.add_unknown_operation(state.mem.program_i);
+                    logger.add_unknown_operation(&program[state.mem.program_i]);
                 }
             }
 
@@ -1495,29 +1331,30 @@ pub(super) fn explain(
     let mut output: Vec<Option<SqliteTypeInfo>> = Vec::new();
     let mut nullable: Vec<Option<bool>> = Vec::new();
 
-    while let Some(result) = result_states.pop() {
+    while let Some(state) = result_states.pop() {
         // find the datatype info from each ResultRow execution
-        for (idx, this_col) in result.into_iter().enumerate() {
-            let this_type = this_col.map_to_datatype();
-            let this_nullable = this_col.map_to_nullable();
-            if output.len() == idx {
-                output.push(Some(SqliteTypeInfo(this_type)));
-            } else if output[idx].is_none()
-                || matches!(output[idx], Some(SqliteTypeInfo(DataType::Null)))
-                    && !matches!(this_type, DataType::Null)
-            {
-                output[idx] = Some(SqliteTypeInfo(this_type));
-            }
-
-            if nullable.len() == idx {
-                nullable.push(this_nullable);
-            } else if let Some(ref mut null) = nullable[idx] {
-                //if any ResultRow's column is nullable, the final result is nullable
-                if let Some(this_null) = this_nullable {
-                    *null |= this_null;
+        if let Some(result) = state.result {
+            let mut idx = 0;
+            for (this_type, this_nullable) in result {
+                if output.len() == idx {
+                    output.push(this_type);
+                } else if output[idx].is_none()
+                    || matches!(output[idx], Some(SqliteTypeInfo(DataType::Null)))
+                {
+                    output[idx] = this_type;
                 }
-            } else {
-                nullable[idx] = this_nullable;
+
+                if nullable.len() == idx {
+                    nullable.push(this_nullable);
+                } else if let Some(ref mut null) = nullable[idx] {
+                    //if any ResultRow's column is nullable, the final result is nullable
+                    if let Some(this_null) = this_nullable {
+                        *null |= this_null;
+                    }
+                } else {
+                    nullable[idx] = this_nullable;
+                }
+                idx += 1;
             }
         }
     }
@@ -1633,147 +1470,147 @@ fn test_root_block_columns_has_types() {
     {
         let table_db_block = table_block_nums["t"];
         assert_eq!(
-            Some(&ColumnType::Single {
-                datatype: DataType::Integer,
+            ColumnType::Single {
+                datatype: DataType::Int64,
                 nullable: Some(true) //sqlite primary key columns are nullable unless declared not null
-            }),
-            root_block_cols[&table_db_block].get(&0)
+            },
+            root_block_cols[&table_db_block][&0]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Text,
                 nullable: Some(true)
-            }),
-            root_block_cols[&table_db_block].get(&1)
+            },
+            root_block_cols[&table_db_block][&1]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Text,
                 nullable: Some(false)
-            }),
-            root_block_cols[&table_db_block].get(&2)
+            },
+            root_block_cols[&table_db_block][&2]
         );
     }
 
     {
         let table_db_block = table_block_nums["i1"];
         assert_eq!(
-            Some(&ColumnType::Single {
-                datatype: DataType::Integer,
+            ColumnType::Single {
+                datatype: DataType::Int64,
                 nullable: Some(true) //sqlite primary key columns are nullable unless declared not null
-            }),
-            root_block_cols[&table_db_block].get(&0)
+            },
+            root_block_cols[&table_db_block][&0]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Text,
                 nullable: Some(true)
-            }),
-            root_block_cols[&table_db_block].get(&1)
+            },
+            root_block_cols[&table_db_block][&1]
         );
     }
 
     {
         let table_db_block = table_block_nums["i2"];
         assert_eq!(
-            Some(&ColumnType::Single {
-                datatype: DataType::Integer,
+            ColumnType::Single {
+                datatype: DataType::Int64,
                 nullable: Some(true) //sqlite primary key columns are nullable unless declared not null
-            }),
-            root_block_cols[&table_db_block].get(&0)
+            },
+            root_block_cols[&table_db_block][&0]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Text,
                 nullable: Some(true)
-            }),
-            root_block_cols[&table_db_block].get(&1)
+            },
+            root_block_cols[&table_db_block][&1]
         );
     }
 
     {
         let table_db_block = table_block_nums["t2"];
         assert_eq!(
-            Some(&ColumnType::Single {
-                datatype: DataType::Integer,
+            ColumnType::Single {
+                datatype: DataType::Int64,
                 nullable: Some(false)
-            }),
-            root_block_cols[&table_db_block].get(&0)
+            },
+            root_block_cols[&table_db_block][&0]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Null,
                 nullable: Some(true)
-            }),
-            root_block_cols[&table_db_block].get(&1)
+            },
+            root_block_cols[&table_db_block][&1]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Null,
                 nullable: Some(false)
-            }),
-            root_block_cols[&table_db_block].get(&2)
+            },
+            root_block_cols[&table_db_block][&2]
         );
     }
 
     {
         let table_db_block = table_block_nums["t2i1"];
         assert_eq!(
-            Some(&ColumnType::Single {
-                datatype: DataType::Integer,
+            ColumnType::Single {
+                datatype: DataType::Int64,
                 nullable: Some(false)
-            }),
-            root_block_cols[&table_db_block].get(&0)
+            },
+            root_block_cols[&table_db_block][&0]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Null,
                 nullable: Some(true)
-            }),
-            root_block_cols[&table_db_block].get(&1)
+            },
+            root_block_cols[&table_db_block][&1]
         );
     }
 
     {
         let table_db_block = table_block_nums["t2i2"];
         assert_eq!(
-            Some(&ColumnType::Single {
-                datatype: DataType::Integer,
+            ColumnType::Single {
+                datatype: DataType::Int64,
                 nullable: Some(false)
-            }),
-            root_block_cols[&table_db_block].get(&0)
+            },
+            root_block_cols[&table_db_block][&0]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Null,
                 nullable: Some(false)
-            }),
-            root_block_cols[&table_db_block].get(&1)
+            },
+            root_block_cols[&table_db_block][&1]
         );
     }
 
     {
         let table_db_block = table_block_nums["t3"];
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Text,
                 nullable: Some(true)
-            }),
-            root_block_cols[&table_db_block].get(&0)
+            },
+            root_block_cols[&table_db_block][&0]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Float,
                 nullable: Some(false)
-            }),
-            root_block_cols[&table_db_block].get(&1)
+            },
+            root_block_cols[&table_db_block][&1]
         );
         assert_eq!(
-            Some(&ColumnType::Single {
+            ColumnType::Single {
                 datatype: DataType::Float,
                 nullable: Some(true)
-            }),
-            root_block_cols[&table_db_block].get(&2)
+            },
+            root_block_cols[&table_db_block][&2]
         );
     }
 }

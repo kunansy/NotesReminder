@@ -92,14 +92,11 @@ where
         set_webhook,
         delete_webhook,
         get_webhook_info,
-        forward_messages,
-        copy_messages,
         edit_message_live_location,
         edit_message_live_location_inline,
         stop_message_live_location,
         stop_message_live_location_inline,
         send_chat_action,
-        set_message_reaction,
         get_user_profile_photos,
         get_file,
         kick_chat_member,
@@ -142,17 +139,9 @@ where
         reopen_general_forum_topic,
         hide_general_forum_topic,
         unhide_general_forum_topic,
-        unpin_all_general_forum_topic_messages,
         answer_callback_query,
-        get_user_chat_boosts,
         set_my_commands,
         get_my_commands,
-        set_my_name,
-        get_my_name,
-        set_my_description,
-        get_my_description,
-        set_my_short_description,
-        get_my_short_description,
         set_chat_menu_button,
         get_chat_menu_button,
         set_my_default_administrator_rights,
@@ -170,7 +159,6 @@ where
         edit_message_reply_markup_inline,
         stop_poll,
         delete_message,
-        delete_messages,
         get_sticker_set,
         get_custom_emoji_stickers,
         upload_sticker_file,
@@ -178,13 +166,7 @@ where
         add_sticker_to_set,
         set_sticker_position_in_set,
         delete_sticker_from_set,
-        set_sticker_set_thumbnail,
-        set_custom_emoji_sticker_set_thumbnail,
-        set_sticker_set_title,
-        delete_sticker_set,
-        set_sticker_emoji_list,
-        set_sticker_keywords,
-        set_sticker_mask_position,
+        set_sticker_set_thumb,
         answer_shipping_query,
         create_invoice_link,
         answer_pre_checkout_query,
@@ -200,6 +182,7 @@ where
 }
 
 download_forward! {
+    'w
     B
     Throttle<B>
     { this => this.inner() }

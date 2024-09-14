@@ -4,8 +4,8 @@ use bitflags::bitflags;
 use bytes::{Buf, Bytes};
 
 use crate::error::Error;
+use crate::io::Decode;
 use crate::io::MySqlBufExt;
-use crate::io::ProtocolDecode;
 use crate::protocol::Capabilities;
 
 // https://dev.mysql.com/doc/dev/mysql-server/8.0.12/group__group__cs__column__definition__flags.html
@@ -112,8 +112,7 @@ pub(crate) struct ColumnDefinition {
     table: Bytes,
     alias: Bytes,
     name: Bytes,
-    #[allow(unused)]
-    pub(crate) collation: u16,
+    pub(crate) char_set: u16,
     pub(crate) max_size: u32,
     pub(crate) r#type: ColumnType,
     pub(crate) flags: ColumnFlags,
@@ -134,16 +133,16 @@ impl ColumnDefinition {
     }
 }
 
-impl ProtocolDecode<'_, Capabilities> for ColumnDefinition {
+impl Decode<'_, Capabilities> for ColumnDefinition {
     fn decode_with(mut buf: Bytes, _: Capabilities) -> Result<Self, Error> {
-        let catalog = buf.get_bytes_lenenc()?;
-        let schema = buf.get_bytes_lenenc()?;
-        let table_alias = buf.get_bytes_lenenc()?;
-        let table = buf.get_bytes_lenenc()?;
-        let alias = buf.get_bytes_lenenc()?;
-        let name = buf.get_bytes_lenenc()?;
+        let catalog = buf.get_bytes_lenenc();
+        let schema = buf.get_bytes_lenenc();
+        let table_alias = buf.get_bytes_lenenc();
+        let table = buf.get_bytes_lenenc();
+        let alias = buf.get_bytes_lenenc();
+        let name = buf.get_bytes_lenenc();
         let _next_len = buf.get_uint_lenenc(); // always 0x0c
-        let collation = buf.get_u16_le();
+        let char_set = buf.get_u16_le();
         let max_size = buf.get_u32_le();
         let type_id = buf.get_u8();
         let flags = buf.get_u16_le();
@@ -156,7 +155,7 @@ impl ProtocolDecode<'_, Capabilities> for ColumnDefinition {
             table,
             alias,
             name,
-            collation,
+            char_set,
             max_size,
             r#type: ColumnType::try_from_u16(type_id)?,
             flags: ColumnFlags::from_bits_truncate(flags),
@@ -166,8 +165,13 @@ impl ProtocolDecode<'_, Capabilities> for ColumnDefinition {
 }
 
 impl ColumnType {
-    pub(crate) fn name(self, flags: ColumnFlags, max_size: Option<u32>) -> &'static str {
-        let is_binary = flags.contains(ColumnFlags::BINARY);
+    pub(crate) fn name(
+        self,
+        char_set: u16,
+        flags: ColumnFlags,
+        max_size: Option<u32>,
+    ) -> &'static str {
+        let is_binary = char_set == 63;
         let is_unsigned = flags.contains(ColumnFlags::UNSIGNED);
         let is_enum = flags.contains(ColumnFlags::ENUM);
 

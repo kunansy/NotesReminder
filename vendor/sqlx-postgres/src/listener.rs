@@ -11,7 +11,7 @@ use sqlx_core::Either;
 use crate::describe::Describe;
 use crate::error::Error;
 use crate::executor::{Execute, Executor};
-use crate::message::{BackendMessageFormat, Notification};
+use crate::message::{MessageFormat, Notification};
 use crate::pool::PoolOptions;
 use crate::pool::{Pool, PoolConnection};
 use crate::{PgConnection, PgQueryResult, PgRow, PgStatement, PgTypeInfo, Postgres};
@@ -188,17 +188,19 @@ impl PgListener {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use sqlx::postgres::PgListener;
+    /// # use sqlx_core::postgres::PgListener;
+    /// # use sqlx_core::error::Error;
     /// #
+    /// # #[cfg(feature = "_rt")]
     /// # sqlx::__rt::test_block_on(async move {
-    /// let mut listener = PgListener::connect("postgres:// ...").await?;
+    /// # let mut listener = PgListener::connect("postgres:// ...").await?;
     /// loop {
     ///     // ask for next notification, re-connecting (transparently) if needed
     ///     let notification = listener.recv().await?;
     ///
     ///     // handle notification, do something interesting
     /// }
-    /// # Result::<(), sqlx::Error>::Ok(())
+    /// # Result::<(), Error>::Ok(())
     /// # }).unwrap();
     /// ```
     pub async fn recv(&mut self) -> Result<PgNotification, Error> {
@@ -217,8 +219,10 @@ impl PgListener {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use sqlx::postgres::PgListener;
+    /// # use sqlx_core::postgres::PgListener;
+    /// # use sqlx_core::error::Error;
     /// #
+    /// # #[cfg(feature = "_rt")]
     /// # sqlx::__rt::test_block_on(async move {
     /// # let mut listener = PgListener::connect("postgres:// ...").await?;
     /// loop {
@@ -229,7 +233,7 @@ impl PgListener {
     ///
     ///     // connection lost, do something interesting
     /// }
-    /// # Result::<(), sqlx::Error>::Ok(())
+    /// # Result::<(), Error>::Ok(())
     /// # }).unwrap();
     /// ```
     pub async fn try_recv(&mut self) -> Result<Option<PgNotification>, Error> {
@@ -277,12 +281,12 @@ impl PgListener {
 
             match message.format {
                 // We've received an async notification, return it.
-                BackendMessageFormat::NotificationResponse => {
+                MessageFormat::NotificationResponse => {
                     return Ok(Some(PgNotification(message.decode()?)));
                 }
 
                 // Mark the connection as ready for another query
-                BackendMessageFormat::ReadyForQuery => {
+                MessageFormat::ReadyForQuery => {
                     self.connection().await?.pending_ready_for_query_count -= 1;
                 }
 
@@ -328,15 +332,13 @@ impl Drop for PgListener {
 impl<'c> Executor<'c> for &'c mut PgListener {
     type Database = Postgres;
 
-    fn fetch_many<'e, 'q, E>(
+    fn fetch_many<'e, 'q: 'e, E: 'q>(
         self,
         query: E,
     ) -> BoxStream<'e, Result<Either<PgQueryResult, PgRow>, Error>>
     where
         'c: 'e,
         E: Execute<'q, Self::Database>,
-        'q: 'e,
-        E: 'q,
     {
         futures_util::stream::once(async move {
             // need some basic type annotation to help the compiler a bit
@@ -347,12 +349,13 @@ impl<'c> Executor<'c> for &'c mut PgListener {
         .boxed()
     }
 
-    fn fetch_optional<'e, 'q, E>(self, query: E) -> BoxFuture<'e, Result<Option<PgRow>, Error>>
+    fn fetch_optional<'e, 'q: 'e, E: 'q>(
+        self,
+        query: E,
+    ) -> BoxFuture<'e, Result<Option<PgRow>, Error>>
     where
         'c: 'e,
         E: Execute<'q, Self::Database>,
-        'q: 'e,
-        E: 'q,
     {
         async move { self.connection().await?.fetch_optional(query).await }.boxed()
     }

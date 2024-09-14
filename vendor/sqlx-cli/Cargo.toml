@@ -12,16 +12,11 @@
 [package]
 edition = "2021"
 name = "sqlx-cli"
-version = "0.8.1"
+version = "0.7.3"
 authors = [
     "Jesper Axelsson <jesperaxe@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
 ]
-build = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 default-run = "sqlx"
 description = "Command-line utility for SQLx, the Rust SQL toolkit."
 homepage = "https://github.com/launchbadge/sqlx"
@@ -39,25 +34,13 @@ categories = [
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/launchbadge/sqlx"
 
-[lib]
-name = "sqlx_cli"
-path = "src/lib.rs"
-
-[[bin]]
-name = "cargo-sqlx"
-path = "src/bin/cargo-sqlx.rs"
-
 [[bin]]
 name = "sqlx"
 path = "src/bin/sqlx.rs"
 
-[[test]]
-name = "add"
-path = "tests/add.rs"
-
-[[test]]
-name = "migrate"
-path = "tests/migrate.rs"
+[[bin]]
+name = "cargo-sqlx"
+path = "src/bin/cargo-sqlx.rs"
 
 [dependencies.anyhow]
 version = "1.0.52"
@@ -73,7 +56,7 @@ features = [
 ]
 
 [dependencies.cargo_metadata]
-version = "0.18.1"
+version = "0.14"
 
 [dependencies.chrono]
 version = "0.4.19"
@@ -121,7 +104,7 @@ features = ["derive"]
 version = "1.0.73"
 
 [dependencies.sqlx]
-version = "=0.8.1"
+version = "=0.7.3"
 features = [
     "runtime-tokio",
     "migrate",
@@ -144,9 +127,6 @@ default-features = false
 [dev-dependencies.assert_cmd]
 version = "2.0.11"
 
-[dev-dependencies.tempfile]
-version = "3.10.1"
-
 [features]
 completions = ["dep:clap_complete"]
 default = [
@@ -162,9 +142,3 @@ openssl-vendored = ["openssl/vendored"]
 postgres = ["sqlx/postgres"]
 rustls = ["sqlx/runtime-tokio-rustls"]
 sqlite = ["sqlx/sqlite"]
-
-[lints.clippy]
-cast_possible_truncation = "deny"
-cast_possible_wrap = "deny"
-cast_sign_loss = "deny"
-disallowed_methods = "deny"

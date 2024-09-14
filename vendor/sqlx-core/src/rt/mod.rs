@@ -33,9 +33,9 @@ pub async fn timeout<F: Future>(duration: Duration, f: F) -> Result<F::Output, T
 
     #[cfg(feature = "_rt-async-std")]
     {
-        async_std::future::timeout(duration, f)
+        return async_std::future::timeout(duration, f)
             .await
-            .map_err(|_| TimeoutError(()))
+            .map_err(|_| TimeoutError(()));
     }
 
     #[cfg(not(feature = "_rt-async-std"))]
@@ -50,7 +50,7 @@ pub async fn sleep(duration: Duration) {
 
     #[cfg(feature = "_rt-async-std")]
     {
-        async_std::task::sleep(duration).await
+        return async_std::task::sleep(duration).await;
     }
 
     #[cfg(not(feature = "_rt-async-std"))]
@@ -70,7 +70,7 @@ where
 
     #[cfg(feature = "_rt-async-std")]
     {
-        JoinHandle::AsyncStd(async_std::task::spawn(fut))
+        return JoinHandle::AsyncStd(async_std::task::spawn(fut));
     }
 
     #[cfg(not(feature = "_rt-async-std"))]
@@ -90,7 +90,7 @@ where
 
     #[cfg(feature = "_rt-async-std")]
     {
-        JoinHandle::AsyncStd(async_std::task::spawn_blocking(f))
+        return JoinHandle::AsyncStd(async_std::task::spawn_blocking(f));
     }
 
     #[cfg(not(feature = "_rt-async-std"))]
@@ -105,7 +105,7 @@ pub async fn yield_now() {
 
     #[cfg(feature = "_rt-async-std")]
     {
-        async_std::task::yield_now().await;
+        return async_std::task::yield_now().await;
     }
 
     #[cfg(not(feature = "_rt-async-std"))]
@@ -125,12 +125,13 @@ pub fn test_block_on<F: Future>(f: F) -> F::Output {
 
     #[cfg(all(feature = "_rt-async-std", not(feature = "_rt-tokio")))]
     {
-        async_std::task::block_on(f)
+        return async_std::task::block_on(f);
     }
 
     #[cfg(not(any(feature = "_rt-async-std", feature = "_rt-tokio")))]
     {
-        missing_rt(f)
+        drop(f);
+        panic!("at least one of the `runtime-*` features must be enabled")
     }
 }
 

@@ -2,7 +2,7 @@ use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 
 use crate::loom::sync::{Mutex, MutexGuard};
-use crate::util::metric_atomics::{MetricAtomicU64, MetricAtomicUsize};
+use std::sync::atomic::AtomicUsize;
 
 use super::linked_list::{Link, LinkedList};
 
@@ -14,8 +14,7 @@ use super::linked_list::{Link, LinkedList};
 /// Note: Due to its inner sharded design, the order of nodes cannot be guaranteed.
 pub(crate) struct ShardedList<L, T> {
     lists: Box<[Mutex<LinkedList<L, T>>]>,
-    added: MetricAtomicU64,
-    count: MetricAtomicUsize,
+    count: AtomicUsize,
     shard_mask: usize,
 }
 
@@ -43,8 +42,7 @@ impl<L, T> ShardedList<L, T> {
         }
         Self {
             lists: lists.into_boxed_slice(),
-            added: MetricAtomicU64::new(0),
-            count: MetricAtomicUsize::new(0),
+            count: AtomicUsize::new(0),
             shard_mask,
         }
     }
@@ -53,8 +51,7 @@ impl<L, T> ShardedList<L, T> {
 /// Used to get the lock of shard.
 pub(crate) struct ShardGuard<'a, L, T> {
     lock: MutexGuard<'a, LinkedList<L, T>>,
-    added: &'a MetricAtomicU64,
-    count: &'a MetricAtomicUsize,
+    count: &'a AtomicUsize,
     id: usize,
 }
 
@@ -65,7 +62,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         let mut lock = self.shard_inner(shard_id);
         let node = lock.pop_back();
         if node.is_some() {
-            self.count.decrement();
+            self.count.fetch_sub(1, Ordering::Relaxed);
         }
         node
     }
@@ -85,7 +82,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         // to be in any other list of the same sharded list.
         let node = unsafe { lock.remove(node) };
         if node.is_some() {
-            self.count.decrement();
+            self.count.fetch_sub(1, Ordering::Relaxed);
         }
         node
     }
@@ -95,7 +92,6 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         let id = unsafe { L::get_shard_id(L::as_raw(val)) };
         ShardGuard {
             lock: self.shard_inner(id),
-            added: &self.added,
             count: &self.count,
             id,
         }
@@ -104,13 +100,6 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     /// Gets the count of elements in this list.
     pub(crate) fn len(&self) -> usize {
         self.count.load(Ordering::Relaxed)
-    }
-
-    cfg_64bit_metrics! {
-        /// Gets the total number of elements added to this list.
-        pub(crate) fn added(&self) -> u64 {
-            self.added.load(Ordering::Relaxed)
-        }
     }
 
     /// Returns whether the linked list does not contain any node.
@@ -138,8 +127,7 @@ impl<'a, L: ShardedListItem> ShardGuard<'a, L, L::Target> {
         let id = unsafe { L::get_shard_id(L::as_raw(&val)) };
         assert_eq!(id, self.id);
         self.lock.push_front(val);
-        self.added.add(1, Ordering::Relaxed);
-        self.count.increment();
+        self.count.fetch_add(1, Ordering::Relaxed);
     }
 }
 

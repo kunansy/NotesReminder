@@ -75,8 +75,7 @@ use self::doc::*;
 /// let server = tokio::spawn(async move {
 ///     loop {
 ///         // Wait for a client to connect.
-///         server.connect().await?;
-///         let connected_client = server;
+///         let connected = server.connect().await?;
 ///
 ///         // Construct the next server to be connected before sending the one
 ///         // we already have of onto a task. This ensures that the server
@@ -2627,7 +2626,7 @@ pub enum PipeEnd {
 /// Information about a named pipe.
 ///
 /// Constructed through [`NamedPipeServer::info`] or [`NamedPipeClient::info`].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct PipeInfo {
     /// Indicates the mode of a named pipe.

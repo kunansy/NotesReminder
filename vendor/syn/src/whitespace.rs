@@ -41,11 +41,11 @@ pub(crate) fn skip(mut s: &str) -> &str {
             }
         }
         match byte {
-            b' ' | 0x09..=0x0D => {
+            b' ' | 0x09..=0x0d => {
                 s = &s[1..];
                 continue;
             }
-            b if b <= 0x7F => {}
+            b if b <= 0x7f => {}
             _ => {
                 let ch = s.chars().next().unwrap();
                 if is_whitespace(ch) {

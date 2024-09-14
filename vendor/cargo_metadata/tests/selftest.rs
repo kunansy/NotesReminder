@@ -132,10 +132,6 @@ fn metadata_deps() {
 
     assert_eq!(this.name, "cargo_metadata");
 
-    let workspace_packages = metadata.workspace_packages();
-    assert_eq!(workspace_packages.len(), 1);
-    assert_eq!(&workspace_packages[0].id, this_id);
-
     let lib = this
         .targets
         .iter()
@@ -160,21 +156,4 @@ fn metadata_deps() {
     assert!(!serde.req.matches(&Version::parse("1.0.0").unwrap()));
     assert!(serde.req.matches(&Version::parse("1.99.99").unwrap()));
     assert!(!serde.req.matches(&Version::parse("2.0.0").unwrap()));
-}
-
-#[test]
-fn workspace_default_packages() {
-    use cargo_metadata::workspace_default_members_is_missing;
-
-    let metadata = MetadataCommand::new()
-        .manifest_path("Cargo.toml")
-        .exec()
-        .unwrap();
-    let workspace_packages = metadata.workspace_packages();
-    // this will only trigger on cargo versions that expose
-    // workspace_default_members (that is, cargo >= 1.71)
-    if !workspace_default_members_is_missing(&metadata.workspace_default_members) {
-        let default_packages = metadata.workspace_default_packages();
-        assert_eq!(default_packages, workspace_packages);
-    }
 }

@@ -13,10 +13,24 @@
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 mod dns_name;
-pub(crate) use dns_name::{verify_dns_names, WildcardDnsNameRef};
+#[cfg(feature = "alloc")]
+pub(crate) use dns_name::GeneralDnsNameRef;
+pub use dns_name::{DnsNameRef, InvalidDnsNameError};
+
+/// Requires the `alloc` feature.
+#[cfg(feature = "alloc")]
+pub use dns_name::DnsName;
+
+mod name;
+pub use name::{InvalidSubjectNameError, SubjectNameRef};
 
 mod ip_address;
-pub(crate) use ip_address::verify_ip_address_names;
+pub use ip_address::{AddrParseError, IpAddrRef};
+
+#[cfg(feature = "alloc")]
+pub use ip_address::IpAddr;
 
 mod verify;
-pub(super) use verify::{check_name_constraints, GeneralName, NameIterator};
+#[cfg(feature = "alloc")]
+pub(super) use verify::list_cert_dns_names;
+pub(super) use verify::{check_name_constraints, verify_cert_subject_name};

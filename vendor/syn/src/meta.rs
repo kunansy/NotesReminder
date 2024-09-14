@@ -1,9 +1,8 @@
 //! Facility for interpreting structured content inside of an `Attribute`.
 
-use crate::error::{Error, Result};
 use crate::ext::IdentExt as _;
 use crate::lit::Lit;
-use crate::parse::{ParseStream, Parser};
+use crate::parse::{Error, ParseStream, Parser, Result};
 use crate::path::{Path, PathSegment};
 use crate::punctuated::Punctuated;
 use proc_macro2::Ident;

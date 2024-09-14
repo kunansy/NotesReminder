@@ -32,15 +32,14 @@ pub enum State {
     },
 }
 
-/// These commands are supported:
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase")]
+#[command(rename_rule = "lowercase", description = "These commands are supported:")]
 enum Command {
-    /// Display this text.
+    #[command(description = "display this text.")]
     Help,
-    /// Start the purchase procedure.
+    #[command(description = "start the purchase procedure.")]
     Start,
-    /// Cancel the purchase procedure.
+    #[command(description = "cancel the purchase procedure.")]
     Cancel,
 }
 

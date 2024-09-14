@@ -1,7 +1,6 @@
 use crate::loom::sync::Arc;
 use crate::runtime::context;
 use crate::runtime::scheduler::{self, current_thread, Inject};
-use crate::task::Id;
 
 use backtrace::BacktraceFrame;
 use std::cell::Cell;
@@ -195,9 +194,13 @@ pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
             if let Some(scheduler) = scheduler {
                 match scheduler {
                     scheduler::Context::CurrentThread(s) => s.defer.defer(cx.waker()),
-                    #[cfg(feature = "rt-multi-thread")]
+                    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                     scheduler::Context::MultiThread(s) => s.defer.defer(cx.waker()),
-                    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                    #[cfg(all(
+                        tokio_unstable,
+                        feature = "rt-multi-thread",
+                        not(target_os = "wasi")
+                    ))]
                     scheduler::Context::MultiThreadAlt(_) => unimplemented!(),
                 }
             }
@@ -267,7 +270,7 @@ pub(in crate::runtime) fn trace_current_thread(
     owned: &OwnedTasks<Arc<current_thread::Handle>>,
     local: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
     injection: &Inject<Arc<current_thread::Handle>>,
-) -> Vec<(Id, Trace)> {
+) -> Vec<Trace> {
     // clear the local and injection queues
 
     let mut dequeued = Vec::new();
@@ -300,7 +303,7 @@ cfg_rt_multi_thread! {
         local: &mut multi_thread::queue::Local<Arc<multi_thread::Handle>>,
         synced: &Mutex<Synced>,
         injection: &Shared<Arc<multi_thread::Handle>>,
-    ) -> Vec<(Id, Trace)> {
+    ) -> Vec<Trace> {
         let mut dequeued = Vec::new();
 
         // clear the local queue
@@ -328,7 +331,7 @@ cfg_rt_multi_thread! {
 ///
 /// This helper presumes exclusive access to each task. The tasks must not exist
 /// in any other queue.
-fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -> Vec<(Id, Trace)> {
+fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -> Vec<Trace> {
     let mut tasks = dequeued;
     // Notify and trace all un-notified tasks. The dequeued tasks are already
     // notified and so do not need to be re-notified.
@@ -348,9 +351,8 @@ fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -
         .into_iter()
         .map(|task| {
             let local_notified = owned.assert_owner(task);
-            let id = local_notified.task.id();
             let ((), trace) = Trace::capture(|| local_notified.run());
-            (id, trace)
+            trace
         })
         .collect()
 }

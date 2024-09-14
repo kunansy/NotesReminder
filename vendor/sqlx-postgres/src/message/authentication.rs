@@ -4,10 +4,10 @@ use memchr::memchr;
 use sqlx_core::bytes::{Buf, Bytes};
 
 use crate::error::Error;
-use crate::io::ProtocolDecode;
+use crate::io::Decode;
 
-use crate::message::{BackendMessage, BackendMessageFormat};
 use base64::prelude::{Engine as _, BASE64_STANDARD};
+
 // On startup, the server sends an appropriate authentication request message,
 // to which the frontend must reply with an appropriate authentication
 // response message (such as a password).
@@ -60,10 +60,8 @@ pub enum Authentication {
     SaslFinal(AuthenticationSaslFinal),
 }
 
-impl BackendMessage for Authentication {
-    const FORMAT: BackendMessageFormat = BackendMessageFormat::Authentication;
-
-    fn decode_body(mut buf: Bytes) -> Result<Self, Error> {
+impl Decode<'_> for Authentication {
+    fn decode_with(mut buf: Bytes, _: ()) -> Result<Self, Error> {
         Ok(match buf.get_u32() {
             0 => Authentication::Ok,
 
@@ -131,7 +129,7 @@ pub struct AuthenticationSaslContinue {
     pub message: String,
 }
 
-impl ProtocolDecode<'_> for AuthenticationSaslContinue {
+impl Decode<'_> for AuthenticationSaslContinue {
     fn decode_with(buf: Bytes, _: ()) -> Result<Self, Error> {
         let mut iterations: u32 = 4096;
         let mut salt = Vec::new();
@@ -164,8 +162,8 @@ impl ProtocolDecode<'_> for AuthenticationSaslContinue {
         Ok(Self {
             iterations,
             salt,
-            nonce: from_utf8(&nonce).map_err(Error::protocol)?.to_owned(),
-            message: from_utf8(&buf).map_err(Error::protocol)?.to_owned(),
+            nonce: from_utf8(&*nonce).map_err(Error::protocol)?.to_owned(),
+            message: from_utf8(&*buf).map_err(Error::protocol)?.to_owned(),
         })
     }
 }
@@ -175,7 +173,7 @@ pub struct AuthenticationSaslFinal {
     pub verifier: Vec<u8>,
 }
 
-impl ProtocolDecode<'_> for AuthenticationSaslFinal {
+impl Decode<'_> for AuthenticationSaslFinal {
     fn decode_with(buf: Bytes, _: ()) -> Result<Self, Error> {
         let mut verifier = Vec::new();
 

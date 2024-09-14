@@ -1,14 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{
-    ChatFullInfo, ChatId, ChatLocation, ChatPermissions, ChatPhoto, Message, ReactionType, Seconds,
-    True, User,
-};
+use crate::types::{ChatId, ChatLocation, ChatPermissions, ChatPhoto, Message, True};
 
 /// This object represents a chat.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#chat).
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Chat {
     /// A unique identifier for this chat.
@@ -22,12 +19,6 @@ pub struct Chat {
     /// [`GetChat`]: crate::payloads::GetChat
     pub photo: Option<ChatPhoto>,
 
-    /// List of available reactions allowed in the chat. If omitted, then all
-    /// emoji reactions are allowed. Returned only from [`GetChat`].
-    ///
-    /// [`GetChat`]: crate::payloads::GetChat
-    pub available_reactions: Option<Vec<ReactionType>>,
-
     /// The most recent pinned message (by sending date). Returned only in
     /// [`GetChat`].
     ///
@@ -38,7 +29,7 @@ pub struct Chat {
     /// deleted; in seconds. Returned only in [`GetChat`].
     ///
     /// [`GetChat`]: crate::payloads::GetChat
-    pub message_auto_delete_time: Option<Seconds>,
+    pub message_auto_delete_time: Option<u32>,
 
     /// `true`, if non-administrators can only get the list of bots and
     /// administrators in the chat. Returned only in [`GetChat`].
@@ -54,12 +45,9 @@ pub struct Chat {
     /// [`GetChat`]: crate::payloads::GetChat
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub has_aggressive_anti_spam_enabled: bool,
-
-    #[serde(flatten)]
-    pub chat_full_info: ChatFullInfo,
 }
 
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ChatKind {
@@ -67,7 +55,7 @@ pub enum ChatKind {
     Private(ChatPrivate),
 }
 
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ChatPublic {
     /// A title, for supergroups, channels and group chats.
@@ -101,7 +89,7 @@ pub struct ChatPublic {
     pub has_protected_content: Option<True>,
 }
 
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(from = "serde_helper::ChatPrivate", into = "serde_helper::ChatPrivate")]
 pub struct ChatPrivate {
@@ -114,6 +102,13 @@ pub struct ChatPrivate {
 
     /// A last name of the other party in a private chat.
     pub last_name: Option<String>,
+
+    /// Custom emoji identifier of emoji status of the other party in a private
+    /// chat. Returned only in [`GetChat`].
+    ///
+    /// [`GetChat`]: crate::payloads::GetChat
+    // FIXME: CustomEmojiId
+    pub emoji_status_custom_emoji_id: Option<String>,
 
     /// Bio of the other party in a private chat. Returned only in [`GetChat`].
     ///
@@ -135,7 +130,7 @@ pub struct ChatPrivate {
     pub has_restricted_voice_and_video_messages: Option<True>,
 }
 
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
@@ -145,7 +140,7 @@ pub enum PublicChatKind {
     Supergroup(PublicChatSupergroup),
 }
 
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct PublicChatChannel {
     /// A username, for private chats, supergroups and channels if available.
@@ -158,7 +153,7 @@ pub struct PublicChatChannel {
     pub linked_chat_id: Option<i64>,
 }
 
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct PublicChatGroup {
     /// A default chat member permissions, for groups and supergroups. Returned
@@ -168,7 +163,7 @@ pub struct PublicChatGroup {
     pub permissions: Option<ChatPermissions>,
 }
 
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PublicChatSupergroup {
     /// A username, for private chats, supergroups and channels if
@@ -207,7 +202,7 @@ pub struct PublicChatSupergroup {
     /// unpriviledged user. Returned only from [`GetChat`].
     ///
     /// [`GetChat`]: crate::payloads::GetChat
-    pub slow_mode_delay: Option<Seconds>,
+    pub slow_mode_delay: Option<u32>,
 
     /// Unique identifier for the linked chat, i.e. the discussion group
     /// identifier for a channel and vice versa. Returned only in [`GetChat`].
@@ -360,7 +355,7 @@ impl Chat {
     ///
     /// [`GetChat`]: crate::payloads::GetChat
     #[must_use]
-    pub fn slow_mode_delay(&self) -> Option<Seconds> {
+    pub fn slow_mode_delay(&self) -> Option<u32> {
         if let ChatKind::Public(this) = &self.kind {
             if let PublicChatKind::Supergroup(this) = &this.kind {
                 return this.slow_mode_delay;
@@ -498,23 +493,6 @@ impl Chat {
             _ => None,
         }
     }
-
-    /// Returns all users that are "contained" in this `Chat`
-    /// structure.
-    ///
-    /// This might be useful to track information about users.
-    ///
-    /// Note that this function can return duplicate users.
-    pub fn mentioned_users(&self) -> impl Iterator<Item = &User> {
-        crate::util::flatten(self.pinned_message.as_ref().map(|m| m.mentioned_users()))
-    }
-
-    /// `{Message, Chat}::mentioned_users` are mutually recursive, as such we
-    /// can't use `->impl Iterator` everywhere, as it would make an infinite
-    /// type. So we need to box somewhere.
-    pub(crate) fn mentioned_users_rec(&self) -> impl Iterator<Item = &User> {
-        crate::util::flatten(self.pinned_message.as_ref().map(|m| m.mentioned_users_rec()))
-    }
 }
 
 mod serde_helper {
@@ -539,6 +517,7 @@ mod serde_helper {
         bio: Option<String>,
         has_private_forwards: Option<True>,
         has_restricted_voice_and_video_messages: Option<True>,
+        emoji_status_custom_emoji_id: Option<String>,
     }
 
     impl From<ChatPrivate> for super::ChatPrivate {
@@ -551,6 +530,7 @@ mod serde_helper {
                 bio,
                 has_private_forwards,
                 has_restricted_voice_and_video_messages,
+                emoji_status_custom_emoji_id,
             }: ChatPrivate,
         ) -> Self {
             Self {
@@ -560,6 +540,7 @@ mod serde_helper {
                 bio,
                 has_private_forwards,
                 has_restricted_voice_and_video_messages,
+                emoji_status_custom_emoji_id,
             }
         }
     }
@@ -573,6 +554,7 @@ mod serde_helper {
                 bio,
                 has_private_forwards,
                 has_restricted_voice_and_video_messages,
+                emoji_status_custom_emoji_id,
             }: super::ChatPrivate,
         ) -> Self {
             Self {
@@ -583,6 +565,7 @@ mod serde_helper {
                 bio,
                 has_private_forwards,
                 has_restricted_voice_and_video_messages,
+                emoji_status_custom_emoji_id,
             }
         }
     }
@@ -609,27 +592,12 @@ mod tests {
                 has_protected_content: None,
             }),
             photo: None,
-            available_reactions: Some(vec![ReactionType::Emoji { emoji: "🌭".to_owned() }]),
             pinned_message: None,
             message_auto_delete_time: None,
             has_hidden_members: false,
             has_aggressive_anti_spam_enabled: false,
-            chat_full_info: ChatFullInfo::default(),
         };
-        let actual = from_str(
-            r#"{
-                "id": -1,
-                "type": "channel",
-                "username": "channel_name",
-                "available_reactions": [
-                    {
-                        "type": "emoji",
-                        "emoji": "🌭"
-                    }
-                ]
-            }"#,
-        )
-        .unwrap();
+        let actual = from_str(r#"{"id":-1,"type":"channel","username":"channel_name"}"#).unwrap();
         assert_eq!(expected, actual);
     }
 
@@ -645,30 +613,16 @@ mod tests {
                     bio: None,
                     has_private_forwards: None,
                     has_restricted_voice_and_video_messages: None,
+                    emoji_status_custom_emoji_id: None
                 }),
                 photo: None,
-                available_reactions: Some(vec![ReactionType::Emoji { emoji: "🌭".to_owned() }]),
                 pinned_message: None,
                 message_auto_delete_time: None,
                 has_hidden_members: false,
                 has_aggressive_anti_spam_enabled: false,
-                chat_full_info: ChatFullInfo::default()
             },
-            from_str(
-                r#"{
-                    "id": 0,
-                    "type": "private",
-                    "username": "username",
-                    "first_name": "Anon",
-                    "available_reactions": [
-                        {
-                            "type": "emoji",
-                            "emoji": "🌭"
-                        }
-                    ]
-                }"#
-            )
-            .unwrap()
+            from_str(r#"{"id":0,"type":"private","username":"username","first_name":"Anon"}"#)
+                .unwrap()
         );
     }
 
@@ -683,14 +637,13 @@ mod tests {
                 bio: None,
                 has_private_forwards: None,
                 has_restricted_voice_and_video_messages: None,
+                emoji_status_custom_emoji_id: None,
             }),
             photo: None,
-            available_reactions: None,
             pinned_message: None,
             message_auto_delete_time: None,
             has_hidden_members: false,
             has_aggressive_anti_spam_enabled: false,
-            chat_full_info: ChatFullInfo::default(),
         };
 
         let json = to_string(&chat).unwrap();

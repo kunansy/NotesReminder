@@ -40,15 +40,16 @@ impl<S> SqliteStorage<S> {
         serializer: S,
     ) -> Result<Arc<Self>, SqliteStorageError<Infallible>> {
         let pool = SqlitePool::connect(format!("sqlite:{path}?mode=rwc").as_str()).await?;
+        let mut conn = pool.acquire().await?;
         sqlx::query(
-            "
+            r#"
 CREATE TABLE IF NOT EXISTS teloxide_dialogues (
     chat_id BIGINT PRIMARY KEY,
     dialogue BLOB NOT NULL
 );
-        ",
+        "#,
         )
-        .execute(&pool)
+        .execute(&mut conn)
         .await?;
 
         Ok(Arc::new(Self { pool, serializer }))
@@ -97,10 +98,10 @@ where
                 .await?
                 .execute(
                     sqlx::query(
-                        "
+                        r#"
             INSERT INTO teloxide_dialogues VALUES (?, ?)
             ON CONFLICT(chat_id) DO UPDATE SET dialogue=excluded.dialogue
-                                ",
+                                "#,
                     )
                     .bind(chat_id)
                     .bind(d),

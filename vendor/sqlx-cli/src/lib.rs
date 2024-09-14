@@ -90,11 +90,10 @@ pub async fn run(opt: Opt) -> Result<()> {
 
         Command::Prepare {
             check,
-            all,
             workspace,
             connect_opts,
             args,
-        } => prepare::run(check, all, workspace, connect_opts, args).await?,
+        } => prepare::run(check, workspace, connect_opts, args).await?,
 
         #[cfg(feature = "completions")]
         Command::Completions { shell } => completions::run(shell),
@@ -130,15 +129,16 @@ where
             .build(),
         || {
             connect(db_url).map_err(|e| -> backoff::Error<anyhow::Error> {
-                if let sqlx::Error::Io(ref ioe) = e {
-                    match ioe.kind() {
+                match e {
+                    sqlx::Error::Io(ref ioe) => match ioe.kind() {
                         io::ErrorKind::ConnectionRefused
                         | io::ErrorKind::ConnectionReset
                         | io::ErrorKind::ConnectionAborted => {
                             return backoff::Error::transient(e.into());
                         }
                         _ => (),
-                    }
+                    },
+                    _ => (),
                 }
 
                 backoff::Error::permanent(e.into())

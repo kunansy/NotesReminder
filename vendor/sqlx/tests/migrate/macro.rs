@@ -1,4 +1,3 @@
-#![cfg(unix)]
 use sqlx::migrate::Migrator;
 use std::path::Path;
 

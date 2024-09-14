@@ -101,7 +101,7 @@ where
         let this = &mut *self;
 
         while !this.buf.is_empty() {
-            match this.socket.try_write(this.buf) {
+            match this.socket.try_write(&mut this.buf) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                     ready!(this.socket.poll_write_ready(cx))?;
                 }
@@ -195,7 +195,6 @@ pub async fn connect_tcp<Ws: WithSocket>(
         use tokio::net::TcpStream;
 
         let stream = TcpStream::connect((host, port)).await?;
-        stream.set_nodelay(true)?;
 
         return Ok(with_socket.with_socket(stream));
     }
@@ -210,13 +209,7 @@ pub async fn connect_tcp<Ws: WithSocket>(
 
         // Loop through all the Socket Addresses that the hostname resolves to
         for socket_addr in (host, port).to_socket_addrs().await? {
-            let stream = Async::<TcpStream>::connect(socket_addr)
-                .await
-                .and_then(|s| {
-                    s.get_ref().set_nodelay(true)?;
-                    Ok(s)
-                });
-            match stream {
+            match Async::<TcpStream>::connect(socket_addr).await {
                 Ok(stream) => return Ok(with_socket.with_socket(stream)),
                 Err(e) => last_err = Some(e),
             }
@@ -225,12 +218,14 @@ pub async fn connect_tcp<Ws: WithSocket>(
         // If we reach this point, it means we failed to connect to any of the addresses.
         // Return the last error we encountered, or a custom error if the hostname didn't resolve to any address.
         match last_err {
-            Some(err) => Err(err.into()),
-            None => Err(io::Error::new(
-                io::ErrorKind::AddrNotAvailable,
-                "Hostname did not resolve to any addresses",
-            )
-            .into()),
+            Some(err) => return Err(err.into()),
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::AddrNotAvailable,
+                    "Hostname did not resolve to any addresses",
+                )
+                .into())
+            }
         }
     }
 
@@ -247,41 +242,36 @@ pub async fn connect_uds<P: AsRef<Path>, Ws: WithSocket>(
     path: P,
     with_socket: Ws,
 ) -> crate::Result<Ws::Output> {
-    #[cfg(unix)]
-    {
-        #[cfg(feature = "_rt-tokio")]
-        if crate::rt::rt_tokio::available() {
-            use tokio::net::UnixStream;
-
-            let stream = UnixStream::connect(path).await?;
-
-            return Ok(with_socket.with_socket(stream));
-        }
-
-        #[cfg(feature = "_rt-async-std")]
-        {
-            use async_io::Async;
-            use std::os::unix::net::UnixStream;
-
-            let stream = Async::<UnixStream>::connect(path).await?;
-
-            Ok(with_socket.with_socket(stream))
-        }
-
-        #[cfg(not(feature = "_rt-async-std"))]
-        {
-            crate::rt::missing_rt((path, with_socket))
-        }
-    }
-
     #[cfg(not(unix))]
     {
-        drop((path, with_socket));
-
-        Err(io::Error::new(
+        return Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "Unix domain sockets are not supported on this platform",
         )
-        .into())
+        .into());
+    }
+
+    #[cfg(all(unix, feature = "_rt-tokio"))]
+    if crate::rt::rt_tokio::available() {
+        use tokio::net::UnixStream;
+
+        let stream = UnixStream::connect(path).await?;
+
+        return Ok(with_socket.with_socket(stream));
+    }
+
+    #[cfg(all(unix, feature = "_rt-async-std"))]
+    {
+        use async_io::Async;
+        use std::os::unix::net::UnixStream;
+
+        let stream = Async::<UnixStream>::connect(path).await?;
+
+        return Ok(with_socket.with_socket(stream));
+    }
+
+    #[cfg(not(feature = "_rt-async-std"))]
+    {
+        crate::rt::missing_rt((path, with_socket))
     }
 }

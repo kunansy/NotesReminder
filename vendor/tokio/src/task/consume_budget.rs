@@ -8,6 +8,10 @@ use std::task::Poll;
 /// computations that do not use Tokio resources like sockets or semaphores,
 /// without redundantly yielding to the runtime each time.
 ///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type
+/// may break in 1.x releases. See [the documentation on unstable
+/// features][unstable] for details.
+///
 /// # Examples
 ///
 /// Make sure that a function which returns a sum of (potentially lots of)
@@ -23,7 +27,8 @@ use std::task::Poll;
 ///     sum
 /// }
 /// ```
-#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+/// [unstable]: crate#unstable-features
+#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt"))))]
 pub async fn consume_budget() {
     let mut status = Poll::Pending;
 

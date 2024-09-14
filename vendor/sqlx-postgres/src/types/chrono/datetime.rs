@@ -33,13 +33,14 @@ impl<Tz: TimeZone> PgHasArrayType for DateTime<Tz> {
 }
 
 impl Encode<'_, Postgres> for NaiveDateTime {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
+        // FIXME: We should *really* be returning an error, Encode needs to be fallible
         // TIMESTAMP is encoded as the microseconds since the epoch
-        let micros = (*self - postgres_epoch_datetime())
+        let us = (*self - postgres_epoch_datetime())
             .num_microseconds()
-            .ok_or_else(|| format!("NaiveDateTime out of range for Postgres: {self:?}"))?;
+            .unwrap_or_else(|| panic!("NaiveDateTime out of range for Postgres: {self:?}"));
 
-        Encode::<Postgres>::encode(micros, buf)
+        Encode::<Postgres>::encode(&us, buf)
     }
 
     fn size_hint(&self) -> usize {
@@ -75,7 +76,7 @@ impl<'r> Decode<'r, Postgres> for NaiveDateTime {
 }
 
 impl<Tz: TimeZone> Encode<'_, Postgres> for DateTime<Tz> {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         Encode::<Postgres>::encode(self.naive_utc(), buf)
     }
 

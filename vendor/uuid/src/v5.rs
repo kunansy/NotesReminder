@@ -26,8 +26,7 @@ impl Uuid {
     ///
     /// # References
     ///
-    /// * [UUID Version 5 in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-5.5)
-    /// * [Name-Based UUID Generation in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-6.5)
+    /// * [Version 3 and 5 UUIDs in RFC4122](https://www.rfc-editor.org/rfc/rfc4122#section-4.3)
     ///
     /// [`NAMESPACE_DNS`]: struct.Uuid.html#associatedconst.NAMESPACE_DNS
     /// [`NAMESPACE_OID`]: struct.Uuid.html#associatedconst.NAMESPACE_OID

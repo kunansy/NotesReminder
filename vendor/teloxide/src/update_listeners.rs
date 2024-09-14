@@ -5,7 +5,7 @@
 //!
 //! - [`polling_default`] function, which returns a default long polling
 //!   listener.
-//! - [`Polling`] function, which returns a long polling listener with your
+//! - [`polling`] function, which returns a long polling listener with your
 //!   configuration.
 //! - Various functions in the [`webhooks`] module that return webhook listeners
 //!
@@ -13,11 +13,12 @@
 //! [`Dispatcher`].
 //!
 //! Telegram supports two ways of [getting updates]: [long polling] and
-//! [webhooks]. For the former see [`Polling`] and [`polling_default`], for the
+//! [webhooks]. For the former see [`polling`] and [`polling_default`], for the
 //! latter see the [`webhooks`] module.
 //!
 //! [`UpdateListener`]: UpdateListener
 //! [`polling_default`]: polling_default
+//! [`polling`]: polling()
 //! [`Dispatcher`]: crate::dispatching::Dispatcher
 //! [`Box::get_updates`]: crate::requests::Requester::get_updates
 //! [getting updates]: https://core.telegram.org/bots/api#getting-updates
@@ -25,11 +26,13 @@
 //! [webhooks]: https://en.wikipedia.org/wiki/Webhook
 
 /// Implementations of webhook update listeners - an alternative (to
-/// [`Polling`]) way of receiving updates from telegram.
+/// [`fn@polling`]) way of receiving updates from telegram.
 #[cfg(feature = "webhooks")]
 pub mod webhooks;
 
 use futures::Stream;
+
+use std::time::Duration;
 
 use crate::{
     stop::StopToken,
@@ -41,7 +44,7 @@ mod stateful_listener;
 
 #[allow(deprecated)]
 pub use self::{
-    polling::{polling_default, Polling, PollingBuilder, PollingStream},
+    polling::{polling, polling_default, Polling, PollingBuilder, PollingStream},
     stateful_listener::StatefulListener,
 };
 
@@ -63,7 +66,7 @@ pub trait UpdateListener:
     type Err;
 
     /// Returns a token which stops this listener.
-    ///
+    ///  
     /// The [`stop`] function of the token is not guaranteed to have an
     /// immediate effect. That is, some listeners can return updates even
     /// after [`stop`] is called (e.g.: because of buffering).
@@ -79,7 +82,7 @@ pub trait UpdateListener:
 
     /// Hint which updates should the listener listen for.
     ///
-    /// For example [`Polling`] should send the hint as
+    /// For example [`polling()`] should send the hint as
     /// [`GetUpdates::allowed_updates`]
     ///
     /// Note however that this is a _hint_ and as such, it can be ignored. The
@@ -90,6 +93,19 @@ pub trait UpdateListener:
     /// crate::payloads::GetUpdates::allowed_updates
     fn hint_allowed_updates(&mut self, hint: &mut dyn Iterator<Item = AllowedUpdate>) {
         let _ = hint;
+    }
+
+    /// The timeout duration hint.
+    ///
+    /// This hints how often dispatcher should check for a shutdown. E.g., for
+    /// [`polling()`] this returns the [`timeout`].
+    ///
+    /// [`timeout`]: crate::payloads::GetUpdates::timeout
+    ///
+    /// If you are implementing this trait and not sure what to return from this
+    /// function, just leave it with the default implementation.
+    fn timeout_hint(&self) -> Option<Duration> {
+        None
     }
 }
 

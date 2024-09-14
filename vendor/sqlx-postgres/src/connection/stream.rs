@@ -9,10 +9,8 @@ use sqlx_core::bytes::{Buf, Bytes};
 
 use crate::connection::tls::MaybeUpgradeTls;
 use crate::error::Error;
-use crate::message::{
-    BackendMessage, BackendMessageFormat, EncodeMessage, FrontendMessage, Notice, Notification,
-    ParameterStatus, ReceivedMessage,
-};
+use crate::io::{Decode, Encode};
+use crate::message::{Message, MessageFormat, Notice, Notification, ParameterStatus};
 use crate::net::{self, BufferedSocket, Socket};
 use crate::{PgConnectOptions, PgDatabaseError, PgSeverity};
 
@@ -57,51 +55,59 @@ impl PgStream {
         })
     }
 
-    #[inline(always)]
-    pub(crate) fn write_msg(&mut self, message: impl FrontendMessage) -> Result<(), Error> {
-        self.write(EncodeMessage(message))
-    }
-
-    pub(crate) async fn send<T>(&mut self, message: T) -> Result<(), Error>
+    pub(crate) async fn send<'en, T>(&mut self, message: T) -> Result<(), Error>
     where
-        T: FrontendMessage,
+        T: Encode<'en>,
     {
-        self.write_msg(message)?;
+        self.write(message);
         self.flush().await?;
         Ok(())
     }
 
     // Expect a specific type and format
-    pub(crate) async fn recv_expect<B: BackendMessage>(&mut self) -> Result<B, Error> {
-        self.recv().await?.decode()
+    pub(crate) async fn recv_expect<'de, T: Decode<'de>>(
+        &mut self,
+        format: MessageFormat,
+    ) -> Result<T, Error> {
+        let message = self.recv().await?;
+
+        if message.format != format {
+            return Err(err_protocol!(
+                "expecting {:?} but received {:?}",
+                format,
+                message.format
+            ));
+        }
+
+        message.decode()
     }
 
-    pub(crate) async fn recv_unchecked(&mut self) -> Result<ReceivedMessage, Error> {
+    pub(crate) async fn recv_unchecked(&mut self) -> Result<Message, Error> {
         // all packets in postgres start with a 5-byte header
         // this header contains the message type and the total length of the message
         let mut header: Bytes = self.inner.read(5).await?;
 
-        let format = BackendMessageFormat::try_from_u8(header.get_u8())?;
+        let format = MessageFormat::try_from_u8(header.get_u8())?;
         let size = (header.get_u32() - 4) as usize;
 
         let contents = self.inner.read(size).await?;
 
-        Ok(ReceivedMessage { format, contents })
+        Ok(Message { format, contents })
     }
 
     // Get the next message from the server
     // May wait for more data from the server
-    pub(crate) async fn recv(&mut self) -> Result<ReceivedMessage, Error> {
+    pub(crate) async fn recv(&mut self) -> Result<Message, Error> {
         loop {
             let message = self.recv_unchecked().await?;
 
             match message.format {
-                BackendMessageFormat::ErrorResponse => {
+                MessageFormat::ErrorResponse => {
                     // An error returned from the database server.
-                    return Err(message.decode::<PgDatabaseError>()?.into());
+                    return Err(PgDatabaseError(message.decode()?).into());
                 }
 
-                BackendMessageFormat::NotificationResponse => {
+                MessageFormat::NotificationResponse => {
                     if let Some(buffer) = &mut self.notifications {
                         let notification: Notification = message.decode()?;
                         let _ = buffer.send(notification).await;
@@ -110,7 +116,7 @@ impl PgStream {
                     }
                 }
 
-                BackendMessageFormat::ParameterStatus => {
+                MessageFormat::ParameterStatus => {
                     // informs the frontend about the current (initial)
                     // setting of backend parameters
 
@@ -129,7 +135,7 @@ impl PgStream {
                     continue;
                 }
 
-                BackendMessageFormat::NoticeResponse => {
+                MessageFormat::NoticeResponse => {
                     // do we need this to be more configurable?
                     // if you are reading this comment and think so, open an issue
 
@@ -153,10 +159,11 @@ impl PgStream {
                         tracing_level
                     );
                     if log_is_enabled {
+                        let message = format!("{}", notice.message());
                         sqlx_core::private_tracing_dynamic_event!(
                             target: "sqlx::postgres::notice",
                             tracing_level,
-                            message = notice.message()
+                            message
                         );
                     }
 
@@ -204,7 +211,7 @@ fn parse_server_version(s: &str) -> Option<u32> {
                     break;
                 }
             }
-            _ if ch.is_ascii_digit() => {
+            _ if ch.is_digit(10) => {
                 if chs.peek().is_none() {
                     if let Ok(num) = u32::from_str(&s[from..]) {
                         parts.push(num);

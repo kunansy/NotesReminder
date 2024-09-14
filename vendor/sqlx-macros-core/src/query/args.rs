@@ -1,11 +1,11 @@
 use crate::database::DatabaseExt;
 use crate::query::QueryMacroInput;
 use either::Either;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
 use sqlx_core::describe::Describe;
 use syn::spanned::Spanned;
-use syn::{Expr, ExprCast, ExprGroup, Type};
+use syn::{Expr, ExprCast, ExprGroup, ExprType, Type};
 
 /// Returns a tokenstream which typechecks the arguments passed to the macro
 /// and binds them to `DB::Arguments` with the ident `query_args`.
@@ -17,7 +17,7 @@ pub fn quote_args<DB: DatabaseExt>(
 
     if input.arg_exprs.is_empty() {
         return Ok(quote! {
-            let query_args = ::core::result::Result::<_, ::sqlx::error::BoxDynError>::Ok(<#db_path as ::sqlx::database::Database>::Arguments::<'_>::default());
+            let query_args = <#db_path as ::sqlx::database::HasArguments>::Arguments::default();
         });
     }
 
@@ -49,28 +49,31 @@ pub fn quote_args<DB: DatabaseExt>(
                 .zip(arg_names.iter().zip(&input.arg_exprs))
                 .enumerate()
                 .map(|(i, (param_ty, (name, expr)))| -> crate::Result<_> {
-                    if get_type_override(expr).is_some() {
+                    let param_ty = match get_type_override(expr) {
                         // cast will fail to compile if the type does not match
                         // and we strip casts to wildcard
-                        return Ok(quote!());
-                    }
+                        Some((_, false)) => return Ok(quote!()),
+                        // type ascription is deprecated
+                        Some((ty, true)) => return Ok(create_warning(name.clone(), &ty, &expr)),
+                        None => {
+                            DB::param_type_for_id(&param_ty)
+                                .ok_or_else(|| {
+                                    if let Some(feature_gate) = <DB as DatabaseExt>::get_feature_gate(&param_ty) {
+                                        format!(
+                                            "optional sqlx feature `{}` required for type {} of param #{}",
+                                            feature_gate,
+                                            param_ty,
+                                            i + 1,
+                                        )
+                                    } else {
+                                        format!("unsupported type {} for param #{}", param_ty, i + 1)
+                                    }
+                                })?
+                                .parse::<TokenStream>()
+                                .map_err(|_| format!("Rust type mapping for {param_ty} not parsable"))?
 
-                    let param_ty =
-                        DB::param_type_for_id(param_ty)
-                            .ok_or_else(|| {
-                                if let Some(feature_gate) = DB::get_feature_gate(param_ty) {
-                                    format!(
-                                        "optional sqlx feature `{}` required for type {} of param #{}",
-                                        feature_gate,
-                                        param_ty,
-                                        i + 1,
-                                    )
-                                } else {
-                                    format!("unsupported type {} for param #{}", param_ty, i + 1)
-                                }
-                            })?
-                            .parse::<TokenStream>()
-                            .map_err(|_| format!("Rust type mapping for {param_ty} not parsable"))?;
+                        }
+                    };
 
                     Ok(quote_spanned!(expr.span() =>
                         // this shouldn't actually run
@@ -104,20 +107,51 @@ pub fn quote_args<DB: DatabaseExt>(
 
         #args_check
 
-        let mut query_args = <#db_path as ::sqlx::database::Database>::Arguments::<'_>::default();
+        let mut query_args = <#db_path as ::sqlx::database::HasArguments>::Arguments::default();
         query_args.reserve(
             #args_count,
             0 #(+ ::sqlx::encode::Encode::<#db_path>::size_hint(#arg_name))*
         );
-        let query_args = ::core::result::Result::<_, ::sqlx::error::BoxDynError>::Ok(query_args)
-        #(.and_then(move |mut query_args| query_args.add(#arg_name).map(move |()| query_args) ))*;
+        #(query_args.add(#arg_name);)*
     })
 }
 
-fn get_type_override(expr: &Expr) -> Option<&Type> {
+fn create_warning(name: Ident, ty: &Type, expr: &Expr) -> TokenStream {
+    let Expr::Type(ExprType { expr: stripped, .. }) = expr else {
+        return quote!();
+    };
+    let current = quote!(#stripped: #ty).to_string();
+    let fix = quote!(#stripped as #ty).to_string();
+    let name = Ident::new(&format!("warning_{name}"), expr.span());
+
+    let message = format!(
+        "
+\t\tType ascription pattern is deprecated, prefer casting
+\t\tTry changing from
+\t\t\t`{current}`
+\t\tto
+\t\t\t`{fix}`
+
+\t\tSee <https://github.com/rust-lang/rfcs/pull/3307> for more information
+"
+    );
+
+    quote_spanned!(expr.span() =>
+        // this shouldn't actually run
+        if false {
+            #[deprecated(note = #message)]
+            #[allow(non_upper_case_globals)]
+            const #name: () = ();
+            let _ = #name;
+        }
+    )
+}
+
+fn get_type_override(expr: &Expr) -> Option<(&Type, bool)> {
     match expr {
         Expr::Group(group) => get_type_override(&group.expr),
-        Expr::Cast(cast) => Some(&cast.ty),
+        Expr::Cast(cast) => Some((&cast.ty, false)),
+        Expr::Type(ascription) => Some((&ascription.ty, true)),
         _ => None,
     }
 }
@@ -133,6 +167,8 @@ fn strip_wildcard(expr: Expr) -> Expr {
             group_token,
             expr: Box::new(strip_wildcard(*expr)),
         }),
+        // type ascription syntax is experimental so we always strip it
+        Expr::Type(ExprType { expr, .. }) => *expr,
         // we want to retain casts if they semantically matter
         Expr::Cast(ExprCast {
             attrs,

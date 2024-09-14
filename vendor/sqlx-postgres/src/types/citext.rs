@@ -94,7 +94,7 @@ impl PgHasArrayType for PgCiText {
 }
 
 impl Encode<'_, Postgres> for PgCiText {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         <&str as Encode<Postgres>>::encode(&**self, buf)
     }
 }

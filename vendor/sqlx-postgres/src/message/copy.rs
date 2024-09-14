@@ -1,24 +1,14 @@
 use crate::error::Result;
-use crate::io::BufMutExt;
-use crate::message::{
-    BackendMessage, BackendMessageFormat, FrontendMessage, FrontendMessageFormat,
-};
-use sqlx_core::bytes::{Buf, Bytes};
-use sqlx_core::Error;
-use std::num::Saturating;
+use crate::io::{BufExt, BufMutExt, Decode, Encode};
+use sqlx_core::bytes::{Buf, BufMut, Bytes};
 use std::ops::Deref;
 
 /// The same structure is sent for both `CopyInResponse` and `CopyOutResponse`
-pub struct CopyResponseData {
+pub struct CopyResponse {
     pub format: i8,
     pub num_columns: i16,
     pub format_codes: Vec<i16>,
 }
-
-pub struct CopyInResponse(pub CopyResponseData);
-
-#[allow(dead_code)]
-pub struct CopyOutResponse(pub CopyResponseData);
 
 pub struct CopyData<B>(pub B);
 
@@ -28,15 +18,14 @@ pub struct CopyFail {
 
 pub struct CopyDone;
 
-impl CopyResponseData {
-    #[inline]
-    fn decode(mut buf: Bytes) -> Result<Self> {
+impl Decode<'_> for CopyResponse {
+    fn decode_with(mut buf: Bytes, _: ()) -> Result<Self> {
         let format = buf.get_i8();
         let num_columns = buf.get_i16();
 
         let format_codes = (0..num_columns).map(|_| buf.get_i16()).collect();
 
-        Ok(CopyResponseData {
+        Ok(CopyResponse {
             format,
             num_columns,
             format_codes,
@@ -44,65 +33,40 @@ impl CopyResponseData {
     }
 }
 
-impl BackendMessage for CopyInResponse {
-    const FORMAT: BackendMessageFormat = BackendMessageFormat::CopyInResponse;
-
-    #[inline(always)]
-    fn decode_body(buf: Bytes) -> std::result::Result<Self, Error> {
-        Ok(Self(CopyResponseData::decode(buf)?))
+impl Decode<'_> for CopyData<Bytes> {
+    fn decode_with(buf: Bytes, _: ()) -> Result<Self> {
+        // well.. that was easy
+        Ok(CopyData(buf))
     }
 }
 
-impl BackendMessage for CopyOutResponse {
-    const FORMAT: BackendMessageFormat = BackendMessageFormat::CopyOutResponse;
-
-    #[inline(always)]
-    fn decode_body(buf: Bytes) -> std::result::Result<Self, Error> {
-        Ok(Self(CopyResponseData::decode(buf)?))
-    }
-}
-
-impl BackendMessage for CopyData<Bytes> {
-    const FORMAT: BackendMessageFormat = BackendMessageFormat::CopyData;
-
-    #[inline(always)]
-    fn decode_body(buf: Bytes) -> std::result::Result<Self, Error> {
-        Ok(Self(buf))
-    }
-}
-
-impl<B: Deref<Target = [u8]>> FrontendMessage for CopyData<B> {
-    const FORMAT: FrontendMessageFormat = FrontendMessageFormat::CopyData;
-
-    #[inline(always)]
-    fn body_size_hint(&self) -> Saturating<usize> {
-        Saturating(self.0.len())
-    }
-
-    #[inline(always)]
-    fn encode_body(&self, buf: &mut Vec<u8>) -> Result<(), Error> {
+impl<B: Deref<Target = [u8]>> Encode<'_> for CopyData<B> {
+    fn encode_with(&self, buf: &mut Vec<u8>, _context: ()) {
+        buf.push(b'd');
+        buf.put_u32(self.0.len() as u32 + 4);
         buf.extend_from_slice(&self.0);
-        Ok(())
     }
 }
 
-impl FrontendMessage for CopyFail {
-    const FORMAT: FrontendMessageFormat = FrontendMessageFormat::CopyFail;
-
-    #[inline(always)]
-    fn body_size_hint(&self) -> Saturating<usize> {
-        Saturating(self.message.len())
+impl Decode<'_> for CopyFail {
+    fn decode_with(mut buf: Bytes, _: ()) -> Result<Self> {
+        Ok(CopyFail {
+            message: buf.get_str_nul()?,
+        })
     }
+}
 
-    #[inline(always)]
-    fn encode_body(&self, buf: &mut Vec<u8>) -> std::result::Result<(), Error> {
+impl Encode<'_> for CopyFail {
+    fn encode_with(&self, buf: &mut Vec<u8>, _: ()) {
+        let len = 4 + self.message.len() + 1;
+
+        buf.push(b'f'); // to pay respects
+        buf.put_u32(len as u32);
         buf.put_str_nul(&self.message);
-        Ok(())
     }
 }
 
 impl CopyFail {
-    #[inline(always)]
     pub fn new(msg: impl Into<String>) -> CopyFail {
         CopyFail {
             message: msg.into(),
@@ -110,32 +74,23 @@ impl CopyFail {
     }
 }
 
-impl FrontendMessage for CopyDone {
-    const FORMAT: FrontendMessageFormat = FrontendMessageFormat::CopyDone;
-    #[inline(always)]
-    fn body_size_hint(&self) -> Saturating<usize> {
-        Saturating(0)
-    }
-
-    #[inline(always)]
-    fn encode_body(&self, _buf: &mut Vec<u8>) -> std::result::Result<(), Error> {
-        Ok(())
+impl Decode<'_> for CopyDone {
+    fn decode_with(buf: Bytes, _: ()) -> Result<Self> {
+        if buf.is_empty() {
+            Ok(CopyDone)
+        } else {
+            Err(err_protocol!(
+                "expected no data for CopyDone, got: {:?}",
+                buf
+            ))
+        }
     }
 }
 
-impl BackendMessage for CopyDone {
-    const FORMAT: BackendMessageFormat = BackendMessageFormat::CopyDone;
-
-    #[inline(always)]
-    fn decode_body(bytes: Bytes) -> std::result::Result<Self, Error> {
-        if !bytes.is_empty() {
-            // Not fatal but may indicate a protocol change
-            tracing::debug!(
-                "Postgres backend returned non-empty message for CopyDone: \"{}\"",
-                bytes.escape_ascii()
-            )
-        }
-
-        Ok(CopyDone)
+impl Encode<'_> for CopyDone {
+    fn encode_with(&self, buf: &mut Vec<u8>, _: ()) {
+        buf.reserve(4);
+        buf.push(b'c');
+        buf.put_u32(4);
     }
 }

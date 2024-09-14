@@ -37,7 +37,6 @@
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
 #![cfg_attr(feature = "nightly", warn(fuzzy_provenance_casts))]
-#![cfg_attr(feature = "nightly", allow(internal_features))]
 
 #[cfg(test)]
 #[macro_use]

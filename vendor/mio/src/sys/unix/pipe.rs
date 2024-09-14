@@ -3,7 +3,7 @@
 //! See the [`new`] function for documentation.
 
 use std::io;
-use std::os::fd::RawFd;
+use std::os::unix::io::RawFd;
 
 pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
     let mut fds: [RawFd; 2] = [-1, -1];
@@ -12,8 +12,6 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
         target_os = "android",
         target_os = "dragonfly",
         target_os = "freebsd",
-        target_os = "fuchsia",
-        target_os = "hurd",
         target_os = "linux",
         target_os = "netbsd",
         target_os = "openbsd",
@@ -30,14 +28,11 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
 
     #[cfg(any(
         target_os = "aix",
-        target_os = "haiku",
         target_os = "ios",
         target_os = "macos",
         target_os = "tvos",
-        target_os = "visionos",
         target_os = "watchos",
         target_os = "espidf",
-        target_os = "nto",
     ))]
     unsafe {
         // For platforms that don't have `pipe2(2)` we need to manually set the
@@ -59,13 +54,33 @@ pub(crate) fn new_raw() -> io::Result<[RawFd; 2]> {
         }
     }
 
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "illumos",
+        target_os = "ios",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "redox",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "espidf",
+        target_os = "solaris",
+        target_os = "vita",
+    )))]
+    compile_error!("unsupported target for `mio::unix::pipe`");
+
     Ok(fds)
 }
 
 cfg_os_ext! {
 use std::fs::File;
 use std::io::{IoSlice, IoSliceMut, Read, Write};
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::process::{ChildStderr, ChildStdin, ChildStdout};
 
 use crate::io_source::IoSource;
@@ -245,7 +260,7 @@ impl Sender {
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
-    /// use std::os::fd::AsRawFd;
+    /// use std::os::unix::io::AsRawFd;
     /// use mio::unix::pipe;
     ///
     /// let (sender, receiver) = pipe::new()?;
@@ -378,12 +393,6 @@ impl IntoRawFd for Sender {
     }
 }
 
-impl AsFd for Sender {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.inner.as_fd()
-    }
-}
-
 /// Receiving end of an Unix pipe.
 ///
 /// See [`new`] for documentation, including examples.
@@ -416,7 +425,7 @@ impl Receiver {
     /// #
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use std::io;
-    /// use std::os::fd::AsRawFd;
+    /// use std::os::unix::io::AsRawFd;
     /// use mio::unix::pipe;
     ///
     /// let (sender, receiver) = pipe::new()?;
@@ -531,9 +540,11 @@ impl From<ChildStderr> for Receiver {
     }
 }
 
-impl IntoRawFd for Receiver {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_inner().into_raw_fd()
+impl FromRawFd for Receiver {
+    unsafe fn from_raw_fd(fd: RawFd) -> Receiver {
+        Receiver {
+            inner: IoSource::new(File::from_raw_fd(fd)),
+        }
     }
 }
 
@@ -543,17 +554,9 @@ impl AsRawFd for Receiver {
     }
 }
 
-impl FromRawFd for Receiver {
-    unsafe fn from_raw_fd(fd: RawFd) -> Receiver {
-        Receiver {
-            inner: IoSource::new(File::from_raw_fd(fd)),
-        }
-    }
-}
-
-impl AsFd for Receiver {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.inner.as_fd()
+impl IntoRawFd for Receiver {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_inner().into_raw_fd()
     }
 }
 

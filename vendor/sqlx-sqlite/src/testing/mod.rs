@@ -11,7 +11,10 @@ const BASE_PATH: &str = "target/sqlx/test-dbs";
 
 impl TestSupport for Sqlite {
     fn test_context(args: &TestArgs) -> BoxFuture<'_, Result<TestContext<Self>, Error>> {
-        Box::pin(async move { test_context(args).await })
+        Box::pin(async move {
+            let res = test_context(args).await;
+            res
+        })
     }
 
     fn cleanup_test(db_name: &str) -> BoxFuture<'_, Result<(), Error>> {

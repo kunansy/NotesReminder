@@ -1,14 +1,11 @@
 //! Types and traits for passing arguments to SQL queries.
 
-use crate::database::Database;
+use crate::database::{Database, HasArguments};
 use crate::encode::Encode;
-use crate::error::BoxDynError;
 use crate::types::Type;
 use std::fmt::{self, Write};
 
 /// A tuple of arguments to be sent to the database.
-// This lint is designed for general collections, but `Arguments` is not meant to be as such.
-#[allow(clippy::len_without_is_empty)]
 pub trait Arguments<'q>: Send + Sized + Default {
     type Database: Database;
 
@@ -17,20 +14,17 @@ pub trait Arguments<'q>: Send + Sized + Default {
     fn reserve(&mut self, additional: usize, size: usize);
 
     /// Add the value to the end of the arguments.
-    fn add<T>(&mut self, value: T) -> Result<(), BoxDynError>
+    fn add<T>(&mut self, value: T)
     where
-        T: 'q + Encode<'q, Self::Database> + Type<Self::Database>;
-
-    /// The number of arguments that were already added.
-    fn len(&self) -> usize;
+        T: 'q + Send + Encode<'q, Self::Database> + Type<Self::Database>;
 
     fn format_placeholder<W: Write>(&self, writer: &mut W) -> fmt::Result {
         writer.write_str("?")
     }
 }
 
-pub trait IntoArguments<'q, DB: Database>: Sized + Send {
-    fn into_arguments(self) -> <DB as Database>::Arguments<'q>;
+pub trait IntoArguments<'q, DB: HasArguments<'q>>: Sized + Send {
+    fn into_arguments(self) -> <DB as HasArguments<'q>>::Arguments;
 }
 
 // NOTE: required due to lack of lazy normalization
@@ -51,10 +45,10 @@ macro_rules! impl_into_arguments_for_arguments {
 }
 
 /// used by the query macros to prevent supernumerary `.bind()` calls
-pub struct ImmutableArguments<'q, DB: Database>(pub <DB as Database>::Arguments<'q>);
+pub struct ImmutableArguments<'q, DB: HasArguments<'q>>(pub <DB as HasArguments<'q>>::Arguments);
 
-impl<'q, DB: Database> IntoArguments<'q, DB> for ImmutableArguments<'q, DB> {
-    fn into_arguments(self) -> <DB as Database>::Arguments<'q> {
+impl<'q, DB: HasArguments<'q>> IntoArguments<'q, DB> for ImmutableArguments<'q, DB> {
+    fn into_arguments(self) -> <DB as HasArguments<'q>>::Arguments {
         self.0
     }
 }

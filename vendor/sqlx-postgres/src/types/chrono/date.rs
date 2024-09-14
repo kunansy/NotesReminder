@@ -1,12 +1,10 @@
-use std::mem;
-
-use chrono::{NaiveDate, TimeDelta};
-
 use crate::decode::Decode;
 use crate::encode::{Encode, IsNull};
 use crate::error::BoxDynError;
 use crate::types::Type;
 use crate::{PgArgumentBuffer, PgHasArrayType, PgTypeInfo, PgValueFormat, PgValueRef, Postgres};
+use chrono::{Duration, NaiveDate};
+use std::mem;
 
 impl Type<Postgres> for NaiveDate {
     fn type_info() -> PgTypeInfo {
@@ -21,16 +19,10 @@ impl PgHasArrayType for NaiveDate {
 }
 
 impl Encode<'_, Postgres> for NaiveDate {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         // DATE is encoded as the days since epoch
-        let days: i32 = (*self - postgres_epoch_date())
-            .num_days()
-            .try_into()
-            .map_err(|_| {
-                format!("value {self:?} would overflow binary encoding for Postgres DATE")
-            })?;
-
-        Encode::<Postgres>::encode(days, buf)
+        let days = (*self - postgres_epoch_date()).num_days() as i32;
+        Encode::<Postgres>::encode(&days, buf)
     }
 
     fn size_hint(&self) -> usize {
@@ -44,13 +36,7 @@ impl<'r> Decode<'r, Postgres> for NaiveDate {
             PgValueFormat::Binary => {
                 // DATE is encoded as the days since epoch
                 let days: i32 = Decode::<Postgres>::decode(value)?;
-
-                let days = TimeDelta::try_days(days.into())
-                    .unwrap_or_else(|| {
-                        unreachable!("BUG: days ({days}) as `i32` multiplied into seconds should not overflow `i64`")
-                    });
-
-                postgres_epoch_date() + days
+                postgres_epoch_date() + Duration::days(days.into())
             }
 
             PgValueFormat::Text => NaiveDate::parse_from_str(value.as_str()?, "%Y-%m-%d")?,

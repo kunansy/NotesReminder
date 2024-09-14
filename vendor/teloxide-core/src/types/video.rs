@@ -1,12 +1,12 @@
 use mime::Mime;
 use serde::{Deserialize, Serialize};
 
-use crate::types::{FileMeta, PhotoSize, Seconds};
+use crate::types::{FileMeta, PhotoSize};
 
 /// This object represents a video file.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#video).
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Video {
     /// Metadata of the video file.
@@ -20,10 +20,10 @@ pub struct Video {
     pub height: u32,
 
     /// Duration of the video in seconds as defined by sender.
-    pub duration: Seconds,
+    pub duration: u32,
 
     /// Video thumbnail.
-    pub thumbnail: Option<PhotoSize>,
+    pub thumb: Option<PhotoSize>,
 
     /// Original filename as defined by sender
     pub file_name: Option<String>,

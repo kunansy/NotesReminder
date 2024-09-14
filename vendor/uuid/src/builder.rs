@@ -54,7 +54,7 @@ impl Uuid {
     ///
     /// # References
     ///
-    /// * [Nil UUID in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-5.9)
+    /// * [Nil UUID in RFC4122](https://tools.ietf.org/html/rfc4122.html#section-4.1.7)
     ///
     /// # Examples
     ///
@@ -80,7 +80,7 @@ impl Uuid {
     ///
     /// # References
     ///
-    /// * [Max UUID in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-5.10)
+    /// * [Max UUID in Draft RFC: New UUID Formats, Version 4](https://datatracker.ietf.org/doc/html/draft-peabody-dispatch-new-uuid-format-04#section-5.4)
     ///
     /// # Examples
     ///
@@ -549,11 +549,9 @@ impl Builder {
         Builder(Uuid::from_bytes_le(b))
     }
 
-    /// Creates a `Builder` for a version 1 UUID using the supplied timestamp, counter, and node ID.
-    pub const fn from_gregorian_timestamp(ticks: u64, counter: u16, node_id: &[u8; 6]) -> Self {
-        Builder(timestamp::encode_gregorian_timestamp(
-            ticks, counter, node_id,
-        ))
+    /// Creates a `Builder` for a version 1 UUID using the supplied timestamp and node ID.
+    pub const fn from_rfc4122_timestamp(ticks: u64, counter: u16, node_id: &[u8; 6]) -> Self {
+        Builder(timestamp::encode_rfc4122_timestamp(ticks, counter, node_id))
     }
 
     /// Creates a `Builder` for a version 3 UUID using the supplied MD5 hashed bytes.
@@ -598,24 +596,22 @@ impl Builder {
             .with_version(Version::Sha1)
     }
 
-    /// Creates a `Builder` for a version 6 UUID using the supplied timestamp, counter, and node ID.
+    /// Creates a `Builder` for a version 6 UUID using the supplied timestamp and node ID.
     ///
     /// This method will encode the ticks, counter, and node ID in a sortable UUID.
-    pub const fn from_sorted_gregorian_timestamp(
+    pub const fn from_sorted_rfc4122_timestamp(
         ticks: u64,
         counter: u16,
         node_id: &[u8; 6],
     ) -> Self {
-        Builder(timestamp::encode_sorted_gregorian_timestamp(
+        Builder(timestamp::encode_sorted_rfc4122_timestamp(
             ticks, counter, node_id,
         ))
     }
 
-    /// Creates a `Builder` for a version 7 UUID using the supplied Unix timestamp and counter bytes.
+    /// Creates a `Builder` for a version 7 UUID using the supplied Unix timestamp and random bytes.
     ///
-    /// This method will set the variant field within the counter bytes without attempting to shift
-    /// the data around it. Callers using the counter as a monotonic value should be careful not to
-    /// store significant data in the 2 least significant bits of the 3rd byte.
+    /// This method assumes the bytes are already sufficiently random.
     ///
     /// # Examples
     ///
@@ -640,10 +636,10 @@ impl Builder {
     /// # Ok(())
     /// # }
     /// ```
-    pub const fn from_unix_timestamp_millis(millis: u64, counter_random_bytes: &[u8; 10]) -> Self {
+    pub const fn from_unix_timestamp_millis(millis: u64, random_bytes: &[u8; 10]) -> Self {
         Builder(timestamp::encode_unix_timestamp_millis(
             millis,
-            counter_random_bytes,
+            random_bytes,
         ))
     }
 
@@ -903,28 +899,5 @@ impl Builder {
     /// ```
     pub const fn into_uuid(self) -> Uuid {
         self.0
-    }
-}
-
-#[doc(hidden)]
-impl Builder {
-    #[deprecated(
-        since = "1.10.0",
-        note = "use `Builder::from_gregorian_timestamp(ticks, counter, node_id)`"
-    )]
-    pub const fn from_rfc4122_timestamp(ticks: u64, counter: u16, node_id: &[u8; 6]) -> Self {
-        Builder::from_gregorian_timestamp(ticks, counter, node_id)
-    }
-
-    #[deprecated(
-        since = "1.10.0",
-        note = "use `Builder::from_sorted_gregorian_timestamp(ticks, counter, node_id)`"
-    )]
-    pub const fn from_sorted_rfc4122_timestamp(
-        ticks: u64,
-        counter: u16,
-        node_id: &[u8; 6],
-    ) -> Self {
-        Builder::from_sorted_gregorian_timestamp(ticks, counter, node_id)
     }
 }

@@ -6,11 +6,13 @@
 
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
+use std::cell::UnsafeCell;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 cfg_io_util! {
@@ -36,7 +38,8 @@ cfg_io_util! {
         let is_write_vectored = stream.is_write_vectored();
 
         let inner = Arc::new(Inner {
-            stream: Mutex::new(stream),
+            locked: AtomicBool::new(false),
+            stream: UnsafeCell::new(stream),
             is_write_vectored,
         });
 
@@ -51,19 +54,13 @@ cfg_io_util! {
 }
 
 struct Inner<T> {
-    stream: Mutex<T>,
+    locked: AtomicBool,
+    stream: UnsafeCell<T>,
     is_write_vectored: bool,
 }
 
-impl<T> Inner<T> {
-    fn with_lock<R>(&self, f: impl FnOnce(Pin<&mut T>) -> R) -> R {
-        let mut guard = self.stream.lock().unwrap();
-
-        // safety: we do not move the stream.
-        let stream = unsafe { Pin::new_unchecked(&mut *guard) };
-
-        f(stream)
-    }
+struct Guard<'a, T> {
+    inner: &'a Inner<T>,
 }
 
 impl<T> ReadHalf<T> {
@@ -79,7 +76,8 @@ impl<T> ReadHalf<T> {
     ///
     /// If this `ReadHalf` and the given `WriteHalf` do not originate from the
     /// same `split` operation this method will panic.
-    /// This can be checked ahead of time by calling [`is_pair_of()`](Self::is_pair_of).
+    /// This can be checked ahead of time by comparing the stream ID
+    /// of the two halves.
     #[track_caller]
     pub fn unsplit(self, wr: WriteHalf<T>) -> T
     where
@@ -92,7 +90,7 @@ impl<T> ReadHalf<T> {
                 .ok()
                 .expect("`Arc::try_unwrap` failed");
 
-            inner.stream.into_inner().unwrap()
+            inner.stream.into_inner()
         } else {
             panic!("Unrelated `split::Write` passed to `split::Read::unsplit`.")
         }
@@ -113,7 +111,8 @@ impl<T: AsyncRead> AsyncRead for ReadHalf<T> {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.inner.with_lock(|stream| stream.poll_read(cx, buf))
+        let mut inner = ready!(self.inner.poll_lock(cx));
+        inner.stream_pin().poll_read(cx, buf)
     }
 }
 
@@ -123,15 +122,18 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        self.inner.with_lock(|stream| stream.poll_write(cx, buf))
+        let mut inner = ready!(self.inner.poll_lock(cx));
+        inner.stream_pin().poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.inner.with_lock(|stream| stream.poll_flush(cx))
+        let mut inner = ready!(self.inner.poll_lock(cx));
+        inner.stream_pin().poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.inner.with_lock(|stream| stream.poll_shutdown(cx))
+        let mut inner = ready!(self.inner.poll_lock(cx));
+        inner.stream_pin().poll_shutdown(cx)
     }
 
     fn poll_write_vectored(
@@ -139,12 +141,45 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        self.inner
-            .with_lock(|stream| stream.poll_write_vectored(cx, bufs))
+        let mut inner = ready!(self.inner.poll_lock(cx));
+        inner.stream_pin().poll_write_vectored(cx, bufs)
     }
 
     fn is_write_vectored(&self) -> bool {
         self.inner.is_write_vectored
+    }
+}
+
+impl<T> Inner<T> {
+    fn poll_lock(&self, cx: &mut Context<'_>) -> Poll<Guard<'_, T>> {
+        if self
+            .locked
+            .compare_exchange(false, true, Acquire, Acquire)
+            .is_ok()
+        {
+            Poll::Ready(Guard { inner: self })
+        } else {
+            // Spin... but investigate a better strategy
+
+            std::thread::yield_now();
+            cx.waker().wake_by_ref();
+
+            Poll::Pending
+        }
+    }
+}
+
+impl<T> Guard<'_, T> {
+    fn stream_pin(&mut self) -> Pin<&mut T> {
+        // safety: the stream is pinned in `Arc` and the `Guard` ensures mutual
+        // exclusion.
+        unsafe { Pin::new_unchecked(&mut *self.inner.stream.get()) }
+    }
+}
+
+impl<T> Drop for Guard<'_, T> {
+    fn drop(&mut self) {
+        self.inner.locked.store(false, Release);
     }
 }
 

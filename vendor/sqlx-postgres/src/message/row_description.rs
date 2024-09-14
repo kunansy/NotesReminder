@@ -1,8 +1,7 @@
 use sqlx_core::bytes::{Buf, Bytes};
 
 use crate::error::Error;
-use crate::io::BufExt;
-use crate::message::{BackendMessage, BackendMessageFormat};
+use crate::io::{BufExt, Decode};
 use crate::types::Oid;
 
 #[derive(Debug)]
@@ -28,43 +27,23 @@ pub struct Field {
 
     /// The data type size (see pg_type.typlen). Note that negative values denote
     /// variable-width types.
-    #[allow(dead_code)]
     pub data_type_size: i16,
 
     /// The type modifier (see pg_attribute.atttypmod). The meaning of the
     /// modifier is type-specific.
-    #[allow(dead_code)]
     pub type_modifier: i32,
 
     /// The format code being used for the field.
-    #[allow(dead_code)]
     pub format: i16,
 }
 
-impl BackendMessage for RowDescription {
-    const FORMAT: BackendMessageFormat = BackendMessageFormat::RowDescription;
-
-    fn decode_body(mut buf: Bytes) -> Result<Self, Error> {
-        if buf.len() < 2 {
-            return Err(err_protocol!(
-                "expected at least 2 bytes, got {}",
-                buf.len()
-            ));
-        }
-
+impl Decode<'_> for RowDescription {
+    fn decode_with(mut buf: Bytes, _: ()) -> Result<Self, Error> {
         let cnt = buf.get_u16();
         let mut fields = Vec::with_capacity(cnt as usize);
 
         for _ in 0..cnt {
             let name = buf.get_str_nul()?.to_owned();
-
-            if buf.len() < 18 {
-                return Err(err_protocol!(
-                    "expected at least 18 bytes after field name {name:?}, got {}",
-                    buf.len()
-                ));
-            }
-
             let relation_id = buf.get_i32();
             let relation_attribute_no = buf.get_i16();
             let data_type_id = Oid(buf.get_u32());

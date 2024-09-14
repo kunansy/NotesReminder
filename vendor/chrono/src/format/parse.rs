@@ -10,8 +10,8 @@ use core::usize;
 
 use super::scan;
 use super::{Fixed, InternalFixed, InternalInternal, Item, Numeric, Pad, Parsed};
-use super::{ParseError, ParseResult};
-use super::{BAD_FORMAT, INVALID, OUT_OF_RANGE, TOO_LONG, TOO_SHORT};
+use super::{ParseError, ParseErrorKind, ParseResult};
+use super::{BAD_FORMAT, INVALID, NOT_ENOUGH, OUT_OF_RANGE, TOO_LONG, TOO_SHORT};
 use crate::{DateTime, FixedOffset, Weekday};
 
 fn set_weekday_with_num_days_from_sunday(p: &mut Parsed, v: i64) -> ParseResult<()> {
@@ -142,7 +142,10 @@ fn parse_rfc2822<'a>(parsed: &mut Parsed, mut s: &'a str) -> ParseResult<(&'a st
     }
 
     s = scan::space(s)?; // mandatory
-    parsed.set_offset(i64::from(try_consume!(scan::timezone_offset_2822(s))))?;
+    if let Some(offset) = try_consume!(scan::timezone_offset_2822(s)) {
+        // only set the offset when it is definitely known (i.e. not `-0000`)
+        parsed.set_offset(i64::from(offset))?;
+    }
 
     // optional comments
     while let Ok((s_out, ())) = scan::comment_2822(s) {
@@ -213,12 +216,7 @@ pub(crate) fn parse_rfc3339<'a>(parsed: &mut Parsed, mut s: &'a str) -> ParseRes
     }
 
     let offset = try_consume!(scan::timezone_offset(s, |s| scan::char(s, b':'), true, false, true));
-    // This range check is similar to the one in `FixedOffset::east_opt`, so it would be redundant.
-    // But it is possible to read the offset directly from `Parsed`. We want to only successfully
-    // populate `Parsed` if the input is fully valid RFC 3339.
-    // Max for the hours field is `23`, and for the minutes field `59`.
-    const MAX_RFC3339_OFFSET: i32 = (23 * 60 + 59) * 60;
-    if !(-MAX_RFC3339_OFFSET..=MAX_RFC3339_OFFSET).contains(&offset) {
+    if offset <= -86_400 || offset >= 86_400 {
         return Err(OUT_OF_RANGE);
     }
     parsed.set_offset(i64::from(offset))?;
@@ -247,11 +245,7 @@ where
     I: Iterator<Item = B>,
     B: Borrow<Item<'a>>,
 {
-    match parse_internal(parsed, s, items) {
-        Ok("") => Ok(()),
-        Ok(_) => Err(TOO_LONG), // if there are trailing chars it is an error
-        Err(e) => Err(e),
-    }
+    parse_internal(parsed, s, items).map(|_| ()).map_err(|(_s, e)| e)
 }
 
 /// Tries to parse given string into `parsed` with given formatting items.
@@ -277,14 +271,18 @@ where
     I: Iterator<Item = B>,
     B: Borrow<Item<'a>>,
 {
-    parse_internal(parsed, s, items)
+    match parse_internal(parsed, s, items) {
+        Ok(s) => Ok(s),
+        Err((s, ParseError(ParseErrorKind::TooLong))) => Ok(s),
+        Err((_s, e)) => Err(e),
+    }
 }
 
 fn parse_internal<'a, 'b, I, B>(
     parsed: &mut Parsed,
     mut s: &'b str,
     items: I,
-) -> Result<&'b str, ParseError>
+) -> Result<&'b str, (&'b str, ParseError)>
 where
     I: Iterator<Item = B>,
     B: Borrow<Item<'a>>,
@@ -296,7 +294,7 @@ where
                     s = s_;
                     v
                 }
-                Err(e) => return Err(e),
+                Err(e) => return Err((s, e)),
             }
         }};
     }
@@ -305,10 +303,10 @@ where
         match *item.borrow() {
             Item::Literal(prefix) => {
                 if s.len() < prefix.len() {
-                    return Err(TOO_SHORT);
+                    return Err((s, TOO_SHORT));
                 }
                 if !s.starts_with(prefix) {
-                    return Err(INVALID);
+                    return Err((s, INVALID));
                 }
                 s = &s[prefix.len()..];
             }
@@ -316,10 +314,10 @@ where
             #[cfg(feature = "alloc")]
             Item::OwnedLiteral(ref prefix) => {
                 if s.len() < prefix.len() {
-                    return Err(TOO_SHORT);
+                    return Err((s, TOO_SHORT));
                 }
                 if !s.starts_with(&prefix[..]) {
-                    return Err(INVALID);
+                    return Err((s, INVALID));
                 }
                 s = &s[prefix.len()..];
             }
@@ -367,7 +365,7 @@ where
                 let v = if signed {
                     if s.starts_with('-') {
                         let v = try_consume!(scan::number(&s[1..], 1, usize::MAX));
-                        0i64.checked_sub(v).ok_or(OUT_OF_RANGE)?
+                        0i64.checked_sub(v).ok_or((s, OUT_OF_RANGE))?
                     } else if s.starts_with('+') {
                         try_consume!(scan::number(&s[1..], 1, usize::MAX))
                     } else {
@@ -377,7 +375,7 @@ where
                 } else {
                     try_consume!(scan::number(s, 1, width))
                 };
-                set(parsed, v)?;
+                set(parsed, v).map_err(|e| (s, e))?;
             }
 
             Item::Fixed(ref spec) => {
@@ -386,66 +384,66 @@ where
                 match spec {
                     &ShortMonthName => {
                         let month0 = try_consume!(scan::short_month0(s));
-                        parsed.set_month(i64::from(month0) + 1)?;
+                        parsed.set_month(i64::from(month0) + 1).map_err(|e| (s, e))?;
                     }
 
                     &LongMonthName => {
                         let month0 = try_consume!(scan::short_or_long_month0(s));
-                        parsed.set_month(i64::from(month0) + 1)?;
+                        parsed.set_month(i64::from(month0) + 1).map_err(|e| (s, e))?;
                     }
 
                     &ShortWeekdayName => {
                         let weekday = try_consume!(scan::short_weekday(s));
-                        parsed.set_weekday(weekday)?;
+                        parsed.set_weekday(weekday).map_err(|e| (s, e))?;
                     }
 
                     &LongWeekdayName => {
                         let weekday = try_consume!(scan::short_or_long_weekday(s));
-                        parsed.set_weekday(weekday)?;
+                        parsed.set_weekday(weekday).map_err(|e| (s, e))?;
                     }
 
                     &LowerAmPm | &UpperAmPm => {
                         if s.len() < 2 {
-                            return Err(TOO_SHORT);
+                            return Err((s, TOO_SHORT));
                         }
                         let ampm = match (s.as_bytes()[0] | 32, s.as_bytes()[1] | 32) {
                             (b'a', b'm') => false,
                             (b'p', b'm') => true,
-                            _ => return Err(INVALID),
+                            _ => return Err((s, INVALID)),
                         };
-                        parsed.set_ampm(ampm)?;
+                        parsed.set_ampm(ampm).map_err(|e| (s, e))?;
                         s = &s[2..];
                     }
 
                     &Nanosecond | &Nanosecond3 | &Nanosecond6 | &Nanosecond9 => {
                         if s.starts_with('.') {
                             let nano = try_consume!(scan::nanosecond(&s[1..]));
-                            parsed.set_nanosecond(nano)?;
+                            parsed.set_nanosecond(nano).map_err(|e| (s, e))?;
                         }
                     }
 
                     &Internal(InternalFixed { val: InternalInternal::Nanosecond3NoDot }) => {
                         if s.len() < 3 {
-                            return Err(TOO_SHORT);
+                            return Err((s, TOO_SHORT));
                         }
                         let nano = try_consume!(scan::nanosecond_fixed(s, 3));
-                        parsed.set_nanosecond(nano)?;
+                        parsed.set_nanosecond(nano).map_err(|e| (s, e))?;
                     }
 
                     &Internal(InternalFixed { val: InternalInternal::Nanosecond6NoDot }) => {
                         if s.len() < 6 {
-                            return Err(TOO_SHORT);
+                            return Err((s, TOO_SHORT));
                         }
                         let nano = try_consume!(scan::nanosecond_fixed(s, 6));
-                        parsed.set_nanosecond(nano)?;
+                        parsed.set_nanosecond(nano).map_err(|e| (s, e))?;
                     }
 
                     &Internal(InternalFixed { val: InternalInternal::Nanosecond9NoDot }) => {
                         if s.len() < 9 {
-                            return Err(TOO_SHORT);
+                            return Err((s, TOO_SHORT));
                         }
                         let nano = try_consume!(scan::nanosecond_fixed(s, 9));
-                        parsed.set_nanosecond(nano)?;
+                        parsed.set_nanosecond(nano).map_err(|e| (s, e))?;
                     }
 
                     &TimezoneName => {
@@ -463,7 +461,7 @@ where
                             false,
                             true,
                         ));
-                        parsed.set_offset(i64::from(offset))?;
+                        parsed.set_offset(i64::from(offset)).map_err(|e| (s, e))?;
                     }
 
                     &TimezoneOffsetColonZ | &TimezoneOffsetZ => {
@@ -474,7 +472,7 @@ where
                             false,
                             true,
                         ));
-                        parsed.set_offset(i64::from(offset))?;
+                        parsed.set_offset(i64::from(offset)).map_err(|e| (s, e))?;
                     }
                     &Internal(InternalFixed {
                         val: InternalInternal::TimezoneOffsetPermissive,
@@ -486,7 +484,7 @@ where
                             true,
                             true,
                         ));
-                        parsed.set_offset(i64::from(offset))?;
+                        parsed.set_offset(i64::from(offset)).map_err(|e| (s, e))?;
                     }
 
                     &RFC2822 => try_consume!(parse_rfc2822(parsed, s)),
@@ -501,11 +499,17 @@ where
             }
 
             Item::Error => {
-                return Err(BAD_FORMAT);
+                return Err((s, BAD_FORMAT));
             }
         }
     }
-    Ok(s)
+
+    // if there are trailling chars, it is an error
+    if !s.is_empty() {
+        Err((s, TOO_LONG))
+    } else {
+        Ok(s)
+    }
 }
 
 /// Accepts a relaxed form of RFC3339.
@@ -564,7 +568,11 @@ fn parse_rfc3339_relaxed<'a>(parsed: &mut Parsed, mut s: &'a str) -> ParseResult
         Item::Space(""),
     ];
 
-    s = parse_internal(parsed, s, DATE_ITEMS.iter())?;
+    s = match parse_internal(parsed, s, DATE_ITEMS.iter()) {
+        Err((remainder, e)) if e.0 == ParseErrorKind::TooLong => remainder,
+        Err((_s, e)) => return Err(e),
+        Ok(_) => return Err(NOT_ENOUGH),
+    };
 
     s = match s.as_bytes().first() {
         Some(&b't' | &b'T' | &b' ') => &s[1..],
@@ -572,7 +580,11 @@ fn parse_rfc3339_relaxed<'a>(parsed: &mut Parsed, mut s: &'a str) -> ParseResult
         None => return Err(TOO_SHORT),
     };
 
-    s = parse_internal(parsed, s, TIME_ITEMS.iter())?;
+    s = match parse_internal(parsed, s, TIME_ITEMS.iter()) {
+        Err((s, e)) if e.0 == ParseErrorKind::TooLong => s,
+        Err((_s, e)) => return Err(e),
+        Ok(_) => return Err(NOT_ENOUGH),
+    };
     s = s.trim_start();
     let (s, offset) = if s.len() >= 3 && "UTC".as_bytes().eq_ignore_ascii_case(&s.as_bytes()[..3]) {
         (&s[3..], 0)
@@ -1627,6 +1639,7 @@ mod tests {
             ("Tue, 20 Jan 2015 17:35:90 -0800", Err(OUT_OF_RANGE)), // bad second
             ("Tue, 20 Jan 2015 17:35:20 -0890", Err(OUT_OF_RANGE)), // bad offset
             ("6 Jun 1944 04:00:00Z", Err(INVALID)),            // bad offset (zulu not allowed)
+            ("Tue, 20 Jan 2015 17:35:20 HAS", Err(NOT_ENOUGH)), // bad named time zone
             // named timezones that have specific timezone offsets
             // see https://www.rfc-editor.org/rfc/rfc2822#section-4.3
             ("Tue, 20 Jan 2015 17:35:20 GMT", Ok(ymd_hmsn(2015, 1, 20, 17, 35, 20, 0, 0))),
@@ -1648,14 +1661,14 @@ mod tests {
             ("Tue, 20 Jan 2015 17:35:20 K", Ok(ymd_hmsn(2015, 1, 20, 17, 35, 20, 0, 0))),
             ("Tue, 20 Jan 2015 17:35:20 k", Ok(ymd_hmsn(2015, 1, 20, 17, 35, 20, 0, 0))),
             // named single-letter timezone "J" is specifically not valid
-            ("Tue, 20 Jan 2015 17:35:20 J", Err(INVALID)),
+            ("Tue, 20 Jan 2015 17:35:20 J", Err(NOT_ENOUGH)),
             ("Tue, 20 Jan 2015 17:35:20 -0890", Err(OUT_OF_RANGE)), // bad offset minutes
             ("Tue, 20 Jan 2015 17:35:20Z", Err(INVALID)),           // bad offset: zulu not allowed
-            ("Tue, 20 Jan 2015 17:35:20 Zulu", Err(INVALID)),       // bad offset: zulu not allowed
-            ("Tue, 20 Jan 2015 17:35:20 ZULU", Err(INVALID)),       // bad offset: zulu not allowed
+            ("Tue, 20 Jan 2015 17:35:20 Zulu", Err(NOT_ENOUGH)),    // bad offset: zulu not allowed
+            ("Tue, 20 Jan 2015 17:35:20 ZULU", Err(NOT_ENOUGH)),    // bad offset: zulu not allowed
             ("Tue, 20 Jan 2015 17:35:20 −0800", Err(INVALID)), // bad offset: timezone offset using MINUS SIGN (U+2212), not specified for RFC 2822
             ("Tue, 20 Jan 2015 17:35:20 0800", Err(INVALID)),  // missing offset sign
-            ("Tue, 20 Jan 2015 17:35:20 HAS", Err(INVALID)),   // bad named timezone
+            ("Tue, 20 Jan 2015 17:35:20 HAS", Err(NOT_ENOUGH)), // bad named timezone
             ("Tue, 20 Jan 2015😈17:35:20 -0800", Err(INVALID)), // bad character!
         ];
 

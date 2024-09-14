@@ -127,7 +127,7 @@ async fn it_gets_posts_mixed_fixtures_path(pool: PgPool) -> sqlx::Result<()> {
 // This should apply migrations and then `../fixtures/postgres/users.sql` and `../fixtures/postgres/posts.sql`
 #[sqlx::test(
     migrations = "tests/postgres/migrations",
-    fixtures("../fixtures/postgres/users.sql", "../fixtures/postgres/posts.sql")
+    fixtures(path = "../fixtures/postgres", scripts("users.sql", "posts"))
 )]
 async fn it_gets_posts_custom_relative_fixtures_path(pool: PgPool) -> sqlx::Result<()> {
     let post_contents: Vec<String> =

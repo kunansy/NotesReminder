@@ -1,13 +1,5 @@
-use crate::attr::Attribute;
-use crate::expr::Expr;
-use crate::generics::{BoundLifetimes, TypeParamBound};
-use crate::ident::Ident;
-use crate::lifetime::Lifetime;
-use crate::lit::LitStr;
-use crate::mac::Macro;
-use crate::path::{Path, QSelf};
+use super::*;
 use crate::punctuated::Punctuated;
-use crate::token;
 use proc_macro2::TokenStream;
 
 ast_enum_of_structs! {
@@ -17,8 +9,8 @@ ast_enum_of_structs! {
     ///
     /// This type is a [syntax tree enum].
     ///
-    /// [syntax tree enum]: crate::expr::Expr#syntax-tree-enums
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    /// [syntax tree enum]: Expr#syntax-tree-enums
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     #[non_exhaustive]
     pub enum Type {
         /// A fixed size array type: `[T; n]`.
@@ -91,7 +83,7 @@ ast_enum_of_structs! {
 
 ast_struct! {
     /// A fixed size array type: `[T; n]`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeArray {
         pub bracket_token: token::Bracket,
         pub elem: Box<Type>,
@@ -102,7 +94,7 @@ ast_struct! {
 
 ast_struct! {
     /// A bare function type: `fn(usize) -> bool`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeBareFn {
         pub lifetimes: Option<BoundLifetimes>,
         pub unsafety: Option<Token![unsafe]>,
@@ -117,7 +109,7 @@ ast_struct! {
 
 ast_struct! {
     /// A type contained within invisible delimiters.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeGroup {
         pub group_token: token::Group,
         pub elem: Box<Type>,
@@ -127,7 +119,7 @@ ast_struct! {
 ast_struct! {
     /// An `impl Bound1 + Bound2 + Bound3` type where `Bound` is a trait or
     /// a lifetime.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeImplTrait {
         pub impl_token: Token![impl],
         pub bounds: Punctuated<TypeParamBound, Token![+]>,
@@ -136,7 +128,7 @@ ast_struct! {
 
 ast_struct! {
     /// Indication that a type should be inferred by the compiler: `_`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeInfer {
         pub underscore_token: Token![_],
     }
@@ -144,7 +136,7 @@ ast_struct! {
 
 ast_struct! {
     /// A macro in the type position.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeMacro {
         pub mac: Macro,
     }
@@ -152,7 +144,7 @@ ast_struct! {
 
 ast_struct! {
     /// The never type: `!`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeNever {
         pub bang_token: Token![!],
     }
@@ -160,7 +152,7 @@ ast_struct! {
 
 ast_struct! {
     /// A parenthesized type equivalent to the inner type.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeParen {
         pub paren_token: token::Paren,
         pub elem: Box<Type>,
@@ -170,7 +162,7 @@ ast_struct! {
 ast_struct! {
     /// A path like `std::slice::Iter`, optionally qualified with a
     /// self-type as in `<Vec<T> as SomeTrait>::Associated`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypePath {
         pub qself: Option<QSelf>,
         pub path: Path,
@@ -179,7 +171,7 @@ ast_struct! {
 
 ast_struct! {
     /// A raw pointer type: `*const T` or `*mut T`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypePtr {
         pub star_token: Token![*],
         pub const_token: Option<Token![const]>,
@@ -190,7 +182,7 @@ ast_struct! {
 
 ast_struct! {
     /// A reference type: `&'a T` or `&'a mut T`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeReference {
         pub and_token: Token![&],
         pub lifetime: Option<Lifetime>,
@@ -201,7 +193,7 @@ ast_struct! {
 
 ast_struct! {
     /// A dynamically sized slice type: `[T]`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeSlice {
         pub bracket_token: token::Bracket,
         pub elem: Box<Type>,
@@ -211,7 +203,7 @@ ast_struct! {
 ast_struct! {
     /// A trait object type `dyn Bound1 + Bound2 + Bound3` where `Bound` is a
     /// trait or a lifetime.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeTraitObject {
         pub dyn_token: Option<Token![dyn]>,
         pub bounds: Punctuated<TypeParamBound, Token![+]>,
@@ -220,7 +212,7 @@ ast_struct! {
 
 ast_struct! {
     /// A tuple type: `(A, B, C, String)`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct TypeTuple {
         pub paren_token: token::Paren,
         pub elems: Punctuated<Type, Token![,]>,
@@ -229,7 +221,7 @@ ast_struct! {
 
 ast_struct! {
     /// The binary interface of a function: `extern "C"`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct Abi {
         pub extern_token: Token![extern],
         pub name: Option<LitStr>,
@@ -238,7 +230,7 @@ ast_struct! {
 
 ast_struct! {
     /// An argument in a function type: the `usize` in `fn(usize) -> bool`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct BareFnArg {
         pub attrs: Vec<Attribute>,
         pub name: Option<(Ident, Token![:])>,
@@ -248,7 +240,7 @@ ast_struct! {
 
 ast_struct! {
     /// The variadic argument of a function pointer like `fn(usize, ...)`.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct BareVariadic {
         pub attrs: Vec<Attribute>,
         pub name: Option<(Ident, Token![:])>,
@@ -259,7 +251,7 @@ ast_struct! {
 
 ast_enum! {
     /// Return type of a function signature.
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub enum ReturnType {
         /// Return type is not specified.
         ///
@@ -272,27 +264,13 @@ ast_enum! {
 
 #[cfg(feature = "parsing")]
 pub(crate) mod parsing {
-    use crate::attr::Attribute;
-    use crate::error::{self, Result};
+    use super::*;
     use crate::ext::IdentExt as _;
-    use crate::generics::{BoundLifetimes, TraitBound, TraitBoundModifier, TypeParamBound};
-    use crate::ident::Ident;
-    use crate::lifetime::Lifetime;
-    use crate::mac::{self, Macro};
-    use crate::parse::{Parse, ParseStream};
+    use crate::parse::{Parse, ParseStream, Result};
     use crate::path;
-    use crate::path::{Path, PathArguments, QSelf};
-    use crate::punctuated::Punctuated;
-    use crate::token;
-    use crate::ty::{
-        Abi, BareFnArg, BareVariadic, ReturnType, Type, TypeArray, TypeBareFn, TypeGroup,
-        TypeImplTrait, TypeInfer, TypeMacro, TypeNever, TypeParen, TypePath, TypePtr,
-        TypeReference, TypeSlice, TypeTraitObject, TypeTuple,
-    };
-    use crate::verbatim;
     use proc_macro2::Span;
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for Type {
         fn parse(input: ParseStream) -> Result<Self> {
             let allow_plus = true;
@@ -307,7 +285,7 @@ pub(crate) mod parsing {
         /// contain a `+` character.
         ///
         /// This parser does not allow a `+`, while the default parser does.
-        #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
         pub fn without_plus(input: ParseStream) -> Result<Self> {
             let allow_plus = false;
             let allow_group_generic = true;
@@ -589,7 +567,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeSlice {
         fn parse(input: ParseStream) -> Result<Self> {
             let content;
@@ -600,7 +578,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeArray {
         fn parse(input: ParseStream) -> Result<Self> {
             let content;
@@ -613,7 +591,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypePtr {
         fn parse(input: ParseStream) -> Result<Self> {
             let star_token: Token![*] = input.parse()?;
@@ -636,7 +614,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeReference {
         fn parse(input: ParseStream) -> Result<Self> {
             Ok(TypeReference {
@@ -649,7 +627,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeBareFn {
         fn parse(input: ParseStream) -> Result<Self> {
             let args;
@@ -669,7 +647,7 @@ pub(crate) mod parsing {
 
                         if inputs.empty_or_trailing()
                             && (args.peek(Token![...])
-                                || (args.peek(Ident) || args.peek(Token![_]))
+                                || args.peek(Ident)
                                     && args.peek2(Token![:])
                                     && args.peek3(Token![...]))
                         {
@@ -696,7 +674,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeNever {
         fn parse(input: ParseStream) -> Result<Self> {
             Ok(TypeNever {
@@ -705,7 +683,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeInfer {
         fn parse(input: ParseStream) -> Result<Self> {
             Ok(TypeInfer {
@@ -714,7 +692,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeTuple {
         fn parse(input: ParseStream) -> Result<Self> {
             let content;
@@ -747,7 +725,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeMacro {
         fn parse(input: ParseStream) -> Result<Self> {
             Ok(TypeMacro {
@@ -756,7 +734,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypePath {
         fn parse(input: ParseStream) -> Result<Self> {
             let expr_style = false;
@@ -766,7 +744,7 @@ pub(crate) mod parsing {
     }
 
     impl ReturnType {
-        #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
         pub fn without_plus(input: ParseStream) -> Result<Self> {
             let allow_plus = false;
             Self::parse(input, allow_plus)
@@ -784,7 +762,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for ReturnType {
         fn parse(input: ParseStream) -> Result<Self> {
             let allow_plus = true;
@@ -792,7 +770,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeTraitObject {
         fn parse(input: ParseStream) -> Result<Self> {
             let allow_plus = true;
@@ -801,7 +779,7 @@ pub(crate) mod parsing {
     }
 
     impl TypeTraitObject {
-        #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
         pub fn without_plus(input: ParseStream) -> Result<Self> {
             let allow_plus = false;
             Self::parse(input, allow_plus)
@@ -846,7 +824,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeImplTrait {
         fn parse(input: ParseStream) -> Result<Self> {
             let allow_plus = true;
@@ -855,7 +833,7 @@ pub(crate) mod parsing {
     }
 
     impl TypeImplTrait {
-        #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
         pub fn without_plus(input: ParseStream) -> Result<Self> {
             let allow_plus = false;
             Self::parse(input, allow_plus)
@@ -889,7 +867,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeGroup {
         fn parse(input: ParseStream) -> Result<Self> {
             let group = crate::group::parse_group(input)?;
@@ -900,7 +878,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for TypeParen {
         fn parse(input: ParseStream) -> Result<Self> {
             let allow_plus = false;
@@ -921,7 +899,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for BareFnArg {
         fn parse(input: ParseStream) -> Result<Self> {
             let allow_self = false;
@@ -992,7 +970,7 @@ pub(crate) mod parsing {
         })
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for Abi {
         fn parse(input: ParseStream) -> Result<Self> {
             Ok(Abi {
@@ -1002,7 +980,7 @@ pub(crate) mod parsing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
     impl Parse for Option<Abi> {
         fn parse(input: ParseStream) -> Result<Self> {
             if input.peek(Token![extern]) {
@@ -1016,19 +994,13 @@ pub(crate) mod parsing {
 
 #[cfg(feature = "printing")]
 mod printing {
+    use super::*;
     use crate::attr::FilterAttrs;
-    use crate::path;
-    use crate::path::printing::PathStyle;
     use crate::print::TokensOrDefault;
-    use crate::ty::{
-        Abi, BareFnArg, BareVariadic, ReturnType, TypeArray, TypeBareFn, TypeGroup, TypeImplTrait,
-        TypeInfer, TypeMacro, TypeNever, TypeParen, TypePath, TypePtr, TypeReference, TypeSlice,
-        TypeTraitObject, TypeTuple,
-    };
     use proc_macro2::TokenStream;
     use quote::{ToTokens, TokenStreamExt};
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeSlice {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.bracket_token.surround(tokens, |tokens| {
@@ -1037,7 +1009,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeArray {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.bracket_token.surround(tokens, |tokens| {
@@ -1048,7 +1020,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypePtr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.star_token.to_tokens(tokens);
@@ -1062,7 +1034,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeReference {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.and_token.to_tokens(tokens);
@@ -1072,7 +1044,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeBareFn {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.lifetimes.to_tokens(tokens);
@@ -1093,14 +1065,14 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeNever {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.bang_token.to_tokens(tokens);
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeTuple {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.paren_token.surround(tokens, |tokens| {
@@ -1114,14 +1086,14 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypePath {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            path::printing::print_qpath(tokens, &self.qself, &self.path, PathStyle::AsWritten);
+            path::printing::print_path(tokens, &self.qself, &self.path);
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeTraitObject {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.dyn_token.to_tokens(tokens);
@@ -1129,7 +1101,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeImplTrait {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.impl_token.to_tokens(tokens);
@@ -1137,7 +1109,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeGroup {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.group_token.surround(tokens, |tokens| {
@@ -1146,7 +1118,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeParen {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.paren_token.surround(tokens, |tokens| {
@@ -1155,21 +1127,21 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeInfer {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.underscore_token.to_tokens(tokens);
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for TypeMacro {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.mac.to_tokens(tokens);
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for ReturnType {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             match self {
@@ -1182,7 +1154,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for BareFnArg {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             tokens.append_all(self.attrs.outer());
@@ -1194,7 +1166,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for BareVariadic {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             tokens.append_all(self.attrs.outer());
@@ -1207,7 +1179,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
     impl ToTokens for Abi {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.extern_token.to_tokens(tokens);

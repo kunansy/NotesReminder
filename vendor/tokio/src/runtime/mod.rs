@@ -385,25 +385,24 @@ cfg_rt! {
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor};
 
-    /// Boundary value to prevent stack overflow caused by a large-sized
-    /// Future being placed in the stack.
-    pub(crate) const BOX_FUTURE_THRESHOLD: usize = 2048;
-
     mod thread_id;
     pub(crate) use thread_id::ThreadId;
 
-    pub(crate) mod metrics;
-    pub use metrics::RuntimeMetrics;
+    cfg_metrics! {
+        mod metrics;
+        pub use metrics::{RuntimeMetrics, HistogramScale};
 
-    cfg_unstable_metrics! {
-        pub use metrics::HistogramScale;
+        pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics, HistogramBuilder};
 
         cfg_net! {
-            pub(crate) use metrics::IoDriverMetrics;
+        pub(crate) use metrics::IoDriverMetrics;
         }
     }
 
-    pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics, HistogramBuilder};
+    cfg_not_metrics! {
+        pub(crate) mod metrics;
+        pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch, HistogramBuilder};
+    }
 
     /// After thread starts / before thread stops
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;

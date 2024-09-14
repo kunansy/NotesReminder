@@ -16,6 +16,12 @@ impl PgHasArrayType for &'_ [u8] {
     }
 }
 
+impl<const N: usize> PgHasArrayType for &'_ [u8; N] {
+    fn array_type_info() -> PgTypeInfo {
+        PgTypeInfo::BYTEA_ARRAY
+    }
+}
+
 impl PgHasArrayType for Box<[u8]> {
     fn array_type_info() -> PgTypeInfo {
         <[&[u8]] as Type<Postgres>>::type_info()
@@ -35,27 +41,27 @@ impl<const N: usize> PgHasArrayType for [u8; N] {
 }
 
 impl Encode<'_, Postgres> for &'_ [u8] {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         buf.extend_from_slice(self);
 
-        Ok(IsNull::No)
+        IsNull::No
     }
 }
 
 impl Encode<'_, Postgres> for Box<[u8]> {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         <&[u8] as Encode<Postgres>>::encode(self.as_ref(), buf)
     }
 }
 
 impl Encode<'_, Postgres> for Vec<u8> {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         <&[u8] as Encode<Postgres>>::encode(self, buf)
     }
 }
 
 impl<const N: usize> Encode<'_, Postgres> for [u8; N] {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         <&[u8] as Encode<Postgres>>::encode(self.as_slice(), buf)
     }
 }

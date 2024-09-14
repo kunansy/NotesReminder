@@ -26,7 +26,7 @@ impl slog::Value for Uuid {
 mod tests {
     use crate::tests::new;
 
-    use slog::{crit, Drain};
+    use slog::{self, crit, Drain};
 
     #[test]
     fn test_slog_kv() {

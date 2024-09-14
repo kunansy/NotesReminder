@@ -10,6 +10,8 @@ pub(crate) struct Row {
 
 impl Row {
     pub(crate) fn get(&self, index: usize) -> Option<&[u8]> {
-        self.values[index].clone().map(|col| &self.storage[col])
+        self.values[index]
+            .as_ref()
+            .map(|col| &self.storage[(col.start as usize)..(col.end as usize)])
     }
 }

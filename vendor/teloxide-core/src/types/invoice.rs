@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 /// This object contains basic information about an invoice.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#invoice).
-#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Invoice {
     /// Product name.
@@ -26,5 +25,5 @@ pub struct Invoice {
     /// majority of currencies).
     ///
     /// [`currencies.json`]: https://core.telegram.org/bots/payments/currencies.json
-    pub total_amount: u32,
+    pub total_amount: i32,
 }

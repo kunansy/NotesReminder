@@ -1,6 +1,6 @@
 //! TODO: automatic test fixture capture
 
-use crate::database::Database;
+use crate::database::{Database, HasArguments};
 
 use crate::query_builder::QueryBuilder;
 
@@ -109,10 +109,9 @@ impl<DB: Database> FixtureSnapshot<DB> {
 
 /// Implements `ToString` but not `Display` because it uses [`QueryBuilder`] internally,
 /// which appends to an internal string.
-#[allow(clippy::to_string_trait_impl)]
 impl<DB: Database> ToString for Fixture<DB>
 where
-    for<'a> <DB as Database>::Arguments<'a>: Default,
+    for<'a> <DB as HasArguments<'a>>::Arguments: Default,
 {
     fn to_string(&self) -> String {
         let mut query = QueryBuilder::<DB>::new("");
@@ -196,14 +195,13 @@ fn foreign_key_depth(
 }
 
 #[test]
-#[cfg(feature = "any")]
+#[cfg(feature = "postgres")]
 fn test_additive_fixture() -> Result<()> {
-    // Just need something that implements `Database`
-    use crate::any::Any;
+    use crate::postgres::Postgres;
 
     let mut snapshot = FixtureSnapshot {
         tables: BTreeMap::new(),
-        db: PhantomData::<Any>,
+        db: PhantomData::<Postgres>,
     };
 
     snapshot.tables.insert(

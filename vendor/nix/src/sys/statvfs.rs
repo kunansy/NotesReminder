@@ -3,51 +3,62 @@
 //! See [the man pages](https://pubs.opengroup.org/onlinepubs/9699919799/functions/fstatvfs.html)
 //! for more details.
 use std::mem;
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{AsFd, AsRawFd};
 
 use libc::{self, c_ulong};
 
-use crate::{Result, NixPath, errno::Errno};
+use crate::{errno::Errno, NixPath, Result};
 
 #[cfg(not(target_os = "redox"))]
 libc_bitflags!(
     /// File system mount Flags
-    #[repr(C)]
     #[derive(Default)]
     pub struct FsFlags: c_ulong {
         /// Read Only
+        #[cfg(not(target_os = "haiku"))]
         ST_RDONLY;
         /// Do not allow the set-uid bits to have an effect
+        #[cfg(not(target_os = "haiku"))]
         ST_NOSUID;
         /// Do not interpret character or block-special devices
         #[cfg(any(target_os = "android", target_os = "linux"))]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_NODEV;
         /// Do not allow execution of binaries on the filesystem
         #[cfg(any(target_os = "android", target_os = "linux"))]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_NOEXEC;
         /// All IO should be done synchronously
         #[cfg(any(target_os = "android", target_os = "linux"))]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_SYNCHRONOUS;
         /// Allow mandatory locks on the filesystem
         #[cfg(any(target_os = "android", target_os = "linux"))]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_MANDLOCK;
         /// Write on file/directory/symlink
         #[cfg(target_os = "linux")]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_WRITE;
         /// Append-only file
         #[cfg(target_os = "linux")]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_APPEND;
         /// Immutable file
         #[cfg(target_os = "linux")]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_IMMUTABLE;
         /// Do not update access times on files
         #[cfg(any(target_os = "android", target_os = "linux"))]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_NOATIME;
         /// Do not update access times on files
         #[cfg(any(target_os = "android", target_os = "linux"))]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_NODIRATIME;
         /// Update access time relative to modify/change time
         #[cfg(any(target_os = "android", all(target_os = "linux", not(target_env = "musl"))))]
+        #[cfg_attr(docsrs, doc(cfg(all())))]
         ST_RELATIME;
     }
 );
@@ -109,6 +120,7 @@ impl Statvfs {
 
     /// Get the mount flags
     #[cfg(not(target_os = "redox"))]
+    #[cfg_attr(docsrs, doc(cfg(all())))]
     pub fn flags(&self) -> FsFlags {
         FsFlags::from_bits_truncate(self.0.f_flag)
     }
@@ -117,7 +129,6 @@ impl Statvfs {
     pub fn name_max(&self) -> c_ulong {
         self.0.f_namemax
     }
-
 }
 
 /// Return a `Statvfs` object with information about the `path`
@@ -125,28 +136,28 @@ pub fn statvfs<P: ?Sized + NixPath>(path: &P) -> Result<Statvfs> {
     unsafe {
         Errno::clear();
         let mut stat = mem::MaybeUninit::<libc::statvfs>::uninit();
-        let res = path.with_nix_path(|path|
+        let res = path.with_nix_path(|path| {
             libc::statvfs(path.as_ptr(), stat.as_mut_ptr())
-        )?;
+        })?;
 
         Errno::result(res).map(|_| Statvfs(stat.assume_init()))
     }
 }
 
 /// Return a `Statvfs` object with information about `fd`
-pub fn fstatvfs<T: AsRawFd>(fd: &T) -> Result<Statvfs> {
+pub fn fstatvfs<Fd: AsFd>(fd: Fd) -> Result<Statvfs> {
     unsafe {
         Errno::clear();
         let mut stat = mem::MaybeUninit::<libc::statvfs>::uninit();
-        Errno::result(libc::fstatvfs(fd.as_raw_fd(), stat.as_mut_ptr()))
+        Errno::result(libc::fstatvfs(fd.as_fd().as_raw_fd(), stat.as_mut_ptr()))
             .map(|_| Statvfs(stat.assume_init()))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::fs::File;
     use crate::sys::statvfs::*;
+    use std::fs::File;
 
     #[test]
     fn statvfs_call() {

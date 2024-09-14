@@ -1,4 +1,5 @@
 use crate::runtime::park;
+use crate::runtime::tests::loom_oneshot as oneshot;
 use crate::runtime::{self, Runtime};
 
 #[test]
@@ -7,9 +8,10 @@ fn yield_calls_park_before_scheduling_again() {
     let mut loom = loom::model::Builder::default();
     loom.max_permutations = Some(1);
     loom.check(|| {
-        let rt = mk_runtime();
+        let rt = mk_runtime(2);
+        let (tx, rx) = oneshot::channel::<()>();
 
-        let jh = rt.spawn(async {
+        rt.spawn(async {
             let tid = loom::thread::current().id();
             let park_count = park::current_thread_park_count();
 
@@ -19,12 +21,17 @@ fn yield_calls_park_before_scheduling_again() {
                 let new_park_count = park::current_thread_park_count();
                 assert_eq!(park_count + 1, new_park_count);
             }
+
+            tx.send(());
         });
 
-        rt.block_on(jh).unwrap();
+        rx.recv();
     });
 }
 
-fn mk_runtime() -> Runtime {
-    runtime::Builder::new_current_thread().build().unwrap()
+fn mk_runtime(num_threads: usize) -> Runtime {
+    runtime::Builder::new_multi_thread()
+        .worker_threads(num_threads)
+        .build()
+        .unwrap()
 }

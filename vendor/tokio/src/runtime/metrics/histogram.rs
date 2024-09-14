@@ -1,5 +1,4 @@
-use crate::util::metric_atomics::MetricAtomicU64;
-use std::sync::atomic::Ordering::Relaxed;
+use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 use std::cmp;
 use std::ops::Range;
@@ -7,7 +6,7 @@ use std::ops::Range;
 #[derive(Debug)]
 pub(crate) struct Histogram {
     /// The histogram buckets
-    buckets: Box<[MetricAtomicU64]>,
+    buckets: Box<[AtomicU64]>,
 
     /// Bucket scale, linear or log
     scale: HistogramScale,
@@ -54,10 +53,8 @@ impl Histogram {
         self.buckets.len()
     }
 
-    cfg_64bit_metrics! {
-        pub(crate) fn get(&self, bucket: usize) -> u64 {
-            self.buckets[bucket].load(Relaxed)
-        }
+    pub(crate) fn get(&self, bucket: usize) -> u64 {
+        self.buckets[bucket].load(Relaxed)
     }
 
     pub(crate) fn bucket_range(&self, bucket: usize) -> Range<u64> {
@@ -153,7 +150,7 @@ impl HistogramBuilder {
 
         Histogram {
             buckets: (0..self.num_buckets)
-                .map(|_| MetricAtomicU64::new(0))
+                .map(|_| AtomicU64::new(0))
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             resolution,
@@ -168,7 +165,7 @@ impl Default for HistogramBuilder {
     }
 }
 
-#[cfg(all(test, target_has_atomic = "64"))]
+#[cfg(test)]
 mod test {
     use super::*;
 

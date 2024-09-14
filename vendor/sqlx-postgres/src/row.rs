@@ -4,11 +4,9 @@ use crate::message::DataRow;
 use crate::statement::PgStatementMetadata;
 use crate::value::PgValueFormat;
 use crate::{PgColumn, PgValueRef, Postgres};
-pub(crate) use sqlx_core::row::Row;
-use sqlx_core::type_checking::TypeChecking;
-use sqlx_core::value::ValueRef;
-use std::fmt::Debug;
 use std::sync::Arc;
+
+pub(crate) use sqlx_core::row::Row;
 
 /// Implementation of [`Row`] for PostgreSQL.
 pub struct PgRow {
@@ -47,29 +45,6 @@ impl ColumnIndex<PgRow> for &'_ str {
             .column_names
             .get(*self)
             .ok_or_else(|| Error::ColumnNotFound((*self).into()))
-            .copied()
-    }
-}
-
-impl Debug for PgRow {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PgRow ")?;
-
-        let mut debug_map = f.debug_map();
-        for (index, column) in self.columns().iter().enumerate() {
-            match self.try_get_raw(index) {
-                Ok(value) => {
-                    debug_map.entry(
-                        &column.name,
-                        &Postgres::fmt_value_debug(&<PgValueRef as ValueRef>::to_owned(&value)),
-                    );
-                }
-                Err(error) => {
-                    debug_map.entry(&column.name, &format!("decode error: {error:?}"));
-                }
-            }
-        }
-
-        debug_map.finish()
+            .map(|v| *v)
     }
 }

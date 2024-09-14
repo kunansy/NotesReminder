@@ -21,15 +21,12 @@ impl Type<Sqlite> for Uuid {
 }
 
 impl<'q> Encode<'q, Sqlite> for Uuid {
-    fn encode_by_ref(
-        &self,
-        args: &mut Vec<SqliteArgumentValue<'q>>,
-    ) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, args: &mut Vec<SqliteArgumentValue<'q>>) -> IsNull {
         args.push(SqliteArgumentValue::Blob(Cow::Owned(
             self.as_bytes().to_vec(),
         )));
 
-        Ok(IsNull::No)
+        IsNull::No
     }
 }
 
@@ -47,13 +44,10 @@ impl Type<Sqlite> for Hyphenated {
 }
 
 impl<'q> Encode<'q, Sqlite> for Hyphenated {
-    fn encode_by_ref(
-        &self,
-        args: &mut Vec<SqliteArgumentValue<'q>>,
-    ) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, args: &mut Vec<SqliteArgumentValue<'q>>) -> IsNull {
         args.push(SqliteArgumentValue::Text(Cow::Owned(self.to_string())));
 
-        Ok(IsNull::No)
+        IsNull::No
     }
 }
 
@@ -73,13 +67,10 @@ impl Type<Sqlite> for Simple {
 }
 
 impl<'q> Encode<'q, Sqlite> for Simple {
-    fn encode_by_ref(
-        &self,
-        args: &mut Vec<SqliteArgumentValue<'q>>,
-    ) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, args: &mut Vec<SqliteArgumentValue<'q>>) -> IsNull {
         args.push(SqliteArgumentValue::Text(Cow::Owned(self.to_string())));
 
-        Ok(IsNull::No)
+        IsNull::No
     }
 }
 

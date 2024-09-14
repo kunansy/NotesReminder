@@ -1,15 +1,16 @@
 use super::{serializer::Serializer, Storage};
-use deadpool_redis::{redis, CreatePoolError, PoolError, Runtime};
 use futures::future::BoxFuture;
-use redis::AsyncCommands;
+use redis::{AsyncCommands, IntoConnectionInfo};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     convert::Infallible,
     fmt::{Debug, Display},
+    ops::DerefMut,
     sync::Arc,
 };
 use teloxide_core::types::ChatId;
 use thiserror::Error;
+use tokio::sync::Mutex;
 
 /// An error returned from [`RedisStorage`].
 #[derive(Debug, Error)]
@@ -23,12 +24,6 @@ where
     #[error("error from Redis: {0}")]
     RedisError(#[from] redis::RedisError),
 
-    #[error("error creating redis pool: {0}")]
-    CreatePoolError(#[from] CreatePoolError),
-
-    #[error("redis pool error: {0}")]
-    PoolError(#[from] PoolError),
-
     /// Returned from [`RedisStorage::remove_dialogue`].
     #[error("row not found")]
     DialogueNotFound,
@@ -36,19 +31,19 @@ where
 
 /// A dialogue storage based on [Redis](https://redis.io/).
 pub struct RedisStorage<S> {
-    pool: deadpool_redis::Pool,
+    conn: Mutex<redis::aio::Connection>,
     serializer: S,
 }
 
 impl<S> RedisStorage<S> {
     pub async fn open(
-        url: &str,
+        url: impl IntoConnectionInfo,
         serializer: S,
     ) -> Result<Arc<Self>, RedisStorageError<Infallible>> {
-        let config = deadpool_redis::Config::from_url(url);
-        let pool = config.create_pool(Some(Runtime::Tokio1))?;
-
-        Ok(Arc::new(Self { pool, serializer }))
+        Ok(Arc::new(Self {
+            conn: Mutex::new(redis::Client::open(url)?.get_async_connection().await?),
+            serializer,
+        }))
     }
 }
 
@@ -65,12 +60,10 @@ where
         ChatId(chat_id): ChatId,
     ) -> BoxFuture<'static, Result<(), Self::Error>> {
         Box::pin(async move {
-            let mut conn = self.pool.get().await?;
-
             let deleted_rows_count = redis::pipe()
                 .atomic()
                 .del(chat_id)
-                .query_async::<_, redis::Value>(&mut conn)
+                .query_async::<_, redis::Value>(self.conn.lock().await.deref_mut())
                 .await?;
 
             if let redis::Value::Bulk(values) = deleted_rows_count {
@@ -96,7 +89,7 @@ where
         Box::pin(async move {
             let dialogue =
                 self.serializer.serialize(&dialogue).map_err(RedisStorageError::SerdeError)?;
-            () = self.pool.get().await?.set::<_, Vec<u8>, _>(chat_id, dialogue).await?;
+            self.conn.lock().await.set::<_, Vec<u8>, _>(chat_id, dialogue).await?;
             Ok(())
         })
     }
@@ -106,9 +99,9 @@ where
         ChatId(chat_id): ChatId,
     ) -> BoxFuture<'static, Result<Option<D>, Self::Error>> {
         Box::pin(async move {
-            self.pool
-                .get()
-                .await?
+            self.conn
+                .lock()
+                .await
                 .get::<_, Option<Vec<u8>>>(chat_id)
                 .await?
                 .map(|d| self.serializer.deserialize(&d).map_err(RedisStorageError::SerdeError))

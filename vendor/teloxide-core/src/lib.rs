@@ -1,13 +1,13 @@
 //! Core part of the [`teloxide`] library.
 //!
 //! This library provides tools for making requests to the [Telegram Bot API]
-//! (Currently, version `7.0` is supported) with ease. The library is fully
+//! (Currently, version `6.4` is supported) with ease. The library is fully
 //! asynchronous and built using [`tokio`].
 //!
 //!```toml
-//! teloxide-core = "0.10.1"
+//! teloxide_core = "0.9"
 //! ```
-//! _Compiler support: requires rustc 1.70+_.
+//! _Compiler support: requires rustc 1.64+_.
 //!
 //! ```
 //! # async {
@@ -47,6 +47,7 @@
 //! - `nightly` — enables nightly-only features, currently:
 //!   - Removes some future boxing using `#![feature(type_alias_impl_trait)]`
 //!   - Used to built docs (`#![feature(doc_cfg, doc_notable_trait)]`)
+//! - `auto_send` — enables [`AutoSend`] bot adaptor (deprecated)
 //!
 //! [`AutoSend`]: adaptors::AutoSend
 //! [`Trace`]: adaptors::Trace
@@ -61,7 +62,7 @@
     html_logo_url = "https://cdn.discordapp.com/attachments/224881373326999553/798598120760934410/logo.png",
     html_favicon_url = "https://cdn.discordapp.com/attachments/224881373326999553/798598120760934410/logo.png"
 )]
-//
+#![forbid(unsafe_code)]
 // we pass "--cfg docsrs" when building docs to add `This is supported on feature="..." only.`
 //
 // To properly build docs of this crate run
@@ -78,29 +79,16 @@
 )]
 #![cfg_attr(feature = "nightly", feature(type_alias_impl_trait))]
 #![cfg_attr(all(feature = "full", docsrs), deny(rustdoc::broken_intra_doc_links))]
-//
-// Lint levels
-#![forbid(unsafe_code)]
 //#![deny(missing_docs)]
 #![warn(clippy::print_stdout, clippy::dbg_macro)]
+#![allow(clippy::let_and_return)]
+#![allow(clippy::bool_assert_comparison)]
+// Unless this becomes machine applicable, I'm not adding 334 #[must_use]s (waffle)
+#![allow(clippy::return_self_not_must_use)]
+// Workaround for CI
+#![allow(rustdoc::bare_urls)]
+// FIXME: deal with these lints
 #![allow(
-    // Sometimes it's more readable to assign to a variable and return it immediately
-    clippy::let_and_return,
-
-    // When you are testing ->bool functions, it makes sense to `assert_eq!(f(..), false)`
-    clippy::bool_assert_comparison,
-
-    // Unless this becomes machine applicable, I'm not adding 334 #[must_use]s (waffle)
-    clippy::return_self_not_must_use,
-
-    // This is dumb. `T: ?Sized where T: Trait` IMO makes perfect sense
-    clippy::multiple_bound_locations,
-
-    // Workaround for CI
-    // FIXME: do we still need this?
-    rustdoc::bare_urls,
-
-    // FIXME: deal with these lints
     clippy::collapsible_str_replace,
     clippy::borrow_deref_ref,
     clippy::unnecessary_lazy_evaluations,
@@ -129,7 +117,6 @@ mod bot;
 
 // implementation details
 mod serde_multipart;
-mod util;
 
 #[cfg(test)]
 mod codegen;

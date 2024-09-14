@@ -1,6 +1,3 @@
-// waffle: efficiency is not important here, and I don't want to rewrite this
-#![allow(clippy::format_collect)]
-
 use std::{borrow::Borrow, collections::HashSet, ops::Deref};
 
 use itertools::Itertools;
@@ -54,17 +51,12 @@ fn codegen_payloads() {
 
         let multipart = multipart_input_file_fields(&method)
             .map(|field| format!("    @[multipart = {}]\n", field.join(", ")))
-            .unwrap_or_default();
+            .unwrap_or_else(String::new);
 
-        // FIXME: CreateNewStickerSet has to be be only Debug + Clone + Serialize (maybe
-        // better fix?)
         let derive = if !multipart.is_empty()
             || matches!(
                 &*method.names.1,
-                "SendMediaGroup"
-                    | "EditMessageMedia"
-                    | "EditMessageMediaInline"
-                    | "CreateNewStickerSet"
+                "SendMediaGroup" | "EditMessageMedia" | "EditMessageMediaInline"
             ) {
             "#[derive(Debug, Clone, Serialize)]".to_owned()
         } else {
@@ -193,9 +185,7 @@ fn eq_hash_suitable(method: &Method) -> bool {
 
             Type::Url | Type::DateTime => true,
 
-            Type::RawTy(raw) => {
-                raw != "InputSticker" && raw != "MaskPosition" && raw != "InlineQueryResult"
-            }
+            Type::RawTy(raw) => raw != "MaskPosition" && raw != "InlineQueryResult",
         }
     }
 
@@ -219,7 +209,10 @@ fn params(params: impl Iterator<Item = impl Borrow<Param>>) -> String {
                      \"crate::types::serialize_reply_to_message_id\")]"
                 }
                 Type::RawTy(s)
-                    if s == "MessageId" || s == "TargetMessage" || s == "StickerType" =>
+                    if s == "MessageId"
+                        || s == "InputSticker"
+                        || s == "TargetMessage"
+                        || s == "StickerType" =>
                 {
                     "\n            #[serde(flatten)]"
                 }

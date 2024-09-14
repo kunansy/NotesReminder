@@ -248,9 +248,7 @@ impl<'a> ReadBuf<'a> {
     pub fn put_slice(&mut self, buf: &[u8]) {
         assert!(
             self.remaining() >= buf.len(),
-            "buf.len() must fit in remaining(); buf.len() = {}, remaining() = {}",
-            buf.len(),
-            self.remaining()
+            "buf.len() must fit in remaining()"
         );
 
         let amt = buf.len();

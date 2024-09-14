@@ -31,7 +31,7 @@ pub enum AnyTypeInfoKind {
 
 impl TypeInfo for AnyTypeInfo {
     fn is_null(&self) -> bool {
-        self.kind == Null
+        false
     }
 
     fn name(&self) -> &str {

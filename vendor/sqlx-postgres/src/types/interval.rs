@@ -10,7 +10,7 @@ use crate::{PgArgumentBuffer, PgHasArrayType, PgTypeInfo, PgValueFormat, PgValue
 
 // `PgInterval` is available for direct access to the INTERVAL type
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct PgInterval {
     pub months: i32,
     pub days: i32,
@@ -54,12 +54,12 @@ impl<'de> Decode<'de, Postgres> for PgInterval {
 }
 
 impl Encode<'_, Postgres> for PgInterval {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         buf.extend(&self.microseconds.to_be_bytes());
         buf.extend(&self.days.to_be_bytes());
         buf.extend(&self.months.to_be_bytes());
 
-        Ok(IsNull::No)
+        IsNull::No
     }
 
     fn size_hint(&self) -> usize {
@@ -83,8 +83,10 @@ impl PgHasArrayType for std::time::Duration {
 }
 
 impl Encode<'_, Postgres> for std::time::Duration {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
-        PgInterval::try_from(*self)?.encode_by_ref(buf)
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
+        PgInterval::try_from(*self)
+            .expect("failed to encode `std::time::Duration`")
+            .encode_by_ref(buf)
     }
 
     fn size_hint(&self) -> usize {
@@ -128,8 +130,8 @@ impl PgHasArrayType for chrono::Duration {
 
 #[cfg(feature = "chrono")]
 impl Encode<'_, Postgres> for chrono::Duration {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
-        let pg_interval = PgInterval::try_from(*self)?;
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
+        let pg_interval = PgInterval::try_from(*self).expect("Failed to encode chrono::Duration");
         pg_interval.encode_by_ref(buf)
     }
 
@@ -167,7 +169,7 @@ impl TryFrom<chrono::Duration> for PgInterval {
                 Ok(Self {
                     months: 0,
                     days: 0,
-                    microseconds,
+                    microseconds: microseconds,
                 })
             },
         )
@@ -190,8 +192,8 @@ impl PgHasArrayType for time::Duration {
 
 #[cfg(feature = "time")]
 impl Encode<'_, Postgres> for time::Duration {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
-        let pg_interval = PgInterval::try_from(*self)?;
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
+        let pg_interval = PgInterval::try_from(*self).expect("Failed to encode time::Duration");
         pg_interval.encode_by_ref(buf)
     }
 
@@ -232,7 +234,7 @@ fn test_encode_interval() {
     };
     assert!(matches!(
         Encode::<Postgres>::encode(&interval, &mut buf),
-        Ok(IsNull::No)
+        IsNull::No
     ));
     assert_eq!(&**buf, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     buf.clear();
@@ -244,7 +246,7 @@ fn test_encode_interval() {
     };
     assert!(matches!(
         Encode::<Postgres>::encode(&interval, &mut buf),
-        Ok(IsNull::No)
+        IsNull::No
     ));
     assert_eq!(&**buf, [0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 0, 0]);
     buf.clear();
@@ -256,7 +258,7 @@ fn test_encode_interval() {
     };
     assert!(matches!(
         Encode::<Postgres>::encode(&interval, &mut buf),
-        Ok(IsNull::No)
+        IsNull::No
     ));
     assert_eq!(&**buf, [0, 0, 0, 0, 0, 15, 66, 64, 0, 0, 0, 0, 0, 0, 0, 0]);
     buf.clear();
@@ -268,7 +270,7 @@ fn test_encode_interval() {
     };
     assert!(matches!(
         Encode::<Postgres>::encode(&interval, &mut buf),
-        Ok(IsNull::No)
+        IsNull::No
     ));
     assert_eq!(
         &**buf,
@@ -283,7 +285,7 @@ fn test_encode_interval() {
     };
     assert!(matches!(
         Encode::<Postgres>::encode(&interval, &mut buf),
-        Ok(IsNull::No)
+        IsNull::No
     ));
     assert_eq!(&**buf, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]);
     buf.clear();
@@ -295,19 +297,10 @@ fn test_encode_interval() {
     };
     assert!(matches!(
         Encode::<Postgres>::encode(&interval, &mut buf),
-        Ok(IsNull::No)
+        IsNull::No
     ));
     assert_eq!(&**buf, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
     buf.clear();
-
-    assert_eq!(
-        PgInterval::default(),
-        PgInterval {
-            months: 0,
-            days: 0,
-            microseconds: 0,
-        }
-    );
 }
 
 #[test]

@@ -6,13 +6,12 @@ use crate::runtime::blocking::schedule::BlockingSchedule;
 use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{Builder, Callback, Handle, BOX_FUTURE_THRESHOLD};
-use crate::util::metric_atomics::MetricAtomicUsize;
+use crate::runtime::{Builder, Callback, Handle};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::io;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 pub(crate) struct BlockingPool {
@@ -27,9 +26,9 @@ pub(crate) struct Spawner {
 
 #[derive(Default)]
 pub(crate) struct SpawnerMetrics {
-    num_threads: MetricAtomicUsize,
-    num_idle_threads: MetricAtomicUsize,
-    queue_depth: MetricAtomicUsize,
+    num_threads: AtomicUsize,
+    num_idle_threads: AtomicUsize,
+    queue_depth: AtomicUsize,
 }
 
 impl SpawnerMetrics {
@@ -41,34 +40,34 @@ impl SpawnerMetrics {
         self.num_idle_threads.load(Ordering::Relaxed)
     }
 
-    cfg_unstable_metrics! {
+    cfg_metrics! {
         fn queue_depth(&self) -> usize {
             self.queue_depth.load(Ordering::Relaxed)
         }
     }
 
     fn inc_num_threads(&self) {
-        self.num_threads.increment();
+        self.num_threads.fetch_add(1, Ordering::Relaxed);
     }
 
     fn dec_num_threads(&self) {
-        self.num_threads.decrement();
+        self.num_threads.fetch_sub(1, Ordering::Relaxed);
     }
 
     fn inc_num_idle_threads(&self) {
-        self.num_idle_threads.increment();
+        self.num_idle_threads.fetch_add(1, Ordering::Relaxed);
     }
 
     fn dec_num_idle_threads(&self) -> usize {
-        self.num_idle_threads.decrement()
+        self.num_idle_threads.fetch_sub(1, Ordering::Relaxed)
     }
 
     fn inc_queue_depth(&self) {
-        self.queue_depth.increment();
+        self.queue_depth.fetch_add(1, Ordering::Relaxed);
     }
 
     fn dec_queue_depth(&self) {
-        self.queue_depth.decrement();
+        self.queue_depth.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
@@ -264,12 +263,8 @@ impl BlockingPool {
 
             // Loom requires that execution be deterministic, so sort by thread ID before joining.
             // (HashMaps use a randomly-seeded hash function, so the order is nondeterministic)
-            #[cfg(loom)]
-            let workers: Vec<(usize, thread::JoinHandle<()>)> = {
-                let mut workers: Vec<_> = workers.into_iter().collect();
-                workers.sort_by_key(|(id, _)| *id);
-                workers
-            };
+            let mut workers: Vec<(usize, thread::JoinHandle<()>)> = workers.into_iter().collect();
+            workers.sort_by_key(|(id, _)| *id);
 
             for (_id, handle) in workers {
                 let _ = handle.join();
@@ -300,7 +295,7 @@ impl Spawner {
         R: Send + 'static,
     {
         let (join_handle, spawn_result) =
-            if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
                 self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
             } else {
                 self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
@@ -327,7 +322,7 @@ impl Spawner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     Mandatory::Mandatory,
@@ -479,7 +474,7 @@ impl Spawner {
     }
 }
 
-cfg_unstable_metrics! {
+cfg_metrics! {
     impl Spawner {
         pub(crate) fn num_threads(&self) -> usize {
             self.inner.metrics.num_threads()

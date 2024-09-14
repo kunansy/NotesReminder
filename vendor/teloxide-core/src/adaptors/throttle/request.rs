@@ -19,7 +19,6 @@ use crate::{
 
 /// Request returned by [`Throttling`](crate::adaptors::Throttle) methods.
 #[must_use = "Requests are lazy and do nothing unless sent"]
-#[derive(Clone)]
 pub struct ThrottlingRequest<R: HasPayload> {
     pub(super) request: Arc<R>,
     pub(super) chat_id: fn(&R::Payload) -> ChatIdHash,
@@ -203,7 +202,7 @@ where
 
         let retry_after = res.as_ref().err().and_then(<_>::retry_after);
         if let Some(retry_after) = retry_after {
-            let after = retry_after.duration();
+            let after = retry_after;
             let until = Instant::now() + after;
 
             // If we'll retry, we check that worker hasn't died at the start of the loop

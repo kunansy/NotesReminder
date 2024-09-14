@@ -54,12 +54,6 @@ pub fn private_level_filter_to_levels(
     tracing_level.zip(filter.to_level())
 }
 
-pub(crate) fn private_level_filter_to_trace_level(
-    filter: log::LevelFilter,
-) -> Option<tracing::Level> {
-    private_level_filter_to_levels(filter).map(|(level, _)| level)
-}
-
 pub use sqlformat;
 
 pub struct QueryLogger<'q> {
@@ -106,14 +100,14 @@ impl<'q> QueryLogger<'q> {
             let log_is_enabled = log::log_enabled!(target: "sqlx::query", log_level)
                 || private_tracing_dynamic_enabled!(target: "sqlx::query", tracing_level);
             if log_is_enabled {
-                let mut summary = parse_query_summary(self.sql);
+                let mut summary = parse_query_summary(&self.sql);
 
                 let sql = if summary != self.sql {
                     summary.push_str(" …");
                     format!(
                         "\n\n{}\n",
                         sqlformat::format(
-                            self.sql,
+                            &self.sql,
                             &sqlformat::QueryParams::None,
                             sqlformat::FormatOptions::default()
                         )
@@ -130,10 +124,7 @@ impl<'q> QueryLogger<'q> {
                         db.statement = sql,
                         rows_affected = self.rows_affected,
                         rows_returned = self.rows_returned,
-                        // Human-friendly - includes units (usually ms). Also kept for backward compatibility
                         ?elapsed,
-                        // Search friendly - numeric
-                        elapsed_secs = elapsed.as_secs_f64(),
                         // When logging to JSON, one can trigger alerts from the presence of this field.
                         slow_threshold=?self.settings.slow_statements_duration,
                         // Make sure to use "slow" in the message as that's likely
@@ -148,10 +139,7 @@ impl<'q> QueryLogger<'q> {
                         db.statement = sql,
                         rows_affected = self.rows_affected,
                         rows_returned = self.rows_returned,
-                        // Human-friendly - includes units (usually ms). Also kept for backward compatibility
                         ?elapsed,
-                        // Search friendly - numeric
-                        elapsed_secs = elapsed.as_secs_f64(),
                     );
                 }
             }

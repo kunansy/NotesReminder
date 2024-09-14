@@ -12,17 +12,15 @@ use tokio::io::{AsyncWrite, AsyncWriteExt};
 use crate::{errors::DownloadError, net::file_url};
 
 /// A trait for downloading files from Telegram.
-pub trait Download {
+pub trait Download<'w>
+/* FIXME(waffle): ideally, this lifetime ('w) shouldn't be here, but we can't help it without
+ * GATs */
+{
     /// An error returned from [`download_file`](Self::download_file).
-    type Err<'dst>;
+    type Err;
 
     /// A future returned from [`download_file`](Self::download_file).
-    type Fut<'dst>: Future<Output = Result<(), Self::Err<'dst>>> + Send;
-
-    // NOTE: We currently only allow borrowing `dst` in the future,
-    //       however we could also allow borrowing `self` or `path`.
-    //       This doesn't seem useful for our current implementers of
-    //       `Download`, but we could.
+    type Fut: Future<Output = Result<(), Self::Err>> + Send;
 
     /// Download a file from Telegram into `destination`.
     ///
@@ -52,11 +50,11 @@ pub trait Download {
     ///
     /// [`GetFile`]: crate::payloads::GetFile
     /// [`download_file_stream`]: Self::download_file_stream
-    fn download_file<'dst>(
+    fn download_file(
         &self,
         path: &str,
-        destination: &'dst mut (dyn AsyncWrite + Unpin + Send),
-    ) -> Self::Fut<'dst>;
+        destination: &'w mut (dyn AsyncWrite + Unpin + Send),
+    ) -> Self::Fut;
 
     /// An error returned from
     /// [`download_file_stream`](Self::download_file_stream).

@@ -1,22 +1,12 @@
-use include_dir::{include_dir, Dir};
 use itertools::Itertools;
-use proc_macro::Span;
 use proc_macro2::TokenStream;
-use proc_macro_error::{abort, emit_call_site_warning, emit_error};
+use proc_macro_error::{abort, emit_call_site_warning};
 use quote::quote;
-use std::fs;
-use std::path::Path;
-use std::{iter, path::PathBuf};
+use std::iter;
 use syn::{Attribute, Ident, MetaNameValue};
 
-// embedded JS code being inserted as html script elmenets
-static MERMAID_JS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/doc/js/");
-
-// Note: relative path depends on sub-module the macro is invoked in:
-//  base=document.getElementById("rustdoc-vars").attributes["data-root-path"]
-const MERMAID_JS_LOCAL: &str = "static.files.mermaid/mermaid.esm.min.mjs";
-const MERMAID_JS_LOCAL_DIR: &str = "static.files.mermaid";
-const MERMAID_JS_CDN: &str = "https://unpkg.com/mermaid@10/dist/mermaid.esm.min.mjs";
+const MERMAID_JS_LOCAL: &str = "../mermaid.min.js";
+const MERMAID_JS_CDN: &str = "https://unpkg.com/mermaid@9.1.5/dist/mermaid.min.js";
 
 const UNEXPECTED_ATTR_ERROR: &str =
     "unexpected attribute inside a diagram definition: only #[doc] is allowed";
@@ -36,36 +26,33 @@ pub enum Attr {
     DiagramEntry(Ident, String),
     /// Diagram end token
     DiagramEnd(Ident),
-    /// Include Anchor
-    DiagramIncludeAnchor(Ident, PathBuf),
 }
 
 impl Attr {
     pub fn as_ident(&self) -> Option<&Ident> {
         match self {
-            Attr::Forward(attr) => attr.path().get_ident(),
+            Attr::Forward(attr) => attr.path.get_ident(),
             Attr::DocComment(ident, _) => Some(ident),
             Attr::DiagramStart(ident) => Some(ident),
             Attr::DiagramEntry(ident, _) => Some(ident),
             Attr::DiagramEnd(ident) => Some(ident),
-            Attr::DiagramIncludeAnchor(ident, _) => Some(ident),
         }
     }
 
     pub fn is_diagram_end(&self) -> bool {
         match self {
             Attr::DiagramEnd(_) => true,
-            _ => false,
+            _ => false
         }
     }
-
+    
     pub fn is_diagram_start(&self) -> bool {
         match self {
             Attr::DiagramStart(_) => true,
-            _ => false,
+            _ => false
         }
     }
-
+    
     pub fn expect_diagram_entry_text(&self) -> &str {
         match self {
             Attr::DiagramEntry(_, body) => body.as_str(),
@@ -73,6 +60,7 @@ impl Attr {
         }
     }
 }
+
 impl From<Vec<Attribute>> for Attrs {
     fn from(attrs: Vec<Attribute>) -> Self {
         let mut out = Attrs::default();
@@ -104,133 +92,39 @@ impl quote::ToTokens for Attrs {
                     emit_call_site_warning!("encountered an unexpected attribute that's going to be ignored, this is a bug! ({})", body);
                 }
                 Attr::DiagramEnd(_) => (),
-                Attr::DiagramIncludeAnchor(_, path) => {
-                    // get cargo manifest dir
-                    let manifest_dir =
-                        std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
-
-                    // append path to cargo manifest dir using PathBuf
-                    let path = &PathBuf::new().join(manifest_dir).join(path);
-
-                    let data = match std::fs::read_to_string(path) {
-                        Ok(data) => data,
-                        Err(e) => {
-                            emit_error!(
-                                Span::call_site(),
-                                "failed to read mermaid file from path {:?}: {}",
-                                path,
-                                e,
-                            );
-                            continue;
-                        }
-                    };
-                    tokens.extend(generate_diagram_rustdoc(Some(data.as_str()).into_iter()))
-                }
             }
         }
     }
 }
 
-fn place_mermaid_js() -> std::io::Result<()> {
-    let target_dir = std::env::var("CARGO_TARGET_DIR").unwrap_or("./target".to_string());
-    let docs_dir = Path::new(&target_dir).join("doc");
-    // extract mermaid module iff rustdoc folder exists already
-    if docs_dir.exists() {
-        let static_files_mermaid_dir = docs_dir.join(MERMAID_JS_LOCAL_DIR);
-        if static_files_mermaid_dir.exists() {
-            Ok(())
-        } else {
-            fs::create_dir_all(&static_files_mermaid_dir).unwrap();
-            MERMAID_JS_DIR.extract(static_files_mermaid_dir)?;
-            Ok(())
+const MERMAID_INIT_SCRIPT: &str = r#"
+    var amrn_mermaid_theme = 'default';
+    if(typeof currentTheme !== 'undefined') {
+        let docs_theme = currentTheme.href;
+        let is_dark = /.*(dark|ayu).*\.css/.test(docs_theme)
+        if(is_dark) {
+            amrn_mermaid_theme = 'dark'
         }
     } else {
-        // no rustdocs rendering
-        Ok(())
+        console.log("currentTheme is undefined, are we not inside rustdoc?");
     }
-}
-
-const MERMAID_INIT_SCRIPT: &str = r#"
-    const mermaidModuleFile = "{mermaidModuleFile}";
-    const fallbackRemoteUrl = "{fallbackRemoteUrl}";
-    const rustdocVarsId= "rustdoc-vars";
-    const dataRootPathAttr = "data-root-path";
-
-
-    function initializeMermaid(mermaid) {
-     var amrn_mermaid_theme =
-         window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-         ? 'dark'
-         : 'default';
-
-      mermaid.initialize({
-        'startOnLoad':'true',
-        'theme': amrn_mermaid_theme,
-        'logLevel': 3 });
-      mermaid.run();
-    }
-
-	function failedToLoadWarnings() {
-		for(var elem of document.getElementsByClassName("mermaid")) {
-			 elem.innerHTML =
-			 `<div> <mark>
-			  &#9888; Cannot render diagram! Failed to import module from local
-			  file and remote location also!
-			  Either access the rustdocs via HTTP/S using a
-			  <a href="https://developer.mozilla.org/en-US/docs/Learn/Common_questions/Tools_and_setup/set_up_a_local_testing_server">
-			   local web server
-			  </a>, for example:
-			   python3 -m http.server --directory target/doc/, <br> or enable local file access in your
-			   Safari/Firefox/Chrome browser, for example
-			  starting Chrome with flag '--allow-file-access-from-files'.
-			  </mark></div> `;
-		}
-	}
-
-
-    // If rustdoc is read from file directly, the import of mermaid module
-    // from file will fail. In this case falling back to remote location.
-    // If neither succeeds, the mermaid markdown is replaced by notice to
-    // enable file acecss in browser.
-    try {
-       var rootPath = document
-         .getElementById(rustdocVarsId)
-         .attributes[dataRootPathAttr]
-         .value;
-       const {
-         default: mermaid,
-       } = await import(rootPath + mermaidModuleFile);
-	   initializeMermaid(mermaid);
-    } catch (e) {
-       try {
-         const {
-            default: mermaid,
-         } = await import(fallbackRemoteUrl);
-	     initializeMermaid(mermaid);
-       } catch (e) {
-		 failedToLoadWarnings();
-	   }
-    }
+    mermaid.initialize({'startOnLoad':'true', 'theme': amrn_mermaid_theme, 'logLevel': 3 });
 "#;
 
 fn generate_diagram_rustdoc<'a>(parts: impl Iterator<Item = &'a str>) -> TokenStream {
     let preamble = iter::once(r#"<div class="mermaid">"#);
     let postamble = iter::once("</div>");
 
-    let mermaid_js_init = format!(
-        r#"<script type="module">{}</script>"#,
-        MERMAID_INIT_SCRIPT
-            .replace("{mermaidModuleFile}", MERMAID_JS_LOCAL)
-            .replace("{fallbackRemoteUrl}", MERMAID_JS_CDN)
-    );
+    let mermaid_js_load_primary = format!(r#"<script src="{}"></script>"#, MERMAID_JS_LOCAL);
+    let mermaid_js_load_fallback = format!(r#"<script>window.mermaid || document.write('<script src="{}" crossorigin="anonymous"><\/script>')</script>"#, MERMAID_JS_CDN);
+
+    let mermaid_js_init = format!(r#"<script>{}</script>"#, MERMAID_INIT_SCRIPT);
 
     let body = preamble.chain(parts).chain(postamble).join("\n");
 
-    place_mermaid_js().unwrap_or_else(|e| {
-        eprintln!("failed to place mermaid.js on the filesystem: {}", e);
-    });
-
     quote! {
+        #[doc = #mermaid_js_load_primary]
+        #[doc = #mermaid_js_load_fallback]
         #[doc = #mermaid_js_init]
         #[doc = #body]
     }
@@ -238,20 +132,17 @@ fn generate_diagram_rustdoc<'a>(parts: impl Iterator<Item = &'a str>) -> TokenSt
 
 impl Attrs {
     pub fn push_attrs(&mut self, attrs: Vec<Attribute>) {
-        use syn::Expr;
-        use syn::ExprLit;
         use syn::Lit::*;
+        use syn::Meta::*;
 
         let mut current_location = Location::OutsideDiagram;
         let mut diagram_start_ident = None;
 
         for attr in attrs {
-            match attr.meta.require_name_value() {
-                Ok(MetaNameValue {
-                    value: Expr::Lit(ExprLit { lit: Str(s), .. }),
-                    path,
-                    ..
-                }) if path.is_ident("doc") => {
+            match &attr.parse_meta() {
+                Ok(NameValue(MetaNameValue {
+                    lit: Str(s), path, ..
+                })) if path.is_ident("doc") => {
                     let ident = path.get_ident().unwrap();
                     for attr in split_attr_body(ident, &s.value(), &mut current_location) {
                         if attr.is_diagram_start() {
@@ -285,8 +176,8 @@ enum Location {
 impl Location {
     fn is_inside(self) -> bool {
         match self {
-            Location::InsideDiagram => true,
-            _ => false,
+            Location::InsideDiagram => true, 
+            _ => false
         }
     }
 }
@@ -311,7 +202,7 @@ fn split_attr_body(ident: &Ident, input: &str, loc: &mut Location) -> Vec<Attr> 
         buffer: Vec<&'a str>,
     }
 
-    let mut ctx: Ctx<'_> = Default::default();
+    let mut ctx = Default::default();
 
     let flush_buffer_as_doc_comment = |ctx: &mut Ctx| {
         if !ctx.buffer.is_empty() {
@@ -331,16 +222,6 @@ fn split_attr_body(ident: &Ident, input: &str, loc: &mut Location) -> Vec<Attr> 
 
     while let Some(token) = tokens.next() {
         match (*loc, token, tokens.peek()) {
-            // Detect include anchor
-            (OutsideDiagram, token, _) if token.starts_with("include_mmd!") => {
-                // cleanup
-                let path = token.trim_start_matches("include_mmd!").trim();
-                let path = path.trim_start_matches('(').trim_end_matches(')');
-                let path = path.trim_matches('"');
-                let path = PathBuf::from(path);
-                ctx.attrs
-                    .push(Attr::DiagramIncludeAnchor(ident.clone(), path));
-            }
             // Flush the buffer, then open the diagram code block
             (OutsideDiagram, TICKS, Some(&MERMAID)) => {
                 tokens.next();
@@ -419,9 +300,6 @@ mod tests {
                 Attr::DiagramStart(..) => f.write_str("Attr::DiagramStart"),
                 Attr::DiagramEntry(_, body) => write!(f, "Attr::DiagramEntry({:?})", body),
                 Attr::DiagramEnd(..) => f.write_str("Attr::DiagramEnd"),
-                Attr::DiagramIncludeAnchor(_, path) => {
-                    write!(f, "Attr::DiagramIncludeAnchor({:?})", path)
-                }
             }
         }
     }

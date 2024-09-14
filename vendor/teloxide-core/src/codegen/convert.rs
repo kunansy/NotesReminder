@@ -1,7 +1,6 @@
 use crate::codegen::schema::Type;
 
 pub enum Convert {
-    #[allow(dead_code)]
     Id(Type),
     Into(Type),
     Collect(Type),

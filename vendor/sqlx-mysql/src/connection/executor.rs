@@ -25,29 +25,32 @@ use futures_util::{pin_mut, TryStreamExt};
 use std::{borrow::Cow, sync::Arc};
 
 impl MySqlConnection {
-    async fn prepare_statement<'c>(
+    async fn get_or_prepare<'c>(
         &mut self,
         sql: &str,
+        persistent: bool,
     ) -> Result<(u32, MySqlStatementMetadata), Error> {
+        if let Some(statement) = self.cache_statement.get_mut(sql) {
+            // <MySqlStatementMetadata> is internally reference-counted
+            return Ok((*statement).clone());
+        }
+
         // https://dev.mysql.com/doc/internals/en/com-stmt-prepare.html
         // https://dev.mysql.com/doc/internals/en/com-stmt-prepare-response.html#packet-COM_STMT_PREPARE_OK
 
-        self.inner
-            .stream
-            .send_packet(Prepare { query: sql })
-            .await?;
+        self.stream.send_packet(Prepare { query: sql }).await?;
 
-        let ok: PrepareOk = self.inner.stream.recv().await?;
+        let ok: PrepareOk = self.stream.recv().await?;
 
         // the parameter definitions are very unreliable so we skip over them
         // as we have little use
 
         if ok.params > 0 {
             for _ in 0..ok.params {
-                let _def: ColumnDefinition = self.inner.stream.recv().await?;
+                let _def: ColumnDefinition = self.stream.recv().await?;
             }
 
-            self.inner.stream.maybe_recv_eof().await?;
+            self.stream.maybe_recv_eof().await?;
         }
 
         // the column definitions are berefit the type information from the
@@ -57,7 +60,7 @@ impl MySqlConnection {
         let mut columns = Vec::new();
 
         let column_names = if ok.columns > 0 {
-            recv_result_metadata(&mut self.inner.stream, ok.columns as usize, &mut columns).await?
+            recv_result_metadata(&mut self.stream, ok.columns as usize, &mut columns).await?
         } else {
             Default::default()
         };
@@ -69,30 +72,11 @@ impl MySqlConnection {
             column_names: Arc::new(column_names),
         };
 
-        Ok((id, metadata))
-    }
-
-    async fn get_or_prepare_statement<'c>(
-        &mut self,
-        sql: &str,
-    ) -> Result<(u32, MySqlStatementMetadata), Error> {
-        if let Some(statement) = self.inner.cache_statement.get_mut(sql) {
-            // <MySqlStatementMetadata> is internally reference-counted
-            return Ok((*statement).clone());
-        }
-
-        let (id, metadata) = self.prepare_statement(sql).await?;
-
-        // in case of the cache being full, close the least recently used statement
-        if let Some((id, _)) = self
-            .inner
-            .cache_statement
-            .insert(sql, (id, metadata.clone()))
-        {
-            self.inner
-                .stream
-                .send_packet(StmtClose { statement: id })
-                .await?;
+        if persistent && self.cache_statement.is_enabled() {
+            // in case of the cache being full, close the least recently used statement
+            if let Some((id, _)) = self.cache_statement.insert(sql, (id, metadata.clone())) {
+                self.stream.send_packet(StmtClose { statement: id }).await?;
+            }
         }
 
         Ok((id, metadata))
@@ -106,10 +90,10 @@ impl MySqlConnection {
         persistent: bool,
     ) -> Result<impl Stream<Item = Result<Either<MySqlQueryResult, MySqlRow>, Error>> + 'e, Error>
     {
-        let mut logger = QueryLogger::new(sql, self.inner.log_settings.clone());
+        let mut logger = QueryLogger::new(sql, self.log_settings.clone());
 
-        self.inner.stream.wait_until_ready().await?;
-        self.inner.stream.waiting.push_back(Waiting::Result);
+        self.stream.wait_until_ready().await?;
+        self.stream.waiting.push_back(Waiting::Result);
 
         Ok(Box::pin(try_stream! {
             // make a slot for the shared column data
@@ -118,40 +102,24 @@ impl MySqlConnection {
             let mut columns = Arc::new(Vec::new());
 
             let (mut column_names, format, mut needs_metadata) = if let Some(arguments) = arguments {
-                if persistent && self.inner.cache_statement.is_enabled() {
-                    let (id, metadata) = self
-                        .get_or_prepare_statement(sql)
-                        .await?;
+                let (id, metadata) = self.get_or_prepare(
+                    sql,
+                    persistent,
+                )
+                .await?;
 
-                    // https://dev.mysql.com/doc/internals/en/com-stmt-execute.html
-                    self.inner.stream
-                        .send_packet(StatementExecute {
-                            statement: id,
-                            arguments: &arguments,
-                        })
-                        .await?;
+                // https://dev.mysql.com/doc/internals/en/com-stmt-execute.html
+                self.stream
+                    .send_packet(StatementExecute {
+                        statement: id,
+                        arguments: &arguments,
+                    })
+                    .await?;
 
-                    (metadata.column_names, MySqlValueFormat::Binary, false)
-                } else {
-                    let (id, metadata) = self
-                        .prepare_statement(sql)
-                        .await?;
-
-                    // https://dev.mysql.com/doc/internals/en/com-stmt-execute.html
-                    self.inner.stream
-                        .send_packet(StatementExecute {
-                            statement: id,
-                            arguments: &arguments,
-                        })
-                        .await?;
-
-                    self.inner.stream.send_packet(StmtClose { statement: id }).await?;
-
-                    (metadata.column_names, MySqlValueFormat::Binary, false)
-                }
+                (metadata.column_names, MySqlValueFormat::Binary, false)
             } else {
                 // https://dev.mysql.com/doc/internals/en/com-query.html
-                self.inner.stream.send_packet(Query(sql)).await?;
+                self.stream.send_packet(Query(sql)).await?;
 
                 (Arc::default(), MySqlValueFormat::Text, true)
             };
@@ -159,7 +127,7 @@ impl MySqlConnection {
             loop {
                 // query response is a meta-packet which may be one of:
                 //  Ok, Err, ResultSet, or (unhandled) LocalInfileRequest
-                let mut packet = self.inner.stream.recv_packet().await?;
+                let mut packet = self.stream.recv_packet().await?;
 
                 if packet[0] == 0x00 || packet[0] == 0xff {
                     // first packet in a query response is OK or ERR
@@ -180,33 +148,31 @@ impl MySqlConnection {
                         continue;
                     }
 
-                    self.inner.stream.waiting.pop_front();
+                    self.stream.waiting.pop_front();
                     return Ok(());
                 }
 
                 // otherwise, this first packet is the start of the result-set metadata,
-                *self.inner.stream.waiting.front_mut().unwrap() = Waiting::Row;
+                *self.stream.waiting.front_mut().unwrap() = Waiting::Row;
 
-                let num_columns = packet.get_uint_lenenc(); // column count
-                let num_columns = usize::try_from(num_columns)
-                    .map_err(|_| err_protocol!("column count overflows usize: {num_columns}"))?;
+                let num_columns = packet.get_uint_lenenc() as usize; // column count
 
                 if needs_metadata {
-                    column_names = Arc::new(recv_result_metadata(&mut self.inner.stream, num_columns, Arc::make_mut(&mut columns)).await?);
+                    column_names = Arc::new(recv_result_metadata(&mut self.stream, num_columns, Arc::make_mut(&mut columns)).await?);
                 } else {
                     // next time we hit here, it'll be a new result set and we'll need the
                     // full metadata
                     needs_metadata = true;
 
-                    recv_result_columns(&mut self.inner.stream, num_columns, Arc::make_mut(&mut columns)).await?;
+                    recv_result_columns(&mut self.stream, num_columns, Arc::make_mut(&mut columns)).await?;
                 }
 
                 // finally, there will be none or many result-rows
                 loop {
-                    let packet = self.inner.stream.recv_packet().await?;
+                    let packet = self.stream.recv_packet().await?;
 
                     if packet[0] == 0xfe && packet.len() < 9 {
-                        let eof = packet.eof(self.inner.stream.capabilities)?;
+                        let eof = packet.eof(self.stream.capabilities)?;
 
                         r#yield!(Either::Left(MySqlQueryResult {
                             rows_affected: 0,
@@ -215,11 +181,11 @@ impl MySqlConnection {
 
                         if eof.status.contains(Status::SERVER_MORE_RESULTS_EXISTS) {
                             // more result sets exist, continue to the next one
-                            *self.inner.stream.waiting.front_mut().unwrap() = Waiting::Result;
+                            *self.stream.waiting.front_mut().unwrap() = Waiting::Result;
                             break;
                         }
 
-                        self.inner.stream.waiting.pop_front();
+                        self.stream.waiting.pop_front();
                         return Ok(());
                     }
 
@@ -247,22 +213,19 @@ impl MySqlConnection {
 impl<'c> Executor<'c> for &'c mut MySqlConnection {
     type Database = MySql;
 
-    fn fetch_many<'e, 'q, E>(
+    fn fetch_many<'e, 'q: 'e, E: 'q>(
         self,
         mut query: E,
     ) -> BoxStream<'e, Result<Either<MySqlQueryResult, MySqlRow>, Error>>
     where
         'c: 'e,
         E: Execute<'q, Self::Database>,
-        'q: 'e,
-        E: 'q,
     {
         let sql = query.sql();
-        let arguments = query.take_arguments().map_err(Error::Encode);
+        let arguments = query.take_arguments();
         let persistent = query.persistent();
 
         Box::pin(try_stream! {
-            let arguments = arguments?;
             let s = self.run(sql, arguments, persistent).await?;
             pin_mut!(s);
 
@@ -274,12 +237,13 @@ impl<'c> Executor<'c> for &'c mut MySqlConnection {
         })
     }
 
-    fn fetch_optional<'e, 'q, E>(self, query: E) -> BoxFuture<'e, Result<Option<MySqlRow>, Error>>
+    fn fetch_optional<'e, 'q: 'e, E: 'q>(
+        self,
+        query: E,
+    ) -> BoxFuture<'e, Result<Option<MySqlRow>, Error>>
     where
         'c: 'e,
         E: Execute<'q, Self::Database>,
-        'q: 'e,
-        E: 'q,
     {
         let mut s = self.fetch_many(query);
 
@@ -303,20 +267,9 @@ impl<'c> Executor<'c> for &'c mut MySqlConnection {
         'c: 'e,
     {
         Box::pin(async move {
-            self.inner.stream.wait_until_ready().await?;
+            self.stream.wait_until_ready().await?;
 
-            let metadata = if self.inner.cache_statement.is_enabled() {
-                self.get_or_prepare_statement(sql).await?.1
-            } else {
-                let (id, metadata) = self.prepare_statement(sql).await?;
-
-                self.inner
-                    .stream
-                    .send_packet(StmtClose { statement: id })
-                    .await?;
-
-                metadata
-            };
+            let (_, metadata) = self.get_or_prepare(sql, true).await?;
 
             Ok(MySqlStatement {
                 sql: Cow::Borrowed(sql),
@@ -332,16 +285,11 @@ impl<'c> Executor<'c> for &'c mut MySqlConnection {
         'c: 'e,
     {
         Box::pin(async move {
-            self.inner.stream.wait_until_ready().await?;
+            self.stream.wait_until_ready().await?;
 
-            let (id, metadata) = self.prepare_statement(sql).await?;
+            let (_, metadata) = self.get_or_prepare(sql, false).await?;
 
-            self.inner
-                .stream
-                .send_packet(StmtClose { statement: id })
-                .await?;
-
-            let columns = (*metadata.columns).clone();
+            let columns = (&*metadata.columns).clone();
 
             let nullable = columns
                 .iter()
@@ -387,7 +335,7 @@ fn recv_next_result_column(def: &ColumnDefinition, ordinal: usize) -> Result<MyS
         (name, _) => UStr::new(name),
     };
 
-    let type_info = MySqlTypeInfo::from_column(def);
+    let type_info = MySqlTypeInfo::from_column(&def);
 
     Ok(MySqlColumn {
         name,

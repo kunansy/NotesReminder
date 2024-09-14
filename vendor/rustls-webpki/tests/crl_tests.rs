@@ -1,4 +1,4 @@
-use webpki::{BorrowedCertRevocationList, CertRevocationList, DerTypeId, Error};
+use webpki::{BorrowedCertRevocationList, CertRevocationList, Error};
 
 const REVOKED_SERIAL: &[u8] = &[0x03, 0xAE, 0x51, 0xDB, 0x51, 0x15, 0x5A, 0x3C];
 
@@ -8,38 +8,34 @@ const REVOKED_SERIAL_NEGATIVE: &[u8] = &[0xfd, 0x78, 0xa8, 0x4e];
 // zero if one is required to make the twos complement representation positive.  in this case
 // one is required.
 const REVOKED_SERIAL_WITH_TOP_BIT_SET: &[u8] = &[0x00, 0x80, 0xfe, 0xed, 0xf0, 0x0d];
+
 #[test]
 fn parse_valid_crl() {
     // We should be able to parse a valid CRL without error, and find the revoked serial.
     let crl = include_bytes!("crls/crl.valid.der");
-    let borrowed_crl =
-        BorrowedCertRevocationList::from_der(&crl[..]).expect("failed to parse valid crl");
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).expect("failed to parse valid crl");
+    assert!(crl.find_serial(REVOKED_SERIAL).unwrap().is_some());
 
     #[cfg(feature = "alloc")]
     {
-        let crl: CertRevocationList = borrowed_crl.to_owned().unwrap().into();
+        let crl = crl.to_owned().unwrap();
         assert!(crl.find_serial(REVOKED_SERIAL).unwrap().is_some());
     }
-
-    let crl: CertRevocationList = borrowed_crl.into();
-    assert!(crl.find_serial(REVOKED_SERIAL).unwrap().is_some());
 }
 
 #[test]
 fn parse_empty_crl() {
     // We should be able to parse an empty CRL without error, and find no revoked certs.
     let crl = include_bytes!("crls/crl.empty.der");
-    let borrowed_crl =
-        BorrowedCertRevocationList::from_der(&crl[..]).expect("failed to parse empty crl");
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).expect("failed to parse empty crl");
+    assert!(crl.into_iter().next().is_none());
 
     #[cfg(feature = "alloc")]
     {
         // We should also be able to create an owned empty CRL without error.
-        let res = borrowed_crl.to_owned();
+        let res = crl.to_owned();
         assert!(res.is_ok());
     }
-
-    assert!(borrowed_crl.into_iter().next().is_none());
 }
 
 #[test]
@@ -63,7 +59,7 @@ fn parse_missing_next_update_crl() {
     // Parsing a CRL with a missing next update time should error.
     let crl = include_bytes!("crls/crl.missing.next.update.der");
     let res = BorrowedCertRevocationList::from_der(&crl[..]);
-    assert!(matches!(res, Err(Error::TrailingData(DerTypeId::Time))));
+    assert!(matches!(res, Err(Error::BadDer)));
 }
 
 #[test]
@@ -117,11 +113,20 @@ fn parse_too_long_crl_number_crl() {
 #[test]
 fn parse_entry_negative_serial_crl() {
     let crl = include_bytes!("crls/crl.negative.serial.der");
-    let borrowed_crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+
+    assert!(crl
+        .find_serial(REVOKED_SERIAL)
+        .expect("looking for REVOKED_SERIAL failed")
+        .is_none());
+    assert!(crl
+        .find_serial(REVOKED_SERIAL_NEGATIVE)
+        .expect("looking for REVOKED_SERIAL_NEGATIVE failed")
+        .is_some());
 
     #[cfg(feature = "alloc")]
     {
-        let crl: CertRevocationList = borrowed_crl.to_owned().unwrap().into();
+        let crl = crl.to_owned().unwrap();
         assert!(crl
             .find_serial(REVOKED_SERIAL)
             .expect("looking for REVOKED_SERIAL failed")
@@ -131,37 +136,26 @@ fn parse_entry_negative_serial_crl() {
             .expect("looking for REVOKED_SERIAL_NEGATIVE failed")
             .is_some());
     }
-
-    let crl: CertRevocationList = borrowed_crl.into();
-    assert!(crl
-        .find_serial(REVOKED_SERIAL)
-        .expect("looking for REVOKED_SERIAL failed")
-        .is_none());
-    assert!(crl
-        .find_serial(REVOKED_SERIAL_NEGATIVE)
-        .expect("looking for REVOKED_SERIAL_NEGATIVE failed")
-        .is_some());
 }
 
 #[test]
 fn parse_entry_topbit_serial_crl() {
     let crl = include_bytes!("crls/crl.topbit.serial.der");
-    let borrowed_crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+
+    assert!(crl
+        .find_serial(REVOKED_SERIAL_WITH_TOP_BIT_SET)
+        .expect("failed to look for REVOKED_SERIAL_WITH_TOP_BIT_SET")
+        .is_some());
 
     #[cfg(feature = "alloc")]
     {
-        let crl: CertRevocationList = borrowed_crl.to_owned().unwrap().into();
+        let crl = crl.to_owned().unwrap();
         assert!(crl
             .find_serial(REVOKED_SERIAL_WITH_TOP_BIT_SET)
             .expect("failed to look for REVOKED_SERIAL_WITH_TOP_BIT_SET")
             .is_some());
     }
-
-    let crl: CertRevocationList = borrowed_crl.into();
-    assert!(crl
-        .find_serial(REVOKED_SERIAL_WITH_TOP_BIT_SET)
-        .expect("failed to look for REVOKED_SERIAL_WITH_TOP_BIT_SET")
-        .is_some());
 }
 
 #[test]
@@ -169,17 +163,14 @@ fn parse_entry_without_exts_crl() {
     // Parsing a CRL that includes a revoked entry that has no extensions shouldn't error, and we
     // should find the expected revoked certificate.
     let crl = include_bytes!("crls/crl.no.entry.exts.der");
-    let borrowed_crl =
-        BorrowedCertRevocationList::from_der(&crl[..]).expect("unexpected error parsing crl");
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).expect("unexpected error parsing crl");
+    assert!(crl.find_serial(REVOKED_SERIAL).unwrap().is_some());
 
     #[cfg(feature = "alloc")]
     {
-        let crl: CertRevocationList = borrowed_crl.to_owned().unwrap().into();
+        let crl = crl.to_owned().unwrap();
         assert!(crl.find_serial(REVOKED_SERIAL).unwrap().is_some());
     }
-
-    let crl: CertRevocationList = borrowed_crl.into();
-    assert!(crl.find_serial(REVOKED_SERIAL).unwrap().is_some());
 }
 
 #[test]
@@ -201,20 +192,19 @@ fn parse_entry_unknown_crit_ext_crl() {
     // Parsing a CRL that includes a revoked entry that has an unknown critical extension shouldn't
     // error up-front because the problem is with a revoked cert entry.
     let crl = include_bytes!("crls/crl.entry.unknown.crit.ext.der");
-    let borrowed_crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+
+    // but should error when we try to find a revoked serial due to the entry with the unsupported
+    // critical ext.
+    let res = crl.find_serial(REVOKED_SERIAL);
+    assert!(matches!(res, Err(Error::UnsupportedCriticalExtension)));
 
     #[cfg(feature = "alloc")]
     {
         // Parsing the CRL as an owned CRL should error since it will process the revoked certs.
-        let res = borrowed_crl.to_owned();
+        let res = crl.to_owned();
         assert!(matches!(res, Err(Error::UnsupportedCriticalExtension)));
     }
-
-    // but should error when we try to find a revoked serial due to the entry with the unsupported
-    // critical ext.
-    let crl: CertRevocationList = borrowed_crl.into();
-    let res = crl.find_serial(REVOKED_SERIAL);
-    assert!(matches!(res, Err(Error::UnsupportedCriticalExtension)));
 }
 
 #[test]
@@ -222,19 +212,18 @@ fn parse_entry_invalid_reason_crl() {
     // Parsing a CRL that includes a revoked entry that has an unknown revocation reason shouldn't
     // error up-front since the problem is with a revoked entry.
     let crl = include_bytes!("crls/crl.entry.invalid.reason.der");
-    let borrowed_crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+
+    // But searching for a serial should error due to the revoked cert with the unknown reason.
+    let res = crl.find_serial(REVOKED_SERIAL);
+    assert!(matches!(res, Err(Error::UnsupportedRevocationReason)));
 
     #[cfg(feature = "alloc")]
     {
         // Parsing the CRL as an owned CRL should error since it will process the revoked certs.
-        let res = borrowed_crl.to_owned();
+        let res = crl.to_owned();
         assert!(matches!(res, Err(Error::UnsupportedRevocationReason)));
     }
-
-    // But searching for a serial should error due to the revoked cert with the unknown reason.
-    let crl: CertRevocationList = borrowed_crl.into();
-    let res = crl.find_serial(REVOKED_SERIAL);
-    assert!(matches!(res, Err(Error::UnsupportedRevocationReason)));
 }
 
 #[test]
@@ -242,12 +231,17 @@ fn parse_entry_invalidity_date_crl() {
     // Parsing a CRL that includes a revoked entry that has an invalidity date ext shouldn't error
     // and we should find the expected revoked cert with an invalidity date.
     let crl = include_bytes!("crls/crl.entry.invalidity.date.der");
-    let borrowed_crl =
-        BorrowedCertRevocationList::from_der(&crl[..]).expect("unexpected err parsing CRL");
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).expect("unexpected err parsing CRL");
+    assert!(crl
+        .find_serial(REVOKED_SERIAL)
+        .unwrap()
+        .unwrap()
+        .invalidity_date
+        .is_some());
 
     #[cfg(feature = "alloc")]
     {
-        let crl: CertRevocationList = borrowed_crl.to_owned().unwrap().into();
+        let crl = crl.to_owned().unwrap();
         assert!(crl
             .find_serial(REVOKED_SERIAL)
             .unwrap()
@@ -255,14 +249,6 @@ fn parse_entry_invalidity_date_crl() {
             .invalidity_date
             .is_some());
     }
-
-    let crl: CertRevocationList = borrowed_crl.into();
-    assert!(crl
-        .find_serial(REVOKED_SERIAL)
-        .unwrap()
-        .unwrap()
-        .invalidity_date
-        .is_some());
 }
 
 #[test]
@@ -271,16 +257,15 @@ fn parse_entry_indirect_issuer_crl() {
     // shouldn't error up-front - we expect the error to be surfaced when we iterate the revoked
     // certs.
     let crl = include_bytes!("crls/crl.entry.issuer.ext.der");
-    let borrowed_crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+    let crl = BorrowedCertRevocationList::from_der(&crl[..]).unwrap();
+
+    let res = crl.find_serial(REVOKED_SERIAL);
+    assert!(matches!(res, Err(Error::UnsupportedIndirectCrl)));
 
     #[cfg(feature = "alloc")]
     {
         // Building an owned CRL should error up front since it will process the revoked certs.
-        let res = borrowed_crl.to_owned();
+        let res = crl.to_owned();
         assert!(matches!(res, Err(Error::UnsupportedIndirectCrl)));
     }
-
-    let crl: CertRevocationList = borrowed_crl.into();
-    let res = crl.find_serial(REVOKED_SERIAL);
-    assert!(matches!(res, Err(Error::UnsupportedIndirectCrl)));
 }

@@ -55,19 +55,6 @@ pub trait PgHasArrayType {
     }
 }
 
-impl<T> PgHasArrayType for &T
-where
-    T: PgHasArrayType,
-{
-    fn array_type_info() -> PgTypeInfo {
-        T::array_type_info()
-    }
-
-    fn array_compatible(ty: &PgTypeInfo) -> bool {
-        T::array_compatible(ty)
-    }
-}
-
 impl<T> PgHasArrayType for Option<T>
 where
     T: PgHasArrayType,
@@ -136,7 +123,7 @@ where
     T: Encode<'q, Postgres>,
 {
     #[inline]
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         self.as_slice().encode_by_ref(buf)
     }
 }
@@ -146,7 +133,7 @@ where
     for<'a> &'a [T]: Encode<'q, Postgres>,
     T: Encode<'q, Postgres>,
 {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         self.as_slice().encode_by_ref(buf)
     }
 }
@@ -155,11 +142,12 @@ impl<'q, T> Encode<'q, Postgres> for &'_ [T]
 where
     T: Encode<'q, Postgres> + Type<Postgres>,
 {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
-        let type_info = self
-            .first()
-            .and_then(Encode::produces)
-            .unwrap_or_else(T::type_info);
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
+        let type_info = if self.len() < 1 {
+            T::type_info()
+        } else {
+            self[0].produces().unwrap_or_else(T::type_info)
+        };
 
         buf.extend(&1_i32.to_be_bytes()); // number of dimensions
         buf.extend(&0_i32.to_be_bytes()); // flags
@@ -167,28 +155,20 @@ where
         // element type
         match type_info.0 {
             PgType::DeclareWithName(name) => buf.patch_type_by_name(&name),
-            PgType::DeclareArrayOf(array) => buf.patch_array_type(array),
 
             ty => {
                 buf.extend(&ty.oid().0.to_be_bytes());
             }
         }
 
-        let array_len = i32::try_from(self.len()).map_err(|_| {
-            format!(
-                "encoded array length is too large for Postgres: {}",
-                self.len()
-            )
-        })?;
-
-        buf.extend(array_len.to_be_bytes()); // len
+        buf.extend(&(self.len() as i32).to_be_bytes()); // len
         buf.extend(&1_i32.to_be_bytes()); // lower bound
 
         for element in self.iter() {
-            buf.encode(element)?;
+            buf.encode(element);
         }
 
-        Ok(IsNull::No)
+        IsNull::No
     }
 }
 
@@ -249,9 +229,6 @@ where
                 // length of the array axis
                 let len = buf.get_i32();
 
-                let len = usize::try_from(len)
-                    .map_err(|_| format!("overflow converting array len ({len}) to usize"))?;
-
                 // the lower bound, we only support arrays starting from "1"
                 let lower = buf.get_i32();
 
@@ -259,12 +236,14 @@ where
                     return Err(format!("encountered an array with a lower bound of {lower} in the first dimension; only arrays starting at one are supported").into());
                 }
 
-                let mut elements = Vec::with_capacity(len);
+                let mut elements = Vec::with_capacity(len as usize);
 
                 for _ in 0..len {
-                    let value_ref = PgValueRef::get(&mut buf, format, element_type_info.clone())?;
-
-                    elements.push(T::decode(value_ref)?);
+                    elements.push(T::decode(PgValueRef::get(
+                        &mut buf,
+                        format,
+                        element_type_info.clone(),
+                    ))?)
                 }
 
                 Ok(elements)

@@ -11,7 +11,7 @@ use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, Par
 /// **.ZIP** files can be sent using this method.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#inlinequeryresultdocument).
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InlineQueryResultDocument {
     /// Unique identifier for this result, 1-64 bytes.
@@ -53,13 +53,13 @@ pub struct InlineQueryResultDocument {
     pub input_message_content: Option<InputMessageContent>,
 
     /// URL of the thumbnail (jpeg only) for the file.
-    pub thumbnail_url: Option<reqwest::Url>,
+    pub thumb_url: Option<reqwest::Url>,
 
     /// Thumbnail width.
-    pub thumbnail_width: Option<u32>,
+    pub thumb_width: Option<i32>,
 
     /// Thumbnail height.
-    pub thumbnail_height: Option<u32>,
+    pub thumb_height: Option<i32>,
 }
 
 impl InlineQueryResultDocument {
@@ -134,20 +134,20 @@ impl InlineQueryResultDocument {
     }
 
     #[must_use]
-    pub fn thumbnail_url(mut self, val: reqwest::Url) -> Self {
-        self.thumbnail_url = Some(val);
+    pub fn thumb_url(mut self, val: reqwest::Url) -> Self {
+        self.thumb_url = Some(val);
         self
     }
 
     #[must_use]
-    pub fn thumbnail_width(mut self, val: u32) -> Self {
-        self.thumbnail_width = Some(val);
+    pub fn thumb_width(mut self, val: i32) -> Self {
+        self.thumb_width = Some(val);
         self
     }
 
     #[must_use]
-    pub fn thumbnail_height(mut self, val: u32) -> Self {
-        self.thumbnail_height = Some(val);
+    pub fn thumb_height(mut self, val: i32) -> Self {
+        self.thumb_height = Some(val);
         self
     }
 }

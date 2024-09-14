@@ -199,10 +199,7 @@ CREATE TABLE IF NOT EXISTS _sqlx_migrations (
             .execute(&mut *tx)
             .await?;
 
-            let _ = tx
-                .execute(&*migration.sql)
-                .await
-                .map_err(|e| MigrateError::ExecuteMigration(e, migration.version))?;
+            let _ = tx.execute(&*migration.sql).await?;
 
             // language=MySQL
             let _ = query(
@@ -224,7 +221,6 @@ CREATE TABLE IF NOT EXISTS _sqlx_migrations (
 
             let elapsed = start.elapsed();
 
-            #[allow(clippy::cast_possible_truncation)]
             let _ = query(
                 r#"
     UPDATE _sqlx_migrations

@@ -7,7 +7,6 @@ use core::fmt::{self, Debug, Display};
 use core::ops::Range;
 use core::ops::RangeBounds;
 use core::str::FromStr;
-use std::ffi::CStr;
 use std::panic;
 #[cfg(super_unstable)]
 use std::path::PathBuf;
@@ -847,38 +846,19 @@ impl Literal {
         }
     }
 
-    pub fn string(string: &str) -> Literal {
+    pub fn string(t: &str) -> Literal {
         if inside_proc_macro() {
-            Literal::Compiler(proc_macro::Literal::string(string))
+            Literal::Compiler(proc_macro::Literal::string(t))
         } else {
-            Literal::Fallback(fallback::Literal::string(string))
+            Literal::Fallback(fallback::Literal::string(t))
         }
     }
 
-    pub fn character(ch: char) -> Literal {
+    pub fn character(t: char) -> Literal {
         if inside_proc_macro() {
-            Literal::Compiler(proc_macro::Literal::character(ch))
+            Literal::Compiler(proc_macro::Literal::character(t))
         } else {
-            Literal::Fallback(fallback::Literal::character(ch))
-        }
-    }
-
-    pub fn byte_character(byte: u8) -> Literal {
-        if inside_proc_macro() {
-            Literal::Compiler({
-                #[cfg(not(no_literal_byte_character))]
-                {
-                    proc_macro::Literal::byte_character(byte)
-                }
-
-                #[cfg(no_literal_byte_character)]
-                {
-                    let fallback = fallback::Literal::byte_character(byte);
-                    fallback.repr.parse::<proc_macro::Literal>().unwrap()
-                }
-            })
-        } else {
-            Literal::Fallback(fallback::Literal::byte_character(byte))
+            Literal::Fallback(fallback::Literal::character(t))
         }
     }
 
@@ -887,25 +867,6 @@ impl Literal {
             Literal::Compiler(proc_macro::Literal::byte_string(bytes))
         } else {
             Literal::Fallback(fallback::Literal::byte_string(bytes))
-        }
-    }
-
-    pub fn c_string(string: &CStr) -> Literal {
-        if inside_proc_macro() {
-            Literal::Compiler({
-                #[cfg(not(no_literal_c_string))]
-                {
-                    proc_macro::Literal::c_string(string)
-                }
-
-                #[cfg(no_literal_c_string)]
-                {
-                    let fallback = fallback::Literal::c_string(string);
-                    fallback.repr.parse::<proc_macro::Literal>().unwrap()
-                }
-            })
-        } else {
-            Literal::Fallback(fallback::Literal::c_string(string))
         }
     }
 

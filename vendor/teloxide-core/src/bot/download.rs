@@ -8,18 +8,18 @@ use crate::{
     DownloadError,
 };
 
-impl Download for Bot {
-    type Err<'dst> = DownloadError;
+impl<'w> Download<'w> for Bot {
+    type Err = DownloadError;
 
     // I would like to unbox this, but my coworkers will kill me if they'll see yet
     // another hand written `Future`. (waffle)
-    type Fut<'dst> = BoxFuture<'dst, Result<(), Self::Err<'dst>>>;
+    type Fut = BoxFuture<'w, Result<(), Self::Err>>;
 
-    fn download_file<'dst>(
+    fn download_file(
         &self,
         path: &str,
-        destination: &'dst mut (dyn AsyncWrite + Unpin + Send),
-    ) -> Self::Fut<'dst> {
+        destination: &'w mut (dyn AsyncWrite + Unpin + Send),
+    ) -> Self::Fut {
         net::download_file(
             &self.client,
             reqwest::Url::clone(&*self.api_url),

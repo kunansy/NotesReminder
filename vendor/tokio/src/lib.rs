@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
@@ -447,9 +446,13 @@
 // least 32 bits, which a lot of components in Tokio currently assumes.
 //
 // TODO: improve once we have MSRV access to const eval to make more flexible.
-#[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
+#[cfg(not(any(
+    target_pointer_width = "32",
+    target_pointer_width = "64",
+    target_pointer_width = "128"
+)))]
 compile_error! {
-    "Tokio requires the platform pointer width to be at least 32 bits"
+    "Tokio requires the platform pointer width to be 32, 64, or 128 bits"
 }
 
 #[cfg(all(
@@ -471,7 +474,6 @@ compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
 
 #[cfg(all(
     tokio_taskdump,
-    not(doc),
     not(all(
         target_os = "linux",
         any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -628,7 +630,6 @@ pub mod stream {}
 #[cfg(docsrs)]
 pub mod doc;
 
-#[cfg(any(feature = "net", feature = "fs"))]
 #[cfg(docsrs)]
 #[allow(unused)]
 pub(crate) use self::doc::os;
@@ -652,6 +653,7 @@ cfg_macros! {
 
     cfg_rt! {
         #[cfg(feature = "rt-multi-thread")]
+        #[cfg(not(test))] // Work around for rust-lang/rust#62127
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
         #[doc(inline)]
         pub use tokio_macros::main;
@@ -662,6 +664,7 @@ cfg_macros! {
         pub use tokio_macros::test;
 
         cfg_not_rt_multi_thread! {
+            #[cfg(not(test))] // Work around for rust-lang/rust#62127
             #[doc(inline)]
             pub use tokio_macros::main_rt as main;
 
@@ -672,6 +675,7 @@ cfg_macros! {
 
     // Always fail if rt is not enabled.
     cfg_not_rt! {
+        #[cfg(not(test))]
         #[doc(inline)]
         pub use tokio_macros::main_fail as main;
 

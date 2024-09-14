@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 /// # Windows
 /// [`AsyncWrite`] adapter that finds last char boundary in given buffer and does not write the rest,
-/// if buffer contents seems to be `utf8`. Otherwise it only trims buffer down to `DEFAULT_MAX_BUF_SIZE`.
+/// if buffer contents seems to be `utf8`. Otherwise it only trims buffer down to `MAX_BUF`.
 /// That's why, wrapped writer will always receive well-formed utf-8 bytes.
 /// # Other platforms
 /// Passes data to `inner` as is.
@@ -45,13 +45,12 @@ where
         // 2. If buffer is small, it will not be shrunk.
         // That's why, it's "textness" will not change, so we don't have
         // to fixup it.
-        if cfg!(not(any(target_os = "windows", test)))
-            || buf.len() <= crate::io::blocking::DEFAULT_MAX_BUF_SIZE
+        if cfg!(not(any(target_os = "windows", test))) || buf.len() <= crate::io::blocking::MAX_BUF
         {
             return call_inner(buf);
         }
 
-        buf = &buf[..crate::io::blocking::DEFAULT_MAX_BUF_SIZE];
+        buf = &buf[..crate::io::blocking::MAX_BUF];
 
         // Now there are two possibilities.
         // If caller gave is binary buffer, we **should not** shrink it
@@ -109,7 +108,7 @@ where
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
-    use crate::io::blocking::DEFAULT_MAX_BUF_SIZE;
+    use crate::io::blocking::MAX_BUF;
     use crate::io::AsyncWriteExt;
     use std::io;
     use std::pin::Pin;
@@ -124,7 +123,7 @@ mod tests {
             _cx: &mut Context<'_>,
             buf: &[u8],
         ) -> Poll<Result<usize, io::Error>> {
-            assert!(buf.len() <= DEFAULT_MAX_BUF_SIZE);
+            assert!(buf.len() <= MAX_BUF);
             assert!(std::str::from_utf8(buf).is_ok());
             Poll::Ready(Ok(buf.len()))
         }
@@ -159,7 +158,7 @@ mod tests {
             _cx: &mut Context<'_>,
             buf: &[u8],
         ) -> Poll<Result<usize, io::Error>> {
-            assert!(buf.len() <= DEFAULT_MAX_BUF_SIZE);
+            assert!(buf.len() <= MAX_BUF);
             self.write_history.push(buf.len());
             Poll::Ready(Ok(buf.len()))
         }
@@ -179,7 +178,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_splitter() {
-        let data = str::repeat("█", DEFAULT_MAX_BUF_SIZE);
+        let data = str::repeat("█", MAX_BUF);
         let mut wr = super::SplitByUtf8BoundaryIfWindows::new(TextMockWriter);
         let fut = async move {
             wr.write_all(data.as_bytes()).await.unwrap();
@@ -198,7 +197,7 @@ mod tests {
         // was not shrunk too much.
         let checked_count = super::MAGIC_CONST * super::MAX_BYTES_PER_CHAR;
         let mut data: Vec<u8> = str::repeat("a", checked_count).into();
-        data.extend(std::iter::repeat(0b1010_1010).take(DEFAULT_MAX_BUF_SIZE - checked_count + 1));
+        data.extend(std::iter::repeat(0b1010_1010).take(MAX_BUF - checked_count + 1));
         let mut writer = LoggingMockWriter::new();
         let mut splitter = super::SplitByUtf8BoundaryIfWindows::new(&mut writer);
         crate::runtime::Builder::new_current_thread()
@@ -215,7 +214,7 @@ mod tests {
             data.len()
         );
         // Check that at most MAX_BYTES_PER_CHAR + 1 (i.e. 5) bytes were shrunk
-        // from the buffer: one because it was outside of DEFAULT_MAX_BUF_SIZE boundary, and
+        // from the buffer: one because it was outside of MAX_BUF boundary, and
         // up to one "utf8 code point".
         assert!(data.len() - writer.write_history[0] <= super::MAX_BYTES_PER_CHAR + 1);
     }

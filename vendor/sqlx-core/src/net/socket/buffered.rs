@@ -4,7 +4,7 @@ use std::{cmp, io};
 
 use crate::error::Error;
 
-use crate::io::{AsyncRead, AsyncReadExt, ProtocolDecode, ProtocolEncode};
+use crate::io::{Decode, Encode};
 
 // Tokio, async-std, and std all use this as the default capacity for their buffered I/O.
 const DEFAULT_BUF_SIZE: usize = 8192;
@@ -59,36 +59,32 @@ impl<S: Socket> BufferedSocket<S> {
 
     pub async fn read<'de, T>(&mut self, byte_len: usize) -> Result<T, Error>
     where
-        T: ProtocolDecode<'de, ()>,
+        T: Decode<'de, ()>,
     {
         self.read_with(byte_len, ()).await
     }
 
     pub async fn read_with<'de, T, C>(&mut self, byte_len: usize, context: C) -> Result<T, Error>
     where
-        T: ProtocolDecode<'de, C>,
+        T: Decode<'de, C>,
     {
         T::decode_with(self.read_buffered(byte_len).await?.freeze(), context)
     }
 
-    #[inline(always)]
-    pub fn write<'en, T>(&mut self, value: T) -> Result<(), Error>
+    pub fn write<'en, T>(&mut self, value: T)
     where
-        T: ProtocolEncode<'en, ()>,
+        T: Encode<'en, ()>,
     {
         self.write_with(value, ())
     }
 
-    #[inline(always)]
-    pub fn write_with<'en, T, C>(&mut self, value: T, context: C) -> Result<(), Error>
+    pub fn write_with<'en, T, C>(&mut self, value: T, context: C)
     where
-        T: ProtocolEncode<'en, C>,
+        T: Encode<'en, C>,
     {
-        value.encode_with(self.write_buf.buf_mut(), context)?;
+        value.encode_with(self.write_buf.buf_mut(), context);
         self.write_buf.bytes_written = self.write_buf.buf.len();
         self.write_buf.sanity_check();
-
-        Ok(())
     }
 
     pub async fn flush(&mut self) -> io::Result<()> {
@@ -170,25 +166,6 @@ impl WriteBuffer {
         self.bytes_written = new_bytes_written;
 
         self.sanity_check();
-    }
-
-    /// Read into the buffer from `source`, returning the number of bytes read.
-    ///
-    /// The buffer is automatically advanced by the number of bytes read.
-    pub async fn read_from(&mut self, mut source: impl AsyncRead + Unpin) -> io::Result<usize> {
-        let read = match () {
-            // Tokio lets us read into the buffer without zeroing first
-            #[cfg(feature = "_rt-tokio")]
-            _ => source.read_buf(self.buf_mut()).await?,
-            #[cfg(not(feature = "_rt-tokio"))]
-            _ => source.read(self.init_remaining_mut()).await?,
-        };
-
-        if read > 0 {
-            self.advance(read);
-        }
-
-        Ok(read)
     }
 
     pub fn is_empty(&self) -> bool {

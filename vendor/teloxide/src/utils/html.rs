@@ -2,7 +2,7 @@
 //!
 //! [spec]: https://core.telegram.org/bots/api#html-style
 
-use teloxide_core::types::{User, UserId};
+use teloxide_core::types::User;
 
 /// Applies the bold font style to the string.
 ///
@@ -12,16 +12,6 @@ use teloxide_core::types::{User, UserId};
               without using its output does nothing useful"]
 pub fn bold(s: &str) -> String {
     format!("<b>{s}</b>")
-}
-
-/// Applies the block quotation style to the string.
-///
-/// Passed string will not be automatically escaped because it can contain
-/// nested markup.
-#[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
-              without using its output does nothing useful"]
-pub fn blockquote(s: &str) -> String {
-    format!("<blockquote>{s}</blockquote>")
 }
 
 /// Applies the italic font style to the string.
@@ -66,7 +56,7 @@ pub fn link(url: &str, text: &str) -> String {
 /// Builds an inline user mention link with an anchor.
 #[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
               without using its output does nothing useful"]
-pub fn user_mention(user_id: UserId, text: &str) -> String {
+pub fn user_mention(user_id: i64, text: &str) -> String {
     link(format!("tg://user?id={user_id}").as_str(), text)
 }
 
@@ -111,15 +101,7 @@ pub fn code_inline(s: &str) -> String {
 #[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
               without using its output does nothing useful"]
 pub fn escape(s: &str) -> String {
-    s.chars().fold(String::with_capacity(s.len()), |mut s, c| {
-        match c {
-            '&' => s.push_str("&amp;"),
-            '<' => s.push_str("&lt;"),
-            '>' => s.push_str("&gt;"),
-            c => s.push(c),
-        }
-        s
-    })
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
 #[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
@@ -133,6 +115,8 @@ pub fn user_mention_or_link(user: &User) -> String {
 
 #[cfg(test)]
 mod tests {
+    use teloxide_core::types::UserId;
+
     use super::*;
 
     #[test]
@@ -174,7 +158,7 @@ mod tests {
     #[test]
     fn test_user_mention() {
         assert_eq!(
-            user_mention(UserId(123_456_789), "<pwner666>"),
+            user_mention(123_456_789, "<pwner666>"),
             "<a href=\"tg://user?id=123456789\">&lt;pwner666&gt;</a>",
         );
     }

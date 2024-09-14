@@ -27,9 +27,9 @@ pub struct PgLTreeLabel(String);
 impl PgLTreeLabel {
     pub fn new<S>(label: S) -> Result<Self, PgLTreeParseError>
     where
-        S: Into<String>,
+        String: From<S>,
     {
-        let label = label.into();
+        let label = String::from(label);
         if label.len() <= 256
             && label
                 .bytes()
@@ -66,13 +66,13 @@ impl Display for PgLTreeLabel {
 
 /// Container for a Label Tree (`ltree`) in Postgres.
 ///
-/// See <https://www.postgresql.org/docs/current/ltree.html>
+/// See https://www.postgresql.org/docs/current/ltree.html
 ///
 /// ### Note: Requires Postgres 13+
 ///
 /// This integration requires that the `ltree` type support the binary format in the Postgres
 /// wire protocol, which only became available in Postgres 13.
-/// ([Postgres 13.0 Release Notes, Additional Modules](https://www.postgresql.org/docs/13/release-13.html#id-1.11.6.11.5.14))
+/// ([Postgres 13.0 Release Notes, Additional Modules][https://www.postgresql.org/docs/13/release-13.html#id-1.11.6.11.5.14])
 ///
 /// Ideally, SQLx's Postgres driver should support falling back to text format for types
 /// which don't have `typsend` and `typrecv` entries in `pg_type`, but that work still needs
@@ -95,15 +95,12 @@ impl PgLTree {
         Self::default()
     }
 
-    /// creates ltree from a [`Vec<PgLTreeLabel>`]
+    /// creates ltree from a [Vec<PgLTreeLabel>]
     pub fn from(labels: Vec<PgLTreeLabel>) -> Self {
         Self { labels }
     }
 
     /// creates ltree from an iterator with checking labels
-    // TODO: this should just be removed but I didn't want to bury it in a massive diff
-    #[deprecated = "renamed to `try_from_iter()`"]
-    #[allow(clippy::should_implement_trait)]
     pub fn from_iter<I, S>(labels: I) -> Result<Self, PgLTreeParseError>
     where
         String: From<S>,
@@ -116,17 +113,6 @@ impl PgLTree {
         Ok(ltree)
     }
 
-    /// Create an `LTREE` from an iterator of label strings.
-    ///
-    /// Returns an error if any label fails to parse according to [`PgLTreeLabel::new()`].
-    pub fn try_from_iter<I, S>(labels: I) -> Result<Self, PgLTreeParseError>
-    where
-        S: Into<String>,
-        I: IntoIterator<Item = S>,
-    {
-        labels.into_iter().map(PgLTreeLabel::new).collect()
-    }
-
     /// push a label to ltree
     pub fn push(&mut self, label: PgLTreeLabel) {
         self.labels.push(label);
@@ -135,14 +121,6 @@ impl PgLTree {
     /// pop a label from ltree
     pub fn pop(&mut self) -> Option<PgLTreeLabel> {
         self.labels.pop()
-    }
-}
-
-impl FromIterator<PgLTreeLabel> for PgLTree {
-    fn from_iter<T: IntoIterator<Item = PgLTreeLabel>>(iter: T) -> Self {
-        Self {
-            labels: iter.into_iter().collect(),
-        }
     }
 }
 
@@ -162,7 +140,7 @@ impl FromStr for PgLTree {
         Ok(Self {
             labels: s
                 .split('.')
-                .map(PgLTreeLabel::new)
+                .map(|s| PgLTreeLabel::new(s))
                 .collect::<Result<Vec<_>, Self::Err>>()?,
         })
     }
@@ -203,11 +181,12 @@ impl PgHasArrayType for PgLTree {
 }
 
 impl Encode<'_, Postgres> for PgLTree {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         buf.extend(1i8.to_le_bytes());
-        write!(buf, "{self}")?;
+        write!(buf, "{self}")
+            .expect("Display implementation panicked while writing to PgArgumentBuffer");
 
-        Ok(IsNull::No)
+        IsNull::No
     }
 }
 

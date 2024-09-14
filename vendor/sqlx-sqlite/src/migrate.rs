@@ -28,7 +28,8 @@ impl MigrateDatabase for Sqlite {
             }
 
             // Opening a connection to sqlite creates the database
-            opts.connect()
+            let _ = opts
+                .connect()
                 .await?
                 // Ensure WAL mode tempfiles are cleaned up
                 .close()
@@ -141,10 +142,7 @@ CREATE TABLE IF NOT EXISTS _sqlx_migrations (
             // The `execution_time` however can only be measured for the whole transaction. This value _only_ exists for
             // data lineage and debugging reasons, so it is not super important if it is lost. So we initialize it to -1
             // and update it once the actual transaction completed.
-            let _ = tx
-                .execute(&*migration.sql)
-                .await
-                .map_err(|e| MigrateError::ExecuteMigration(e, migration.version))?;
+            let _ = tx.execute(&*migration.sql).await?;
 
             // language=SQL
             let _ = query(
@@ -168,7 +166,6 @@ CREATE TABLE IF NOT EXISTS _sqlx_migrations (
             let elapsed = start.elapsed();
 
             // language=SQL
-            #[allow(clippy::cast_possible_truncation)]
             let _ = query(
                 r#"
     UPDATE _sqlx_migrations

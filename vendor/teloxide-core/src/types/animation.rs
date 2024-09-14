@@ -1,13 +1,13 @@
 use mime::Mime;
 use serde::{Deserialize, Serialize};
 
-use crate::types::{FileMeta, PhotoSize, Seconds};
+use crate::types::{FileMeta, PhotoSize};
 
 /// This object represents an animation file (GIF or H.264/MPEG-4 AVC video
 /// without sound).
 ///
 /// [The official docs](https://core.telegram.org/bots/api#animation).
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Animation {
     /// Metadata of the animation file.
@@ -21,10 +21,10 @@ pub struct Animation {
     pub height: u32,
 
     /// A duration of the video in seconds as defined by a sender.
-    pub duration: Seconds,
+    pub duration: u32,
 
     /// An animation thumbnail as defined by a sender.
-    pub thumbnail: Option<PhotoSize>,
+    pub thumb: Option<PhotoSize>,
 
     /// An original animation filename as defined by a sender.
     pub file_name: Option<String>,
@@ -36,6 +36,8 @@ pub struct Animation {
 
 #[cfg(test)]
 mod tests {
+    use crate::types::FileMeta;
+
     use super::*;
 
     #[test]
@@ -46,7 +48,7 @@ mod tests {
         "width":320,
         "height":320,
         "duration":59,
-        "thumbnail":{
+        "thumb":{
             "file_id":"id",
             "file_unique_id":"",
             "width":320,
@@ -60,8 +62,8 @@ mod tests {
             file: FileMeta { id: "id".to_string(), unique_id: "".to_string(), size: 6500 },
             width: 320,
             height: 320,
-            duration: Seconds::from_seconds(59),
-            thumbnail: Some(PhotoSize {
+            duration: 59,
+            thumb: Some(PhotoSize {
                 file: FileMeta { id: "id".to_owned(), unique_id: "".to_owned(), size: 3452 },
                 width: 320,
                 height: 320,

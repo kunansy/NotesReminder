@@ -12,30 +12,23 @@
 [package]
 edition = "2021"
 name = "sqlx-macros-core"
-version = "0.8.1"
+version = "0.7.3"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
     "Chloe Ross <orangesnowfox@gmail.com>",
     "Daniel Akhterov <akhterovd@gmail.com>",
 ]
-build = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "Macro support core for SQLx, the Rust SQL toolkit. Not intended to be used directly."
-readme = false
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/launchbadge/sqlx"
-
-[lib]
-name = "sqlx_macros_core"
-path = "src/lib.rs"
 
 [dependencies.async-std]
 version = "1.12"
 optional = true
+
+[dependencies.atomic-write-file]
+version = "0.1"
 
 [dependencies.dotenvy]
 version = "0.15.0"
@@ -45,7 +38,8 @@ default-features = false
 version = "1.6.1"
 
 [dependencies.heck]
-version = "0.5"
+version = "0.4"
+features = ["unicode"]
 
 [dependencies.hex]
 version = "0.4.3"
@@ -54,11 +48,11 @@ version = "0.4.3"
 version = "1.9.0"
 
 [dependencies.proc-macro2]
-version = "1.0.79"
+version = "1.0.36"
 default-features = false
 
 [dependencies.quote]
-version = "1.0.26"
+version = "1.0.14"
 default-features = false
 
 [dependencies.serde]
@@ -72,11 +66,11 @@ version = "1.0.73"
 version = "0.10.0"
 
 [dependencies.sqlx-core]
-version = "=0.8.1"
+version = "=0.7.3"
 features = ["offline"]
 
 [dependencies.sqlx-mysql]
-version = "=0.8.1"
+version = "=0.7.3"
 features = [
     "offline",
     "migrate",
@@ -84,7 +78,7 @@ features = [
 optional = true
 
 [dependencies.sqlx-postgres]
-version = "=0.8.1"
+version = "=0.7.3"
 features = [
     "offline",
     "migrate",
@@ -92,7 +86,7 @@ features = [
 optional = true
 
 [dependencies.sqlx-sqlite]
-version = "=0.8.1"
+version = "=0.7.3"
 features = [
     "offline",
     "migrate",
@@ -100,7 +94,7 @@ features = [
 optional = true
 
 [dependencies.syn]
-version = "2.0.52"
+version = "1.0.84"
 features = [
     "full",
     "derive",
@@ -111,7 +105,7 @@ features = [
 default-features = false
 
 [dependencies.tempfile]
-version = "3.10.1"
+version = "3.3.0"
 
 [dependencies.tokio]
 version = "1"
@@ -140,8 +134,7 @@ _rt-tokio = [
     "sqlx-core/_rt-tokio",
 ]
 _tls-native-tls = ["sqlx-core/_tls-native-tls"]
-_tls-rustls-aws-lc-rs = ["sqlx-core/_tls-rustls-aws-lc-rs"]
-_tls-rustls-ring = ["sqlx-core/_tls-rustls-ring"]
+_tls-rustls = ["sqlx-core/_tls-rustls"]
 bigdecimal = [
     "sqlx-core/bigdecimal",
     "sqlx-mysql?/bigdecimal",
@@ -158,7 +151,6 @@ chrono = [
     "sqlx-sqlite?/chrono",
 ]
 default = []
-derive = []
 ipnetwork = [
     "sqlx-core/ipnetwork",
     "sqlx-postgres?/ipnetwork",
@@ -166,14 +158,12 @@ ipnetwork = [
 json = [
     "sqlx-core/json",
     "sqlx-mysql?/json",
-    "sqlx-postgres?/json",
     "sqlx-sqlite?/json",
 ]
 mac_address = [
     "sqlx-core/mac_address",
     "sqlx-postgres?/mac_address",
 ]
-macros = []
 migrate = ["sqlx-core/migrate"]
 mysql = ["sqlx-mysql"]
 postgres = ["sqlx-postgres"]
@@ -194,12 +184,4 @@ uuid = [
     "sqlx-mysql?/uuid",
     "sqlx-postgres?/uuid",
     "sqlx-sqlite?/uuid",
-]
-
-[lints.rust.unexpected_cfgs]
-level = "warn"
-priority = 0
-check-cfg = [
-    "cfg(sqlx_macros_unstable)",
-    "cfg(procmacro2_semver_exempt)",
 ]

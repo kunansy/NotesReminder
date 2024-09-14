@@ -7,21 +7,18 @@ use std::time::Duration;
 
 #[allow(unused)]
 macro_rules! assert_metrics {
-    ($stats:ident, $field:ident == $v:expr) => {
-        #[cfg(target_has_atomic = "64")]
-        {
-            use crate::runtime::WorkerMetrics;
-            use std::sync::atomic::Ordering::Relaxed;
+    ($stats:ident, $field:ident == $v:expr) => {{
+        use crate::runtime::WorkerMetrics;
+        use std::sync::atomic::Ordering::Relaxed;
 
-            let worker = WorkerMetrics::new();
-            $stats.submit(&worker);
+        let worker = WorkerMetrics::new();
+        $stats.submit(&worker);
 
-            let expect = $v;
-            let actual = worker.$field.load(Relaxed);
+        let expect = $v;
+        let actual = worker.$field.load(Relaxed);
 
-            assert!(actual == expect, "expect = {}; actual = {}", expect, actual)
-        }
-    };
+        assert!(actual == expect, "expect = {}; actual = {}", expect, actual)
+    }};
 }
 
 fn new_stats() -> Stats {
@@ -40,7 +37,7 @@ fn fits_256_one_at_a_time() {
         local.push_back_or_overflow(task, &inject, &mut stats);
     }
 
-    cfg_unstable_metrics! {
+    cfg_metrics! {
         assert_metrics!(stats, overflow_count == 0);
     }
 
@@ -98,7 +95,7 @@ fn overflow() {
         local.push_back_or_overflow(task, &inject, &mut stats);
     }
 
-    cfg_unstable_metrics! {
+    cfg_metrics! {
         assert_metrics!(stats, overflow_count == 1);
     }
 
@@ -128,7 +125,7 @@ fn steal_batch() {
 
     assert!(steal1.steal_into(&mut local2, &mut stats).is_some());
 
-    cfg_unstable_metrics! {
+    cfg_metrics! {
         assert_metrics!(stats, steal_count == 2);
     }
 
@@ -184,7 +181,7 @@ fn stress1() {
                 thread::yield_now();
             }
 
-            cfg_unstable_metrics! {
+            cfg_metrics! {
                 assert_metrics!(stats, steal_count == n as _);
             }
 
@@ -273,7 +270,6 @@ fn stress2() {
     }
 }
 
-#[allow(dead_code)]
 struct Runtime;
 
 impl Schedule for Runtime {

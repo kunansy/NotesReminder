@@ -17,10 +17,10 @@ impl PgHasArrayType for bool {
 }
 
 impl Encode<'_, Postgres> for bool {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
         buf.push(*self as u8);
 
-        Ok(IsNull::No)
+        IsNull::No
     }
 }
 

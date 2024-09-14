@@ -1,6 +1,6 @@
 use crate::runtime::time::{EntryList, TimerHandle, TimerShared};
 
-use std::{array, fmt, ptr::NonNull};
+use std::{fmt, ptr::NonNull};
 
 /// Wheel for a single level in the timer. This wheel contains 64 slots.
 pub(crate) struct Level {
@@ -39,10 +39,89 @@ const LEVEL_MULT: usize = 64;
 
 impl Level {
     pub(crate) fn new(level: usize) -> Level {
+        // A value has to be Copy in order to use syntax like:
+        //     let stack = Stack::default();
+        //     ...
+        //     slots: [stack; 64],
+        //
+        // Alternatively, since Stack is Default one can
+        // use syntax like:
+        //     let slots: [Stack; 64] = Default::default();
+        //
+        // However, that is only supported for arrays of size
+        // 32 or fewer.  So in our case we have to explicitly
+        // invoke the constructor for each array element.
+        let ctor = EntryList::default;
+
         Level {
             level,
             occupied: 0,
-            slot: array::from_fn(|_| EntryList::default()),
+            slot: [
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+            ],
         }
     }
 
@@ -51,7 +130,10 @@ impl Level {
     pub(crate) fn next_expiration(&self, now: u64) -> Option<Expiration> {
         // Use the `occupied` bit field to get the index of the next slot that
         // needs to be processed.
-        let slot = self.next_occupied_slot(now)?;
+        let slot = match self.next_occupied_slot(now) {
+            Some(slot) => slot,
+            None => return None,
+        };
 
         // From the slot index, calculate the `Instant` at which it needs to be
         // processed. This value *must* be in the future with respect to `now`.
@@ -114,7 +196,7 @@ impl Level {
         let now_slot = (now / slot_range(self.level)) as usize;
         let occupied = self.occupied.rotate_right(now_slot as u32);
         let zeros = occupied.trailing_zeros() as usize;
-        let slot = (zeros + now_slot) % LEVEL_MULT;
+        let slot = (zeros + now_slot) % 64;
 
         Some(slot)
     }

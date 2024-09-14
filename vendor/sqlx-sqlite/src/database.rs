@@ -1,4 +1,6 @@
-pub(crate) use sqlx_core::database::{Database, HasStatementCache};
+pub(crate) use sqlx_core::database::{
+    Database, HasArguments, HasStatement, HasStatementCache, HasValueRef,
+};
 
 use crate::{
     SqliteArgumentValue, SqliteArguments, SqliteColumn, SqliteConnection, SqliteQueryResult,
@@ -24,16 +26,30 @@ impl Database for Sqlite {
     type TypeInfo = SqliteTypeInfo;
 
     type Value = SqliteValue;
-    type ValueRef<'r> = SqliteValueRef<'r>;
-
-    type Arguments<'q> = SqliteArguments<'q>;
-    type ArgumentBuffer<'q> = Vec<SqliteArgumentValue<'q>>;
-
-    type Statement<'q> = SqliteStatement<'q>;
 
     const NAME: &'static str = "SQLite";
 
     const URL_SCHEMES: &'static [&'static str] = &["sqlite"];
+}
+
+impl<'r> HasValueRef<'r> for Sqlite {
+    type Database = Sqlite;
+
+    type ValueRef = SqliteValueRef<'r>;
+}
+
+impl<'q> HasArguments<'q> for Sqlite {
+    type Database = Sqlite;
+
+    type Arguments = SqliteArguments<'q>;
+
+    type ArgumentBuffer = Vec<SqliteArgumentValue<'q>>;
+}
+
+impl<'q> HasStatement<'q> for Sqlite {
+    type Database = Sqlite;
+
+    type Statement = SqliteStatement<'q>;
 }
 
 impl HasStatementCache for Sqlite {}

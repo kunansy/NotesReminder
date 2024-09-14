@@ -12,7 +12,7 @@ use crate::types::True;
 /// [The official docs](https://core.telegram.org/bots/api#forcereply).
 ///
 /// [privacy mode]: https://core.telegram.org/bots#privacy-mode
-#[serde_with::skip_serializing_none]
+#[serde_with_macros::skip_serializing_none]
 #[derive(Clone, Default, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct ForceReply {
     /// Shows reply interface to the user, as if they manually selected the
@@ -29,28 +29,26 @@ pub struct ForceReply {
     /// (has reply_to_message_id), sender of the original message.
     ///
     /// [`Message`]: crate::types::Message
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub selective: bool,
+    pub selective: Option<bool>,
 }
 
 impl ForceReply {
     #[must_use]
     pub const fn new() -> Self {
-        Self { force_reply: True, input_field_placeholder: None, selective: false }
+        Self { force_reply: True, input_field_placeholder: None, selective: None }
     }
 
-    pub fn input_field_placeholder<T>(self, val: T) -> Self
+    pub fn input_field_placeholder<T>(mut self, val: T) -> Self
     where
         T: Into<Option<String>>,
     {
-        Self { input_field_placeholder: val.into(), ..self }
+        self.input_field_placeholder = val.into();
+        self
     }
 
-    /// Sets [`selective`] to `true`.
-    ///
-    /// [`selective`]: ForceReply::selective
     #[must_use]
-    pub fn selective(self) -> Self {
-        Self { selective: true, ..self }
+    pub const fn selective(mut self, val: bool) -> Self {
+        self.selective = Some(val);
+        self
     }
 }

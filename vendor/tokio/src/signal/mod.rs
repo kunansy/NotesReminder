@@ -45,9 +45,7 @@
 use crate::sync::watch::Receiver;
 use std::task::{Context, Poll};
 
-#[cfg(feature = "signal")]
 mod ctrl_c;
-#[cfg(feature = "signal")]
 pub use ctrl_c::ctrl_c;
 
 pub(crate) mod registry;

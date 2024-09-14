@@ -3,10 +3,7 @@ use tokio_test::task;
 
 use std::task::Waker;
 
-#[allow(unused)]
 trait AssertSend: Send {}
-
-#[allow(unused)]
 trait AssertSync: Sync {}
 
 impl AssertSend for AtomicWaker {}
