@@ -15,7 +15,12 @@ COPY vendor ./vendor
 COPY .sqlx ./.sqlx
 COPY src ./src
 
-RUN cargo build --release --offline --target ${TARGET} --jobs $(nproc) -vv
+RUN cargo build \
+    --release \
+    --offline \
+    --target ${TARGET} \
+    --jobs $(nproc) \
+    -vv
 
 FROM ubuntu:20.04
 
