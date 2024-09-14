@@ -3,7 +3,7 @@
 use serde::Serialize;
 
 use crate::types::{
-    InputFile, Message, MessageEntity, MessageId, ParseMode, Recipient, ReplyMarkup,
+    InputFile, Message, MessageEntity, ParseMode, Recipient, ReplyMarkup, ReplyParameters, ThreadId,
 };
 
 impl_payload! {
@@ -25,7 +25,7 @@ impl_payload! {
         }
         optional {
             /// Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
-            pub message_thread_id: i32,
+            pub message_thread_id: ThreadId,
             /// Voice message caption, 0-1024 characters after entities parsing
             pub caption: String [into],
             /// Mode for parsing entities in the voice message caption. See [formatting options] for more details.
@@ -40,11 +40,8 @@ impl_payload! {
             ///
             /// [silently]: https://telegram.org/blog/channels-2-0#silent-messages
             pub disable_notification: bool,
-            /// If the message is a reply, ID of the original message
-            #[serde(serialize_with = "crate::types::serialize_reply_to_message_id")]
-            pub reply_to_message_id: MessageId,
-            /// Pass _True_, if the message should be sent even if the specified replied-to message is not found
-            pub allow_sending_without_reply: bool,
+            /// Description of the message to reply to
+            pub reply_parameters: ReplyParameters,
             /// Additional interface options. A JSON-serialized object for an [inline keyboard], [custom reply keyboard], instructions to remove reply keyboard or to force a reply from the user.
             ///
             /// [inline keyboard]: https://core.telegram.org/bots#inline-keyboards-and-on-the-fly-updating

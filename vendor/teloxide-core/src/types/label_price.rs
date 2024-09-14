@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 /// This object represents a portion of the price for goods or services.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#labeledprice).
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct LabeledPrice {
     /// Portion label.
@@ -16,11 +17,11 @@ pub struct LabeledPrice {
     ///
     /// [currency]: https://core.telegram.org/bots/payments#supported-currencies
     /// [`currencies.json`]: https://core.telegram.org/bots/payments/currencies.json
-    pub amount: i32,
+    pub amount: u32,
 }
 
 impl LabeledPrice {
-    pub fn new<S>(label: S, amount: i32) -> Self
+    pub fn new<S>(label: S, amount: u32) -> Self
     where
         S: Into<String>,
     {
@@ -36,7 +37,7 @@ impl LabeledPrice {
     }
 
     #[must_use]
-    pub fn amount(mut self, val: i32) -> Self {
+    pub fn amount(mut self, val: u32) -> Self {
         self.amount = val;
         self
     }

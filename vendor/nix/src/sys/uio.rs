@@ -1,25 +1,16 @@
 //! Vectored I/O
 
-use crate::errno::Errno;
 use crate::Result;
-use libc::{self, c_int, c_void, off_t, size_t};
-use std::io::{IoSlice, IoSliceMut};
-use std::os::unix::io::{AsFd, AsRawFd};
+use crate::errno::Errno;
+use libc::{self, c_int, c_void, size_t, off_t};
+use std::marker::PhantomData;
+use std::os::unix::io::RawFd;
 
 /// Low-level vectored write to a raw file descriptor
 ///
 /// See also [writev(2)](https://pubs.opengroup.org/onlinepubs/9699919799/functions/writev.html)
-pub fn writev<Fd: AsFd>(fd: Fd, iov: &[IoSlice<'_>]) -> Result<usize> {
-    // SAFETY: to quote the documentation for `IoSlice`:
-    //
-    // [IoSlice] is semantically a wrapper around a &[u8], but is
-    // guaranteed to be ABI compatible with the iovec type on Unix
-    // platforms.
-    //
-    // Because it is ABI compatible, a pointer cast here is valid
-    let res = unsafe {
-        libc::writev(fd.as_fd().as_raw_fd(), iov.as_ptr() as *const libc::iovec, iov.len() as c_int)
-    };
+pub fn writev(fd: RawFd, iov: &[IoVec<&[u8]>]) -> Result<usize> {
+    let res = unsafe { libc::writev(fd, iov.as_ptr() as *const libc::iovec, iov.len() as c_int) };
 
     Errno::result(res).map(|r| r as usize)
 }
@@ -27,14 +18,8 @@ pub fn writev<Fd: AsFd>(fd: Fd, iov: &[IoSlice<'_>]) -> Result<usize> {
 /// Low-level vectored read from a raw file descriptor
 ///
 /// See also [readv(2)](https://pubs.opengroup.org/onlinepubs/9699919799/functions/readv.html)
-// Clippy doesn't know that we need to pass iov mutably only because the
-// mutation happens after converting iov to a pointer
-#[allow(clippy::needless_pass_by_ref_mut)]
-pub fn readv<Fd: AsFd>(fd: Fd, iov: &mut [IoSliceMut<'_>]) -> Result<usize> {
-    // SAFETY: same as in writev(), IoSliceMut is ABI-compatible with iovec
-    let res = unsafe {
-        libc::readv(fd.as_fd().as_raw_fd(), iov.as_ptr() as *const libc::iovec, iov.len() as c_int)
-    };
+pub fn readv(fd: RawFd, iov: &mut [IoVec<&mut [u8]>]) -> Result<usize> {
+    let res = unsafe { libc::readv(fd, iov.as_ptr() as *const libc::iovec, iov.len() as c_int) };
 
     Errno::result(res).map(|r| r as usize)
 }
@@ -45,20 +30,11 @@ pub fn readv<Fd: AsFd>(fd: Fd, iov: &mut [IoSliceMut<'_>]) -> Result<usize> {
 /// or an error occurs. The file offset is not changed.
 ///
 /// See also: [`writev`](fn.writev.html) and [`pwrite`](fn.pwrite.html)
-#[cfg(not(any(target_os = "redox", target_os = "haiku")))]
-#[cfg_attr(docsrs, doc(cfg(all())))]
-pub fn pwritev<Fd: AsFd>(fd: Fd, iov: &[IoSlice<'_>], offset: off_t) -> Result<usize> {
-    #[cfg(target_env = "uclibc")]
-    let offset = offset as libc::off64_t; // uclibc doesn't use off_t
-
-    // SAFETY: same as in writev()
+#[cfg(not(target_os = "redox"))]
+pub fn pwritev(fd: RawFd, iov: &[IoVec<&[u8]>],
+               offset: off_t) -> Result<usize> {
     let res = unsafe {
-        libc::pwritev(
-            fd.as_fd().as_raw_fd(),
-            iov.as_ptr() as *const libc::iovec,
-            iov.len() as c_int,
-            offset,
-        )
+        libc::pwritev(fd, iov.as_ptr() as *const libc::iovec, iov.len() as c_int, offset)
     };
 
     Errno::result(res).map(|r| r as usize)
@@ -71,27 +47,11 @@ pub fn pwritev<Fd: AsFd>(fd: Fd, iov: &[IoSlice<'_>], offset: off_t) -> Result<u
 /// changed.
 ///
 /// See also: [`readv`](fn.readv.html) and [`pread`](fn.pread.html)
-#[cfg(not(any(target_os = "redox", target_os = "haiku")))]
-#[cfg_attr(docsrs, doc(cfg(all())))]
-// Clippy doesn't know that we need to pass iov mutably only because the
-// mutation happens after converting iov to a pointer
-#[allow(clippy::needless_pass_by_ref_mut)]
-pub fn preadv<Fd: AsFd>(
-    fd: Fd,
-    iov: &mut [IoSliceMut<'_>],
-    offset: off_t,
-) -> Result<usize> {
-    #[cfg(target_env = "uclibc")]
-    let offset = offset as libc::off64_t; // uclibc doesn't use off_t
-
-    // SAFETY: same as in readv()
+#[cfg(not(target_os = "redox"))]
+pub fn preadv(fd: RawFd, iov: &[IoVec<&mut [u8]>],
+              offset: off_t) -> Result<usize> {
     let res = unsafe {
-        libc::preadv(
-            fd.as_fd().as_raw_fd(),
-            iov.as_ptr() as *const libc::iovec,
-            iov.len() as c_int,
-            offset,
-        )
+        libc::preadv(fd, iov.as_ptr() as *const libc::iovec, iov.len() as c_int, offset)
     };
 
     Errno::result(res).map(|r| r as usize)
@@ -101,31 +61,23 @@ pub fn preadv<Fd: AsFd>(
 ///
 /// See also [pwrite(2)](https://pubs.opengroup.org/onlinepubs/9699919799/functions/pwrite.html)
 // TODO: move to unistd
-pub fn pwrite<Fd: AsFd>(fd: Fd, buf: &[u8], offset: off_t) -> Result<usize> {
+pub fn pwrite(fd: RawFd, buf: &[u8], offset: off_t) -> Result<usize> {
     let res = unsafe {
-        libc::pwrite(
-            fd.as_fd().as_raw_fd(),
-            buf.as_ptr() as *const c_void,
-            buf.len() as size_t,
-            offset,
-        )
+        libc::pwrite(fd, buf.as_ptr() as *const c_void, buf.len() as size_t,
+                    offset)
     };
 
     Errno::result(res).map(|r| r as usize)
 }
 
-/// Low-level read from a file, with specified offset.
+/// Low-level write to a file, with specified offset.
 ///
 /// See also [pread(2)](https://pubs.opengroup.org/onlinepubs/9699919799/functions/pread.html)
 // TODO: move to unistd
-pub fn pread<Fd: AsFd>(fd: Fd, buf: &mut [u8], offset: off_t) -> Result<usize> {
+pub fn pread(fd: RawFd, buf: &mut [u8], offset: off_t) -> Result<usize>{
     let res = unsafe {
-        libc::pread(
-            fd.as_fd().as_raw_fd(),
-            buf.as_mut_ptr() as *mut c_void,
-            buf.len() as size_t,
-            offset,
-        )
+        libc::pread(fd, buf.as_mut_ptr() as *mut c_void, buf.len() as size_t,
+                   offset)
     };
 
     Errno::result(res).map(|r| r as usize)
@@ -134,13 +86,12 @@ pub fn pread<Fd: AsFd>(fd: Fd, buf: &mut [u8], offset: off_t) -> Result<usize> {
 /// A slice of memory in a remote process, starting at address `base`
 /// and consisting of `len` bytes.
 ///
-/// This is the same underlying C structure as `IoSlice`,
+/// This is the same underlying C structure as [`IoVec`](struct.IoVec.html),
 /// except that it refers to memory in some other process, and is
-/// therefore not represented in Rust by an actual slice as `IoSlice` is. It
+/// therefore not represented in Rust by an actual slice as `IoVec` is. It
 /// is used with [`process_vm_readv`](fn.process_vm_readv.html)
 /// and [`process_vm_writev`](fn.process_vm_writev.html).
-#[cfg(any(target_os = "linux", target_os = "android"))]
-#[cfg_attr(docsrs, doc(cfg(all())))]
+#[cfg(target_os = "linux")]
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct RemoteIoVec {
@@ -150,13 +101,10 @@ pub struct RemoteIoVec {
     pub len: usize,
 }
 
-feature! {
-#![feature = "process"]
-
 /// Write data directly to another process's virtual memory
 /// (see [`process_vm_writev`(2)]).
 ///
-/// `local_iov` is a list of [`IoSlice`]s containing the data to be written,
+/// `local_iov` is a list of [`IoVec`]s containing the data to be written,
 /// and `remote_iov` is a list of [`RemoteIoVec`]s identifying where the
 /// data should be written in the target process. On success, returns the
 /// number of bytes written, which will always be a whole
@@ -167,16 +115,16 @@ feature! {
 /// `CAP_SYS_PTRACE`), or you must be running as the same user as the
 /// target process and the OS must have unprivileged debugging enabled.
 ///
-/// This function is only available on Linux and Android(SDK23+).
+/// This function is only available on Linux.
 ///
 /// [`process_vm_writev`(2)]: https://man7.org/linux/man-pages/man2/process_vm_writev.2.html
 /// [ptrace]: ../ptrace/index.html
-/// [`IoSlice`]: https://doc.rust-lang.org/std/io/struct.IoSlice.html
+/// [`IoVec`]: struct.IoVec.html
 /// [`RemoteIoVec`]: struct.RemoteIoVec.html
-#[cfg(all(any(target_os = "linux", target_os = "android"), not(target_env = "uclibc")))]
+#[cfg(target_os = "linux")]
 pub fn process_vm_writev(
     pid: crate::unistd::Pid,
-    local_iov: &[IoSlice<'_>],
+    local_iov: &[IoVec<&[u8]>],
     remote_iov: &[RemoteIoVec]) -> Result<usize>
 {
     let res = unsafe {
@@ -191,7 +139,7 @@ pub fn process_vm_writev(
 /// Read data directly from another process's virtual memory
 /// (see [`process_vm_readv`(2)]).
 ///
-/// `local_iov` is a list of [`IoSliceMut`]s containing the buffer to copy
+/// `local_iov` is a list of [`IoVec`]s containing the buffer to copy
 /// data into, and `remote_iov` is a list of [`RemoteIoVec`]s identifying
 /// where the source data is in the target process. On success,
 /// returns the number of bytes written, which will always be a whole
@@ -202,16 +150,16 @@ pub fn process_vm_writev(
 /// `CAP_SYS_PTRACE`), or you must be running as the same user as the
 /// target process and the OS must have unprivileged debugging enabled.
 ///
-/// This function is only available on Linux and Android(SDK23+).
+/// This function is only available on Linux.
 ///
 /// [`process_vm_readv`(2)]: https://man7.org/linux/man-pages/man2/process_vm_readv.2.html
 /// [`ptrace`]: ../ptrace/index.html
-/// [`IoSliceMut`]: https://doc.rust-lang.org/std/io/struct.IoSliceMut.html
+/// [`IoVec`]: struct.IoVec.html
 /// [`RemoteIoVec`]: struct.RemoteIoVec.html
-#[cfg(all(any(target_os = "linux", target_os = "android"), not(target_env = "uclibc")))]
+#[cfg(any(target_os = "linux"))]
 pub fn process_vm_readv(
     pid: crate::unistd::Pid,
-    local_iov: &mut [IoSliceMut<'_>],
+    local_iov: &[IoVec<&mut [u8]>],
     remote_iov: &[RemoteIoVec]) -> Result<usize>
 {
     let res = unsafe {
@@ -222,4 +170,54 @@ pub fn process_vm_readv(
 
     Errno::result(res).map(|r| r as usize)
 }
+
+/// A vector of buffers.
+///
+/// Vectored I/O methods like [`writev`] and [`readv`] use this structure for
+/// both reading and writing.  Each `IoVec` specifies the base address and
+/// length of an area in memory.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct IoVec<T>(pub(crate) libc::iovec, PhantomData<T>);
+
+impl<T> IoVec<T> {
+    /// View the `IoVec` as a Rust slice.
+    #[inline]
+    pub fn as_slice(&self) -> &[u8] {
+        use std::slice;
+
+        unsafe {
+            slice::from_raw_parts(
+                self.0.iov_base as *const u8,
+                self.0.iov_len)
+        }
+    }
+}
+
+impl<'a> IoVec<&'a [u8]> {
+    #[cfg(target_os = "freebsd")]
+    pub(crate) fn from_raw_parts(base: *mut c_void, len: usize) -> Self {
+        IoVec(libc::iovec {
+            iov_base: base,
+            iov_len: len
+        }, PhantomData)
+    }
+
+    /// Create an `IoVec` from a Rust slice.
+    pub fn from_slice(buf: &'a [u8]) -> IoVec<&'a [u8]> {
+        IoVec(libc::iovec {
+            iov_base: buf.as_ptr() as *mut c_void,
+            iov_len: buf.len() as size_t,
+        }, PhantomData)
+    }
+}
+
+impl<'a> IoVec<&'a mut [u8]> {
+    /// Create an `IoVec` from a mutable Rust slice.
+    pub fn from_mut_slice(buf: &'a mut [u8]) -> IoVec<&'a mut [u8]> {
+        IoVec(libc::iovec {
+            iov_base: buf.as_ptr() as *mut c_void,
+            iov_len: buf.len() as size_t,
+        }, PhantomData)
+    }
 }

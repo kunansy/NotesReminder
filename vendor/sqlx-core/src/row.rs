@@ -1,5 +1,5 @@
 use crate::column::ColumnIndex;
-use crate::database::{Database, HasValueRef};
+use crate::database::Database;
 use crate::decode::Decode;
 use crate::error::{mismatched_types, Error};
 
@@ -12,7 +12,7 @@ use crate::value::ValueRef;
 /// [`FromRow`]: crate::row::FromRow
 /// [`Query::fetch`]: crate::query::Query::fetch
 pub trait Row: Unpin + Send + Sync + 'static {
-    type Database: Database;
+    type Database: Database<Row = Self>;
 
     /// Returns `true` if this row has no columns.
     #[inline]
@@ -42,7 +42,7 @@ pub trait Row: Unpin + Send + Sync + 'static {
         self.try_column(index).unwrap()
     }
 
-    /// Gets the column information at `index` or `None` if out of bounds.
+    /// Gets the column information at `index` or a `ColumnIndexOutOfBounds` error if out of bounds.
     fn try_column<I>(&self, index: I) -> Result<&<Self::Database as Database>::Column, Error>
     where
         I: ColumnIndex<Self>,
@@ -171,10 +171,7 @@ pub trait Row: Unpin + Send + Sync + 'static {
     /// [`ColumnNotFound`]: Error::ColumnNotFound
     /// [`ColumnIndexOutOfBounds`]: Error::ColumnIndexOutOfBounds
     ///
-    fn try_get_raw<I>(
-        &self,
-        index: I,
-    ) -> Result<<Self::Database as HasValueRef<'_>>::ValueRef, Error>
+    fn try_get_raw<I>(&self, index: I) -> Result<<Self::Database as Database>::ValueRef<'_>, Error>
     where
         I: ColumnIndex<Self>;
 }

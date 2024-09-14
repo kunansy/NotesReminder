@@ -17,12 +17,6 @@ pub struct Oid(
     pub u32,
 );
 
-impl Oid {
-    pub(crate) fn incr_one(&mut self) {
-        self.0 = self.0.wrapping_add(1);
-    }
-}
-
 impl Type<Postgres> for Oid {
     fn type_info() -> PgTypeInfo {
         PgTypeInfo::OID
@@ -36,10 +30,10 @@ impl PgHasArrayType for Oid {
 }
 
 impl Encode<'_, Postgres> for Oid {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> IsNull {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
         buf.extend(&self.0.to_be_bytes());
 
-        IsNull::No
+        Ok(IsNull::No)
     }
 }
 

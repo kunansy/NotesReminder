@@ -1,7 +1,7 @@
 use mime::Mime;
 use serde::{Deserialize, Serialize};
 
-use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, ParseMode};
+use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, ParseMode, Seconds};
 
 /// Represents a link to a page containing an embedded video player or a video
 /// file.
@@ -11,7 +11,7 @@ use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, Par
 /// message with the specified content instead of the video.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#inlinequeryresultvideo).
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InlineQueryResultVideo {
     /// Unique identifier for this result, 1-64 bytes.
@@ -25,7 +25,7 @@ pub struct InlineQueryResultVideo {
     pub mime_type: Mime,
 
     /// URL of the thumbnail (jpeg only) for the video.
-    pub thumb_url: reqwest::Url,
+    pub thumbnail_url: reqwest::Url,
 
     /// Title for the result.
     pub title: String,
@@ -46,13 +46,13 @@ pub struct InlineQueryResultVideo {
     pub caption_entities: Option<Vec<MessageEntity>>,
 
     /// Video width.
-    pub video_width: Option<i32>,
+    pub video_width: Option<u32>,
 
     /// Video height.
-    pub video_height: Option<i32>,
+    pub video_height: Option<u32>,
 
     /// Video duration in seconds.
-    pub video_duration: Option<i32>,
+    pub video_duration: Option<Seconds>,
 
     /// Short description of the result.
     pub description: Option<String>,
@@ -76,7 +76,7 @@ impl InlineQueryResultVideo {
         id: S1,
         video_url: reqwest::Url,
         mime_type: Mime,
-        thumb_url: reqwest::Url,
+        thumbnail_url: reqwest::Url,
         title: S2,
     ) -> Self
     where
@@ -87,7 +87,7 @@ impl InlineQueryResultVideo {
             id: id.into(),
             video_url,
             mime_type,
-            thumb_url,
+            thumbnail_url,
             title: title.into(),
             caption: None,
             parse_mode: None,
@@ -122,8 +122,8 @@ impl InlineQueryResultVideo {
     }
 
     #[must_use]
-    pub fn thumb_url(mut self, val: reqwest::Url) -> Self {
-        self.thumb_url = val;
+    pub fn thumbnail_url(mut self, val: reqwest::Url) -> Self {
+        self.thumbnail_url = val;
         self
     }
 
@@ -158,19 +158,19 @@ impl InlineQueryResultVideo {
     }
 
     #[must_use]
-    pub fn video_width(mut self, val: i32) -> Self {
+    pub fn video_width(mut self, val: u32) -> Self {
         self.video_width = Some(val);
         self
     }
 
     #[must_use]
-    pub fn video_height(mut self, val: i32) -> Self {
+    pub fn video_height(mut self, val: u32) -> Self {
         self.video_height = Some(val);
         self
     }
 
     #[must_use]
-    pub fn video_duration(mut self, val: i32) -> Self {
+    pub fn video_duration(mut self, val: Seconds) -> Self {
         self.video_duration = Some(val);
         self
     }

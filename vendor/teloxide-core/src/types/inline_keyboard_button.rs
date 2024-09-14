@@ -1,9 +1,10 @@
-use crate::types::{CallbackGame, LoginUrl, True, WebAppInfo};
+use crate::types::{CallbackGame, LoginUrl, SwitchInlineQueryChosenChat, True, WebAppInfo};
 use serde::{Deserialize, Serialize};
 
 /// This object represents one button of an inline keyboard.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#inlinekeyboardbutton).
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct InlineKeyboardButton {
     /// Label text on the button.
@@ -69,6 +70,11 @@ pub enum InlineKeyboardButtonKind {
     ///This offers a quick way for the user to open your bot in inline mode in
     /// the same chat – good for selecting something from multiple options.
     SwitchInlineQueryCurrentChat(String),
+
+    /// If set, pressing the button will prompt the user to select one of their
+    /// chats of the specified type, open that chat and insert the bot's
+    /// username and the specified inline query in the input field
+    SwitchInlineQueryChosenChat(SwitchInlineQueryChosenChat),
 
     /// Description of the game that will be launched when the user presses the
     /// button.
@@ -189,29 +195,5 @@ impl InlineKeyboardButton {
         T: Into<String>,
     {
         Self::new(text, InlineKeyboardButtonKind::Pay(True))
-    }
-}
-
-impl InlineKeyboardButton {
-    #[deprecated(
-        since = "0.7.0",
-        note = "set correct text in the constructor or access the field directly"
-    )]
-    pub fn text<S>(mut self, val: S) -> Self
-    where
-        S: Into<String>,
-    {
-        self.text = val.into();
-        self
-    }
-
-    #[deprecated(
-        since = "0.7.0",
-        note = "set correct kind in the constructor or access the field directly"
-    )]
-    #[must_use]
-    pub fn kind(mut self, val: InlineKeyboardButtonKind) -> Self {
-        self.kind = val;
-        self
     }
 }

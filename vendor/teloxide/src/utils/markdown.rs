@@ -2,7 +2,7 @@
 //!
 //! [spec]: https://core.telegram.org/bots/api#markdownv2-style
 
-use teloxide_core::types::User;
+use teloxide_core::types::{User, UserId};
 
 /// Applies the bold font style to the string.
 ///
@@ -12,6 +12,16 @@ use teloxide_core::types::User;
               without using its output does nothing useful"]
 pub fn bold(s: &str) -> String {
     format!("*{s}*")
+}
+
+/// Applies the block quotation style to the string.
+///
+/// Passed string will not be automatically escaped because it can contain
+/// nested markup.
+#[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
+              without using its output does nothing useful"]
+pub fn blockquote(s: &str) -> String {
+    format!(">{s}")
 }
 
 /// Applies the italic font style to the string.
@@ -71,7 +81,7 @@ pub fn link(url: &str, text: &str) -> String {
 /// Builds an inline user mention link with an anchor.
 #[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
               without using its output does nothing useful"]
-pub fn user_mention(user_id: i64, text: &str) -> String {
+pub fn user_mention(user_id: UserId, text: &str) -> String {
     link(format!("tg://user?id={user_id}").as_str(), text)
 }
 
@@ -109,24 +119,16 @@ pub fn code_inline(s: &str) -> String {
 #[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
               without using its output does nothing useful"]
 pub fn escape(s: &str) -> String {
-    s.replace('_', r"\_")
-        .replace('*', r"\*")
-        .replace('[', r"\[")
-        .replace(']', r"\]")
-        .replace('(', r"\(")
-        .replace(')', r"\)")
-        .replace('~', r"\~")
-        .replace('`', r"\`")
-        .replace('>', r"\>")
-        .replace('#', r"\#")
-        .replace('+', r"\+")
-        .replace('-', r"\-")
-        .replace('=', r"\=")
-        .replace('|', r"\|")
-        .replace('{', r"\{")
-        .replace('}', r"\}")
-        .replace('.', r"\.")
-        .replace('!', r"\!")
+    const CHARS: [char; 18] =
+        ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+
+    s.chars().fold(String::with_capacity(s.len()), |mut s, c| {
+        if CHARS.contains(&c) {
+            s.push('\\');
+        }
+        s.push(c);
+        s
+    })
 }
 
 /// Escapes all markdown special characters specific for the inline link URL
@@ -134,7 +136,13 @@ pub fn escape(s: &str) -> String {
 #[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
               without using its output does nothing useful"]
 pub fn escape_link_url(s: &str) -> String {
-    s.replace('`', r"\`").replace(')', r"\)")
+    s.chars().fold(String::with_capacity(s.len()), |mut s, c| {
+        if ['`', ')'].contains(&c) {
+            s.push('\\');
+        }
+        s.push(c);
+        s
+    })
 }
 
 /// Escapes all markdown special characters specific for the code block (``` and
@@ -142,7 +150,13 @@ pub fn escape_link_url(s: &str) -> String {
 #[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
               without using its output does nothing useful"]
 pub fn escape_code(s: &str) -> String {
-    s.replace('\\', r"\\").replace('`', r"\`")
+    s.chars().fold(String::with_capacity(s.len()), |mut s, c| {
+        if ['`', '\\'].contains(&c) {
+            s.push('\\');
+        }
+        s.push(c);
+        s
+    })
 }
 
 #[must_use = "This function returns a new string, rather than mutating the argument, so calling it \
@@ -157,7 +171,6 @@ pub fn user_mention_or_link(user: &User) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use teloxide_core::types::{User, UserId};
 
     #[test]
     fn test_bold() {
@@ -203,7 +216,10 @@ mod tests {
 
     #[test]
     fn test_user_mention() {
-        assert_eq!(user_mention(123_456_789, "pwner666"), "[pwner666](tg://user?id=123456789)");
+        assert_eq!(
+            user_mention(UserId(123_456_789), "pwner666"),
+            "[pwner666](tg://user?id=123456789)"
+        );
     }
 
     #[test]
@@ -280,9 +296,6 @@ mod tests {
             is_premium: false,
             added_to_attachment_menu: false,
         };
-        assert_eq!(
-            user_mention_or_link(&user_without_username),
-            r#"[Name](tg://user/?id=123456789)"#
-        )
+        assert_eq!(user_mention_or_link(&user_without_username), "[Name](tg://user/?id=123456789)")
     }
 }

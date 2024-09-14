@@ -12,28 +12,38 @@
 [package]
 edition = "2021"
 name = "sqlx-postgres"
-version = "0.7.3"
+version = "0.8.1"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
     "Chloe Ross <orangesnowfox@gmail.com>",
     "Daniel Akhterov <akhterovd@gmail.com>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "PostgreSQL driver implementation for SQLx. Not for direct use; see the `sqlx` crate for details."
 documentation = "https://docs.rs/sqlx"
+readme = false
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/launchbadge/sqlx"
+
+[lib]
+name = "sqlx_postgres"
+path = "src/lib.rs"
 
 [dependencies.atoi]
 version = "2.0"
 
 [dependencies.base64]
-version = "0.21.0"
+version = "0.22.0"
 features = ["std"]
 default-features = false
 
 [dependencies.bigdecimal]
-version = "0.3.0"
+version = "0.4.0"
 optional = true
 
 [dependencies.bit-vec]
@@ -50,7 +60,11 @@ features = ["std"]
 default-features = false
 
 [dependencies.chrono]
-version = "0.4.22"
+version = "0.4.34"
+features = [
+    "std",
+    "clock",
+]
 optional = true
 default-features = false
 
@@ -94,6 +108,7 @@ version = "0.12.0"
 
 [dependencies.hmac]
 version = "0.12.0"
+features = ["reset"]
 default-features = false
 
 [dependencies.home]
@@ -107,7 +122,7 @@ optional = true
 version = "1.0.1"
 
 [dependencies.log]
-version = "0.4.17"
+version = "0.4.18"
 
 [dependencies.mac_address]
 version = "1.1.5"
@@ -138,7 +153,9 @@ default-features = false
 
 [dependencies.rust_decimal]
 version = "1.26.1"
+features = ["std"]
 optional = true
+default-features = false
 
 [dependencies.serde]
 version = "1.0.144"
@@ -148,19 +165,16 @@ features = ["derive"]
 version = "1.0.85"
 features = ["raw_value"]
 
-[dependencies.sha1]
-version = "0.10.1"
-default-features = false
-
 [dependencies.sha2]
 version = "0.10.0"
 default-features = false
 
 [dependencies.smallvec]
 version = "1.7.0"
+features = ["serde"]
 
 [dependencies.sqlx-core]
-version = "=0.7.3"
+version = "=0.8.1"
 features = ["json"]
 
 [dependencies.stringprep]
@@ -170,7 +184,7 @@ version = "0.1.2"
 version = "1.0.35"
 
 [dependencies.time]
-version = "0.3.14"
+version = "0.3.36"
 features = [
     "formatting",
     "parsing",
@@ -190,19 +204,59 @@ optional = true
 version = "1.2.1"
 default-features = false
 
+[dev-dependencies.sqlx]
+version = "=0.8.1"
+features = [
+    "postgres",
+    "derive",
+]
+default-features = false
+
 [features]
 any = ["sqlx-core/any"]
 bigdecimal = [
     "dep:bigdecimal",
     "dep:num-bigint",
+    "sqlx-core/bigdecimal",
+]
+bit-vec = [
+    "dep:bit-vec",
+    "sqlx-core/bit-vec",
+]
+chrono = [
+    "dep:chrono",
+    "sqlx-core/chrono",
+]
+ipnetwork = [
+    "dep:ipnetwork",
+    "sqlx-core/ipnetwork",
 ]
 json = ["sqlx-core/json"]
+mac_address = [
+    "dep:mac_address",
+    "sqlx-core/mac_address",
+]
 migrate = ["sqlx-core/migrate"]
 offline = ["sqlx-core/offline"]
 rust_decimal = [
     "dep:rust_decimal",
     "rust_decimal/maths",
+    "sqlx-core/rust_decimal",
+]
+time = [
+    "dep:time",
+    "sqlx-core/time",
+]
+uuid = [
+    "dep:uuid",
+    "sqlx-core/uuid",
 ]
 
-[target."cfg(target_os = \"windows\")".dependencies.etcetera]
+[target.'cfg(target_os = "windows")'.dependencies.etcetera]
 version = "0.8.0"
+
+[lints.clippy]
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_sign_loss = "deny"
+disallowed_methods = "deny"

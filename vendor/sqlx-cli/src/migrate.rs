@@ -20,7 +20,7 @@ fn create_file(
     use std::path::PathBuf;
 
     let mut file_name = file_prefix.to_string();
-    file_name.push_str("_");
+    file_name.push('_');
     file_name.push_str(&description.replace(' ', "_"));
     file_name.push_str(migration_type.suffix());
 
@@ -109,11 +109,6 @@ pub async fn add(
 ) -> anyhow::Result<()> {
     fs::create_dir_all(migration_source).context("Unable to create migrations directory")?;
 
-    // if the migrations directory is empty
-    let has_existing_migrations = fs::read_dir(migration_source)
-        .map(|mut dir| dir.next().is_some())
-        .unwrap_or(false);
-
     let migrator = Migrator::new(Path::new(migration_source)).await?;
     // Type of newly created migration will be the same as the first one
     // or reversible flag if this is the first migration
@@ -125,30 +120,48 @@ pub async fn add(
     if migration_type.is_reversible() {
         create_file(
             migration_source,
-            &file_prefix,
+            file_prefix,
             description,
             MigrationType::ReversibleUp,
         )?;
         create_file(
             migration_source,
-            &file_prefix,
+            file_prefix,
             description,
             MigrationType::ReversibleDown,
         )?;
     } else {
         create_file(
             migration_source,
-            &file_prefix,
+            file_prefix,
             description,
             MigrationType::Simple,
         )?;
     }
+
+    // if the migrations directory is empty
+    let has_existing_migrations = fs::read_dir(migration_source)
+        .map(|mut dir| dir.next().is_some())
+        .unwrap_or(false);
 
     if !has_existing_migrations {
         let quoted_source = if migration_source != "migrations" {
             format!("{migration_source:?}")
         } else {
             "".to_string()
+        };
+
+        // Provide a link to the current version in case the details change.
+        // Patch version is deliberately omitted.
+        let version = if let (Some(major), Some(minor)) = (
+            // Don't fail if we're not being built by Cargo
+            option_env!("CARGO_PKG_VERSION_MAJOR"),
+            option_env!("CARGO_PKG_VERSION_MINOR"),
+        ) {
+            format!("{major}.{minor}")
+        } else {
+            // If a version isn't available, "latest" is fine.
+            "latest".to_string()
         };
 
         print!(
@@ -158,14 +171,13 @@ Congratulations on creating your first migration!
 Did you know you can embed your migrations in your application binary?
 On startup, after creating your database connection or pool, add:
 
-sqlx::migrate!({}).run(<&your_pool OR &mut your_connection>).await?;
+sqlx::migrate!({quoted_source}).run(<&your_pool OR &mut your_connection>).await?;
 
 Note that the compiler won't pick up new migrations if no Rust source files have changed.
 You can create a Cargo build script to work around this with `sqlx migrate build-script`.
 
-See: https://docs.rs/sqlx/0.5/sqlx/macro.migrate.html
+See: https://docs.rs/sqlx/{version}/sqlx/macro.migrate.html
 "#,
-            quoted_source
         );
     }
 
@@ -182,7 +194,7 @@ fn short_checksum(checksum: &[u8]) -> String {
 
 pub async fn info(migration_source: &str, connect_opts: &ConnectOpts) -> anyhow::Result<()> {
     let migrator = Migrator::new(Path::new(migration_source)).await?;
-    let mut conn = crate::connect(&connect_opts).await?;
+    let mut conn = crate::connect(connect_opts).await?;
 
     conn.ensure_migrations_table().await?;
 
@@ -228,7 +240,7 @@ pub async fn info(migration_source: &str, connect_opts: &ConnectOpts) -> anyhow:
                 ),
             );
             println!(
-                "local migration has checksum   {}",
+                "local migration has checksum {}",
                 short_checksum(&migration.checksum)
             )
         }
@@ -268,7 +280,7 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     let migrator = Migrator::new(Path::new(migration_source)).await?;
     if let Some(target_version) = target_version {
-        if !migrator.iter().any(|m| target_version == m.version) {
+        if !migrator.version_exists(target_version) {
             bail!(MigrateError::VersionNotPresent(target_version));
         }
     }
@@ -288,7 +300,7 @@ pub async fn run(
     let latest_version = applied_migrations
         .iter()
         .max_by(|x, y| x.version.cmp(&y.version))
-        .and_then(|migration| Some(migration.version))
+        .map(|migration| migration.version)
         .unwrap_or(0);
     if let Some(target_version) = target_version {
         if target_version < latest_version {
@@ -314,10 +326,8 @@ pub async fn run(
                 }
             }
             None => {
-                let skip = match target_version {
-                    Some(target_version) if migration.version > target_version => true,
-                    _ => false,
-                };
+                let skip =
+                    target_version.is_some_and(|target_version| migration.version > target_version);
 
                 let elapsed = if dry_run || skip {
                     Duration::new(0, 0)
@@ -363,12 +373,12 @@ pub async fn revert(
 ) -> anyhow::Result<()> {
     let migrator = Migrator::new(Path::new(migration_source)).await?;
     if let Some(target_version) = target_version {
-        if target_version != 0 && !migrator.iter().any(|m| target_version == m.version) {
+        if target_version != 0 && !migrator.version_exists(target_version) {
             bail!(MigrateError::VersionNotPresent(target_version));
         }
     }
 
-    let mut conn = crate::connect(&connect_opts).await?;
+    let mut conn = crate::connect(connect_opts).await?;
 
     conn.ensure_migrations_table().await?;
 
@@ -383,7 +393,7 @@ pub async fn revert(
     let latest_version = applied_migrations
         .iter()
         .max_by(|x, y| x.version.cmp(&y.version))
-        .and_then(|migration| Some(migration.version))
+        .map(|migration| migration.version)
         .unwrap_or(0);
     if let Some(target_version) = target_version {
         if target_version > latest_version {
@@ -405,10 +415,9 @@ pub async fn revert(
         }
 
         if applied_migrations.contains_key(&migration.version) {
-            let skip = match target_version {
-                Some(target_version) if migration.version <= target_version => true,
-                _ => false,
-            };
+            let skip =
+                target_version.is_some_and(|target_version| migration.version <= target_version);
+
             let elapsed = if dry_run || skip {
                 Duration::new(0, 0)
             } else {
@@ -435,7 +444,7 @@ pub async fn revert(
 
             // Only a single migration will be reverted at a time if no target
             // version is supplied, so we break.
-            if let None = target_version {
+            if target_version.is_none() {
                 break;
             }
         }
@@ -465,7 +474,8 @@ pub fn build_script(migration_source: &str, force: bool) -> anyhow::Result<()> {
 fn main() {{
     // trigger recompilation when a new migration is added
     println!("cargo:rerun-if-changed={migration_source}");
-}}"#,
+}}
+"#,
     );
 
     fs::write("build.rs", contents)?;

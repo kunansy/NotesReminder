@@ -5,7 +5,7 @@ use std::path::Path;
 /// `cfg!(windows)`, since the latter does not properly handle cross-compilation
 ///
 /// Note that there is no way to know at compile-time which system we'll be
-/// targetting, and this test must be made at run-time (of the build script) See
+/// targeting, and this test must be made at run-time (of the build script) See
 /// https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
 fn win_target() -> bool {
     env::var("CARGO_CFG_WINDOWS").is_ok()
@@ -114,6 +114,7 @@ mod build_bundled {
         {
             super::copy_bindings(lib_name, "bindgen_bundled_version", out_path);
         }
+        println!("cargo:include={}/{lib_name}", env!("CARGO_MANIFEST_DIR"));
         println!("cargo:rerun-if-changed={lib_name}/sqlite3.c");
         println!("cargo:rerun-if-changed=sqlite3/wasm32-wasi-vfs.c");
         let mut cfg = cc::Build::new();
@@ -130,12 +131,12 @@ mod build_bundled {
             .flag("-DSQLITE_ENABLE_LOAD_EXTENSION=1")
             .flag("-DSQLITE_ENABLE_MEMORY_MANAGEMENT")
             .flag("-DSQLITE_ENABLE_RTREE")
-            .flag("-DSQLITE_ENABLE_STAT2")
             .flag("-DSQLITE_ENABLE_STAT4")
             .flag("-DSQLITE_SOUNDEX")
             .flag("-DSQLITE_THREADSAFE=1")
             .flag("-DSQLITE_USE_URI")
             .flag("-DHAVE_USLEEP=1")
+            .flag("-DHAVE_ISNAN")
             .flag("-D_POSIX_THREAD_SAFE_FUNCTIONS") // cross compile with MinGW
             .warnings(false);
 
@@ -155,25 +156,34 @@ mod build_bundled {
             let (lib_dir, inc_dir) = match (lib_dir, inc_dir) {
                 (Some(lib_dir), Some(inc_dir)) => {
                     use_openssl = true;
-                    (lib_dir, inc_dir)
+                    (vec![lib_dir], inc_dir)
                 }
                 (lib_dir, inc_dir) => match find_openssl_dir(&host, &target) {
                     None => {
                         if is_windows && !cfg!(feature = "bundled-sqlcipher-vendored-openssl") {
                             panic!("Missing environment variable OPENSSL_DIR or OPENSSL_DIR is not set")
                         } else {
-                            (PathBuf::new(), PathBuf::new())
+                            (vec![PathBuf::new()], PathBuf::new())
                         }
                     }
                     Some(openssl_dir) => {
-                        let lib_dir = lib_dir.unwrap_or_else(|| openssl_dir.join("lib"));
+                        let lib_dir = lib_dir.map(|d| vec![d]).unwrap_or_else(|| {
+                            let mut lib_dirs = vec![];
+                            // OpenSSL 3.0 now puts its libraries in lib64/ by default,
+                            // check for both it and lib/.
+                            if openssl_dir.join("lib64").exists() {
+                                lib_dirs.push(openssl_dir.join("lib64"));
+                            }
+                            if openssl_dir.join("lib").exists() {
+                                lib_dirs.push(openssl_dir.join("lib"));
+                            }
+                            lib_dirs
+                        });
                         let inc_dir = inc_dir.unwrap_or_else(|| openssl_dir.join("include"));
 
-                        assert!(
-                            Path::new(&lib_dir).exists(),
-                            "OpenSSL library directory does not exist: {}",
-                            lib_dir.to_string_lossy()
-                        );
+                        if !lib_dir.iter().all(|p| p.exists()) {
+                            panic!("OpenSSL library directory does not exist: {:?}", lib_dir);
+                        }
 
                         if !Path::new(&inc_dir).exists() {
                             panic!(
@@ -196,7 +206,9 @@ mod build_bundled {
                 cfg.include(inc_dir.to_string_lossy().as_ref());
                 let lib_name = if is_windows { "libcrypto" } else { "crypto" };
                 println!("cargo:rustc-link-lib=dylib={}", lib_name);
-                println!("cargo:rustc-link-search={}", lib_dir.to_string_lossy());
+                for lib_dir_item in lib_dir.iter() {
+                    println!("cargo:rustc-link-search={}", lib_dir_item.to_string_lossy());
+                }
             } else if is_apple {
                 cfg.flag("-DSQLCIPHER_CRYPTO_CC");
                 println!("cargo:rustc-link-lib=framework=Security");
@@ -224,33 +236,19 @@ mod build_bundled {
             cfg.static_crt(true);
         }
 
-        // Older versions of visual studio don't support c99 (including isnan), which
-        // causes a build failure when the linker fails to find the `isnan`
-        // function. `sqlite` provides its own implementation, using the fact
-        // that x != x when x is NaN.
-        //
-        // There may be other platforms that don't support `isnan`, they should be
-        // tested for here.
-        if is_compiler("msvc") {
-            use cc::windows_registry::{find_vs_version, VsVers};
-            let vs_has_nan = match find_vs_version() {
-                Ok(ver) => ver != VsVers::Vs12,
-                Err(_msg) => false,
-            };
-            if vs_has_nan {
-                cfg.flag("-DHAVE_ISNAN");
-            }
-        } else {
-            cfg.flag("-DHAVE_ISNAN");
-        }
         if !win_target() {
             cfg.flag("-DHAVE_LOCALTIME_R");
         }
-        // Target wasm32-wasi can't compile the default VFS
         if env::var("TARGET").map_or(false, |v| v == "wasm32-wasi") {
-            cfg.flag("-DSQLITE_OS_OTHER")
+            cfg.flag("-USQLITE_THREADSAFE")
+                .flag("-DSQLITE_THREADSAFE=0")
                 // https://github.com/rust-lang/rust/issues/74393
-                .flag("-DLONGDOUBLE_TYPE=double");
+                .flag("-DLONGDOUBLE_TYPE=double")
+                .flag("-D_WASI_EMULATED_MMAN")
+                .flag("-D_WASI_EMULATED_GETPID")
+                .flag("-D_WASI_EMULATED_SIGNAL")
+                .flag("-D_WASI_EMULATED_PROCESS_CLOCKS");
+
             if cfg!(feature = "wasm32-wasi-vfs") {
                 cfg.file("sqlite3/wasm32-wasi-vfs.c");
             }
@@ -266,17 +264,17 @@ mod build_bundled {
         }
 
         if let Ok(limit) = env::var("SQLITE_MAX_VARIABLE_NUMBER") {
-            cfg.flag(&format!("-DSQLITE_MAX_VARIABLE_NUMBER={limit}"));
+            cfg.flag(format!("-DSQLITE_MAX_VARIABLE_NUMBER={limit}"));
         }
         println!("cargo:rerun-if-env-changed=SQLITE_MAX_VARIABLE_NUMBER");
 
         if let Ok(limit) = env::var("SQLITE_MAX_EXPR_DEPTH") {
-            cfg.flag(&format!("-DSQLITE_MAX_EXPR_DEPTH={limit}"));
+            cfg.flag(format!("-DSQLITE_MAX_EXPR_DEPTH={limit}"));
         }
         println!("cargo:rerun-if-env-changed=SQLITE_MAX_EXPR_DEPTH");
 
         if let Ok(limit) = env::var("SQLITE_MAX_COLUMN") {
-            cfg.flag(&format!("-DSQLITE_MAX_COLUMN={limit}"));
+            cfg.flag(format!("-DSQLITE_MAX_COLUMN={limit}"));
         }
         println!("cargo:rerun-if-env-changed=SQLITE_MAX_COLUMN");
 
@@ -285,7 +283,7 @@ mod build_bundled {
                 if extra.starts_with("-D") || extra.starts_with("-U") {
                     cfg.flag(extra);
                 } else if extra.starts_with("SQLITE_") {
-                    cfg.flag(&format!("-D{extra}"));
+                    cfg.flag(format!("-D{extra}"));
                 } else {
                     panic!("Don't understand {} in LIBSQLITE3_FLAGS", extra);
                 }
@@ -326,8 +324,6 @@ fn env_prefix() -> &'static str {
 fn lib_name() -> &'static str {
     if cfg!(any(feature = "sqlcipher", feature = "bundled-sqlcipher")) {
         "sqlcipher"
-    } else if cfg!(all(windows, feature = "winsqlite3")) {
-        "winsqlite3"
     } else {
         "sqlite3"
     }
@@ -345,10 +341,7 @@ impl From<HeaderLocation> for String {
             HeaderLocation::FromEnvironment => {
                 let prefix = env_prefix();
                 let mut header = env::var(format!("{prefix}_INCLUDE_DIR")).unwrap_or_else(|_| {
-                    panic!(
-                        "{}_INCLUDE_DIR must be set if {}_LIB_DIR is set",
-                        prefix, prefix
-                    )
+                    panic!("{prefix}_INCLUDE_DIR must be set if {prefix}_LIB_DIR is set")
                 });
                 header.push_str(if cfg!(feature = "loadable_extension") {
                     "/sqlite3ext.h"
@@ -431,12 +424,6 @@ mod build_linked {
         #[cfg(not(feature = "loadable_extension"))]
         println!("cargo:link-target={link_lib}");
 
-        if win_target() && cfg!(feature = "winsqlite3") {
-            #[cfg(not(feature = "loadable_extension"))]
-            println!("cargo:rustc-link-lib=dylib={link_lib}");
-            return HeaderLocation::Wrapper;
-        }
-
         // Allow users to specify where to find SQLite.
         if let Ok(dir) = env::var(format!("{}_LIB_DIR", env_prefix())) {
             // Try to use pkg-config to determine link commands
@@ -492,8 +479,8 @@ mod build_linked {
 }
 
 #[cfg(not(feature = "buildtime_bindgen"))]
+#[allow(dead_code)]
 mod bindings {
-    #![allow(dead_code)]
     use super::HeaderLocation;
 
     use std::path::Path;
@@ -512,9 +499,6 @@ mod bindings {
     use bindgen::callbacks::{IntKind, ParseCallbacks};
 
     use std::path::Path;
-
-    use super::win_target;
-
     #[derive(Debug)]
     struct SqliteTypeChooser;
 
@@ -562,8 +546,8 @@ mod bindings {
         xEntryPoint: ::std::option::Option<
             unsafe extern "C" fn(
                 db: *mut sqlite3,
-                pzErrMsg: *mut *const ::std::os::raw::c_char,
-                pThunk: *const sqlite3_api_routines,
+                pzErrMsg: *mut *mut ::std::os::raw::c_char,
+                _: *const sqlite3_api_routines,
             ) -> ::std::os::raw::c_int,
         >,
     ) -> ::std::os::raw::c_int;
@@ -576,13 +560,19 @@ mod bindings {
         xEntryPoint: ::std::option::Option<
             unsafe extern "C" fn(
                 db: *mut sqlite3,
-                pzErrMsg: *mut *const ::std::os::raw::c_char,
-                pThunk: *const sqlite3_api_routines,
+                pzErrMsg: *mut *mut ::std::os::raw::c_char,
+                _: *const sqlite3_api_routines,
             ) -> ::std::os::raw::c_int,
         >,
     ) -> ::std::os::raw::c_int;
 }"#,
-                );
+                )
+                .blocklist_function(".*16.*")
+                .blocklist_function("sqlite3_close_v2")
+                .blocklist_function("sqlite3_create_collation")
+                .blocklist_function("sqlite3_create_function")
+                .blocklist_function("sqlite3_create_module")
+                .blocklist_function("sqlite3_prepare");
         }
 
         if cfg!(any(feature = "sqlcipher", feature = "bundled-sqlcipher")) {
@@ -596,36 +586,6 @@ mod bindings {
         }
         if cfg!(feature = "session") {
             bindings = bindings.clang_arg("-DSQLITE_ENABLE_SESSION");
-        }
-        if win_target() && cfg!(feature = "winsqlite3") {
-            bindings = bindings
-                .clang_arg("-DBINDGEN_USE_WINSQLITE3")
-                .blocklist_item("NTDDI_.+")
-                .blocklist_item("WINAPI_FAMILY.*")
-                .blocklist_item("_WIN32_.+")
-                .blocklist_item("_VCRT_COMPILER_PREPROCESSOR")
-                .blocklist_item("_SAL_VERSION")
-                .blocklist_item("__SAL_H_VERSION")
-                .blocklist_item("_USE_DECLSPECS_FOR_SAL")
-                .blocklist_item("_USE_ATTRIBUTES_FOR_SAL")
-                .blocklist_item("_CRT_PACKING")
-                .blocklist_item("_HAS_EXCEPTIONS")
-                .blocklist_item("_STL_LANG")
-                .blocklist_item("_HAS_CXX17")
-                .blocklist_item("_HAS_CXX20")
-                .blocklist_item("_HAS_NODISCARD")
-                .blocklist_item("WDK_NTDDI_VERSION")
-                .blocklist_item("OSVERSION_MASK")
-                .blocklist_item("SPVERSION_MASK")
-                .blocklist_item("SUBVERSION_MASK")
-                .blocklist_item("WINVER")
-                .blocklist_item("__security_cookie")
-                .blocklist_type("size_t")
-                .blocklist_type("__vcrt_bool")
-                .blocklist_type("wchar_t")
-                .blocklist_function("__security_init_cookie")
-                .blocklist_function("__report_gsfailure")
-                .blocklist_function("__va_start");
         }
 
         // When cross compiling unless effort is taken to fix the issue, bindgen
@@ -706,16 +666,23 @@ mod loadable_extension {
         // (2) `#define sqlite3_xyz sqlite3_api->abc` => `pub unsafe fn
         // sqlite3_xyz(args) -> ty {...}` for each `abc` field:
         for field in sqlite3_api_routines.fields {
-            let ident = field.ident.expect("unamed field");
+            let ident = field.ident.expect("unnamed field");
             let span = ident.span();
             let name = ident.to_string();
-            if name == "vmprintf" || name == "xvsnprintf" || name == "str_vappendf" {
+            if name.contains("16") {
+                continue; // skip UTF-16 api as rust uses UTF-8
+            } else if name == "vmprintf" || name == "xvsnprintf" || name == "str_vappendf" {
                 continue; // skip va_list
             } else if name == "aggregate_count"
                 || name == "expired"
                 || name == "global_recover"
                 || name == "thread_cleanup"
                 || name == "transfer_bindings"
+                || name == "create_collation"
+                || name == "create_function"
+                || name == "create_module"
+                || name == "prepare"
+                || name == "close_v2"
             {
                 continue; // omit deprecated
             }

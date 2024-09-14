@@ -3,10 +3,6 @@ use crate::{adaptors::DefaultParseMode, requests::Requester, types::ParseMode};
 #[cfg(feature = "cache_me")]
 use crate::adaptors::CacheMe;
 
-#[cfg(feature = "auto_send")]
-#[allow(deprecated)]
-use crate::adaptors::AutoSend;
-
 #[cfg(feature = "erased")]
 use crate::adaptors::ErasedRequester;
 
@@ -20,6 +16,7 @@ use crate::adaptors::throttle::{Limits, Throttle};
 pub trait RequesterExt: Requester {
     /// Add `get_me` caching ability, see [`CacheMe`] for more.
     #[cfg(feature = "cache_me")]
+    #[must_use]
     fn cache_me(self) -> CacheMe<Self>
     where
         Self: Sized,
@@ -27,22 +24,9 @@ pub trait RequesterExt: Requester {
         CacheMe::new(self)
     }
 
-    /// Send requests automatically, see [`AutoSend`] for more.
-    #[cfg(feature = "auto_send")]
-    #[deprecated(
-        since = "0.8.0",
-        note = "`AutoSend` is no longer required to `.await` requests and is now noop"
-    )]
-    #[allow(deprecated)]
-    fn auto_send(self) -> AutoSend<Self>
-    where
-        Self: Sized,
-    {
-        AutoSend::new(self)
-    }
-
     /// Erase requester type.
     #[cfg(feature = "erased")]
+    #[must_use]
     fn erase<'a>(self) -> ErasedRequester<'a, Self::Err>
     where
         Self: 'a,
@@ -53,6 +37,7 @@ pub trait RequesterExt: Requester {
 
     /// Trace requests, see [`Trace`] for more.
     #[cfg(feature = "trace_adaptor")]
+    #[must_use]
     fn trace(self, settings: Settings) -> Trace<Self>
     where
         Self: Sized,
@@ -64,6 +49,7 @@ pub trait RequesterExt: Requester {
     ///
     /// Note: this spawns the worker, just as [`Throttle::new_spawn`].
     #[cfg(feature = "throttle")]
+    #[must_use]
     fn throttle(self, limits: Limits) -> Throttle<Self>
     where
         Self: Sized + Clone + Send + Sync + 'static,
@@ -101,6 +87,7 @@ pub trait RequesterExt: Requester {
     /// crate::requests::Requester::edit_message_caption
     /// [`edit_message_caption_inline`]:
     /// crate::requests::Requester::edit_message_caption_inline
+    #[must_use]
     fn parse_mode(self, parse_mode: ParseMode) -> DefaultParseMode<Self>
     where
         Self: Sized,

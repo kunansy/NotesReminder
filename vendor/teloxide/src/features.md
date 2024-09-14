@@ -6,7 +6,6 @@
 | `webhooks-axum`      | Enables webhook implementation based on axum framework. |
 | `macros`             | Re-exports macros from [`teloxide-macros`]. |
 | `ctrlc_handler`      | Enables the [`DispatcherBuilder::enable_ctrlc_handler`] function (**enabled by default**). |
-| `auto-send`          | Enables the [`AutoSend`](adaptors::AutoSend) bot adaptor (**enabled by default; DEPRECATED**). |
 | `throttle`           | Enables the [`Throttle`](adaptors::Throttle) bot adaptor. |
 | `cache-me`           | Enables the [`CacheMe`](adaptors::CacheMe) bot adaptor. |
 | `trace-adaptor`      | Enables the [`Trace`](adaptors::Trace) bot adaptor. |
@@ -16,8 +15,8 @@
 | `native-tls`         | Enables the [`native-tls`] TLS implementation (**enabled by default**). |
 | `rustls`             | Enables the [`rustls`] TLS implementation. |
 | `redis-storage`      | Enables the [Redis] storage support for dialogues. |
-| `sqlite-storage`     | Enables the [Sqlite] storage support for dialogues (depends on `native-tls`). |
-| `sqlite-storage-rustls`     | Enables the [Sqlite] storage support for dialogues (depends on `rustls`, conflicts with `sqlite-storage`). |
+| `sqlite-storage-nativetls`     | Enables the [Sqlite] storage support for dialogues (depends on `native-tls`). |
+| `sqlite-storage-rustls`     | Enables the [Sqlite] storage support for dialogues (depends on `rustls`, conflicts with `sqlite-storage-nativetls`). |
 | `cbor-serializer`    | Enables the [CBOR] serializer for dialogues. |
 | `bincode-serializer` | Enables the [Bincode] serializer for dialogues. |
 

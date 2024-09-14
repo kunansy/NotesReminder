@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::any::{Any, AnyTypeInfo, AnyTypeInfoKind};
-use crate::database::{Database, HasValueRef};
+use crate::database::Database;
 use crate::error::BoxDynError;
 use crate::types::Type;
 use crate::value::{Value, ValueRef};
@@ -9,7 +9,7 @@ use crate::value::{Value, ValueRef};
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum AnyValueKind<'a> {
-    Null,
+    Null(AnyTypeInfoKind),
     Bool(bool),
     SmallInt(i16),
     Integer(i32),
@@ -24,7 +24,7 @@ impl AnyValueKind<'_> {
     fn type_info(&self) -> AnyTypeInfo {
         AnyTypeInfo {
             kind: match self {
-                AnyValueKind::Null => AnyTypeInfoKind::Null,
+                AnyValueKind::Null(_) => AnyTypeInfoKind::Null,
                 AnyValueKind::Bool(_) => AnyTypeInfoKind::Bool,
                 AnyValueKind::SmallInt(_) => AnyTypeInfoKind::SmallInt,
                 AnyValueKind::Integer(_) => AnyTypeInfoKind::Integer,
@@ -71,10 +71,10 @@ pub struct AnyValueRef<'a> {
 impl Value for AnyValue {
     type Database = Any;
 
-    fn as_ref(&self) -> <Self::Database as HasValueRef<'_>>::ValueRef {
+    fn as_ref(&self) -> <Self::Database as Database>::ValueRef<'_> {
         AnyValueRef {
             kind: match &self.kind {
-                AnyValueKind::Null => AnyValueKind::Null,
+                AnyValueKind::Null(k) => AnyValueKind::Null(*k),
                 AnyValueKind::Bool(b) => AnyValueKind::Bool(*b),
                 AnyValueKind::SmallInt(i) => AnyValueKind::SmallInt(*i),
                 AnyValueKind::Integer(i) => AnyValueKind::Integer(*i),
@@ -92,7 +92,7 @@ impl Value for AnyValue {
     }
 
     fn is_null(&self) -> bool {
-        false
+        matches!(self.kind, AnyValueKind::Null(_))
     }
 }
 
@@ -102,7 +102,7 @@ impl<'a> ValueRef<'a> for AnyValueRef<'a> {
     fn to_owned(&self) -> <Self::Database as Database>::Value {
         AnyValue {
             kind: match &self.kind {
-                AnyValueKind::Null => AnyValueKind::Null,
+                AnyValueKind::Null(k) => AnyValueKind::Null(*k),
                 AnyValueKind::Bool(b) => AnyValueKind::Bool(*b),
                 AnyValueKind::SmallInt(i) => AnyValueKind::SmallInt(*i),
                 AnyValueKind::Integer(i) => AnyValueKind::Integer(*i),
@@ -120,6 +120,6 @@ impl<'a> ValueRef<'a> for AnyValueRef<'a> {
     }
 
     fn is_null(&self) -> bool {
-        false
+        matches!(self.kind, AnyValueKind::Null(_))
     }
 }

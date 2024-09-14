@@ -1,16 +1,18 @@
 use crate::error::Error;
 use crate::ext::ustr::UStr;
+use crate::io::StatementId;
 use crate::message::{ParameterDescription, RowDescription};
 use crate::query_as::query_as;
-use crate::query_scalar::{query_scalar, query_scalar_with};
+use crate::query_scalar::query_scalar;
 use crate::statement::PgStatementMetadata;
-use crate::type_info::{PgCustomType, PgType, PgTypeKind};
+use crate::type_info::{PgArrayOf, PgCustomType, PgType, PgTypeKind};
 use crate::types::Json;
 use crate::types::Oid;
 use crate::HashMap;
-use crate::{PgArguments, PgColumn, PgConnection, PgTypeInfo};
+use crate::{PgColumn, PgConnection, PgTypeInfo};
 use futures_core::future::BoxFuture;
-use std::fmt::Write;
+use smallvec::SmallVec;
+use sqlx_core::query_builder::QueryBuilder;
 use std::sync::Arc;
 
 /// Describes the type of the `pg_type.typtype` column
@@ -26,10 +28,12 @@ enum TypType {
     Range,
 }
 
-impl TryFrom<u8> for TypType {
+impl TryFrom<i8> for TypType {
     type Error = ();
 
-    fn try_from(t: u8) -> Result<Self, Self::Error> {
+    fn try_from(t: i8) -> Result<Self, Self::Error> {
+        let t = u8::try_from(t).or(Err(()))?;
+
         let t = match t {
             b'b' => Self::Base,
             b'c' => Self::Composite,
@@ -65,10 +69,12 @@ enum TypCategory {
     Unknown,
 }
 
-impl TryFrom<u8> for TypCategory {
+impl TryFrom<i8> for TypCategory {
     type Error = ();
 
-    fn try_from(c: u8) -> Result<Self, Self::Error> {
+    fn try_from(c: i8) -> Result<Self, Self::Error> {
+        let c = u8::try_from(c).or(Err(()))?;
+
         let c = match c {
             b'A' => Self::Array,
             b'B' => Self::Boolean,
@@ -185,15 +191,31 @@ impl PgConnection {
 
     fn fetch_type_by_oid(&mut self, oid: Oid) -> BoxFuture<'_, Result<PgTypeInfo, Error>> {
         Box::pin(async move {
-            let (name, typ_type, category, relation_id, element, base_type): (String, i8, i8, Oid, Oid, Oid) = query_as(
-                "SELECT typname, typtype, typcategory, typrelid, typelem, typbasetype FROM pg_catalog.pg_type WHERE oid = $1",
+            let (name, typ_type, category, relation_id, element, base_type): (
+                String,
+                i8,
+                i8,
+                Oid,
+                Oid,
+                Oid,
+            ) = query_as(
+                // Converting the OID to `regtype` and then `text` will give us the name that
+                // the type will need to be found at by search_path.
+                "SELECT oid::regtype::text, \
+                     typtype, \
+                     typcategory, \
+                     typrelid, \
+                     typelem, \
+                     typbasetype \
+                     FROM pg_catalog.pg_type \
+                     WHERE oid = $1",
             )
             .bind(oid)
             .fetch_one(&mut *self)
             .await?;
 
-            let typ_type = TypType::try_from(typ_type as u8);
-            let category = TypCategory::try_from(category as u8);
+            let typ_type = TypType::try_from(typ_type);
+            let category = TypCategory::try_from(category);
 
             match (typ_type, category) {
                 (Ok(TypType::Domain), _) => self.fetch_domain_by_oid(oid, base_type, name).await,
@@ -338,6 +360,19 @@ WHERE rngtypid = $1
         })
     }
 
+    pub(crate) async fn resolve_type_id(&mut self, ty: &PgType) -> Result<Oid, Error> {
+        if let Some(oid) = ty.try_oid() {
+            return Ok(oid);
+        }
+
+        match ty {
+            PgType::DeclareWithName(name) => self.fetch_type_id_by_name(name).await,
+            PgType::DeclareArrayOf(array) => self.fetch_array_type_id(array).await,
+            // `.try_oid()` should return `Some()` or it should be covered here
+            _ => unreachable!("(bug) OID should be resolvable for type {ty:?}"),
+        }
+    }
+
     pub(crate) async fn fetch_type_id_by_name(&mut self, name: &str) -> Result<Oid, Error> {
         if let Some(oid) = self.cache_type_oid.get(name) {
             return Ok(*oid);
@@ -349,44 +384,77 @@ WHERE rngtypid = $1
             .fetch_optional(&mut *self)
             .await?
             .ok_or_else(|| Error::TypeNotFound {
-                type_name: String::from(name),
+                type_name: name.into(),
             })?;
 
         self.cache_type_oid.insert(name.to_string().into(), oid);
         Ok(oid)
     }
 
+    pub(crate) async fn fetch_array_type_id(&mut self, array: &PgArrayOf) -> Result<Oid, Error> {
+        if let Some(oid) = self
+            .cache_type_oid
+            .get(&array.elem_name)
+            .and_then(|elem_oid| self.cache_elem_type_to_array.get(elem_oid))
+        {
+            return Ok(*oid);
+        }
+
+        // language=SQL
+        let (elem_oid, array_oid): (Oid, Oid) =
+            query_as("SELECT oid, typarray FROM pg_catalog.pg_type WHERE oid = $1::regtype::oid")
+                .bind(&*array.elem_name)
+                .fetch_optional(&mut *self)
+                .await?
+                .ok_or_else(|| Error::TypeNotFound {
+                    type_name: array.name.to_string(),
+                })?;
+
+        // Avoids copying `elem_name` until necessary
+        self.cache_type_oid
+            .entry_ref(&array.elem_name)
+            .insert(elem_oid);
+        self.cache_elem_type_to_array.insert(elem_oid, array_oid);
+
+        Ok(array_oid)
+    }
+
     pub(crate) async fn get_nullable_for_columns(
         &mut self,
-        stmt_id: Oid,
+        stmt_id: StatementId,
         meta: &PgStatementMetadata,
     ) -> Result<Vec<Option<bool>>, Error> {
         if meta.columns.is_empty() {
             return Ok(vec![]);
         }
 
-        let mut nullable_query = String::from("SELECT NOT pg_attribute.attnotnull FROM (VALUES ");
-        let mut args = PgArguments::default();
-
-        for (i, (column, bind)) in meta.columns.iter().zip((1..).step_by(3)).enumerate() {
-            if !args.buffer.is_empty() {
-                nullable_query += ", ";
-            }
-
-            let _ = write!(
-                nullable_query,
-                "(${}::int4, ${}::int4, ${}::int2)",
-                bind,
-                bind + 1,
-                bind + 2
+        if meta.columns.len() * 3 > 65535 {
+            tracing::debug!(
+                ?stmt_id,
+                num_columns = meta.columns.len(),
+                "number of columns in query is too large to pull nullability for"
             );
-
-            args.add(i as i32);
-            args.add(column.relation_id);
-            args.add(column.relation_attribute_no);
         }
 
-        nullable_query.push_str(
+        // Query for NOT NULL constraints for each column in the query.
+        //
+        // This will include columns that don't have a `relation_id` (are not from a table);
+        // assuming those are a minority of columns, it's less code to _not_ work around it
+        // and just let Postgres return `NULL`.
+        let mut nullable_query = QueryBuilder::new("SELECT NOT pg_attribute.attnotnull FROM ( ");
+
+        nullable_query.push_values(meta.columns.iter().zip(0i32..), |mut tuple, (column, i)| {
+            // ({i}::int4, {column.relation_id}::int4, {column.relation_attribute_no}::int2)
+            tuple.push_bind(i).push_unseparated("::int4");
+            tuple
+                .push_bind(column.relation_id)
+                .push_unseparated("::int4");
+            tuple
+                .push_bind(column.relation_attribute_no)
+                .push_unseparated("::int2");
+        });
+
+        nullable_query.push(
             ") as col(idx, table_id, col_idx) \
             LEFT JOIN pg_catalog.pg_attribute \
                 ON table_id IS NOT NULL \
@@ -395,9 +463,16 @@ WHERE rngtypid = $1
             ORDER BY col.idx",
         );
 
-        let mut nullables = query_scalar_with::<_, Option<bool>, _>(&nullable_query, args)
+        let mut nullables: Vec<Option<bool>> = nullable_query
+            .build_query_scalar()
             .fetch_all(&mut *self)
-            .await?;
+            .await
+            .map_err(|e| {
+                err_protocol!(
+                    "error from nullables query: {e}; query: {:?}",
+                    nullable_query.sql()
+                )
+            })?;
 
         // If the server is CockroachDB or Materialize, skip this step (#1248).
         if !self.stream.parameter_statuses.contains_key("crdb_version")
@@ -422,13 +497,14 @@ WHERE rngtypid = $1
     /// and returns `None` for all others.
     async fn nullables_from_explain(
         &mut self,
-        stmt_id: Oid,
+        stmt_id: StatementId,
         params_len: usize,
     ) -> Result<Vec<Option<bool>>, Error> {
-        let mut explain = format!(
-            "EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlx_s_{}",
-            stmt_id.0
-        );
+        let stmt_id_display = stmt_id
+            .display()
+            .ok_or_else(|| err_protocol!("cannot EXPLAIN unnamed statement: {stmt_id:?}"))?;
+
+        let mut explain = format!("EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE {stmt_id_display}");
         let mut comma = false;
 
         if params_len > 0 {
@@ -447,17 +523,18 @@ WHERE rngtypid = $1
             explain += ")";
         }
 
-        let (Json([explain]),): (Json<[Explain; 1]>,) = query_as(&explain).fetch_one(self).await?;
+        let (Json(explains),): (Json<SmallVec<[Explain; 1]>>,) =
+            query_as(&explain).fetch_one(self).await?;
 
         let mut nullables = Vec::new();
 
-        if let Explain::Plan {
+        if let Some(Explain::Plan {
             plan:
                 plan @ Plan {
                     output: Some(ref outputs),
                     ..
                 },
-        } = &explain
+        }) = explains.first()
         {
             nullables.resize(outputs.len(), None);
             visit_plan(plan, outputs, &mut nullables);

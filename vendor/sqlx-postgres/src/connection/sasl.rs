@@ -1,8 +1,6 @@
 use crate::connection::stream::PgStream;
 use crate::error::Error;
-use crate::message::{
-    Authentication, AuthenticationSasl, MessageFormat, SaslInitialResponse, SaslResponse,
-};
+use crate::message::{Authentication, AuthenticationSasl, SaslInitialResponse, SaslResponse};
 use crate::PgConnectOptions;
 use hmac::{Hmac, Mac};
 use rand::Rng;
@@ -76,7 +74,7 @@ pub(crate) async fn authenticate(
         })
         .await?;
 
-    let cont = match stream.recv_expect(MessageFormat::Authentication).await? {
+    let cont = match stream.recv_expect().await? {
         Authentication::SaslContinue(data) => data,
 
         auth => {
@@ -101,7 +99,7 @@ pub(crate) async fn authenticate(
     let client_key = mac.finalize().into_bytes();
 
     // StoredKey := H(ClientKey)
-    let stored_key = Sha256::digest(&client_key);
+    let stored_key = Sha256::digest(client_key);
 
     // client-final-message-without-proof
     let client_final_message_wo_proof = format!(
@@ -120,7 +118,7 @@ pub(crate) async fn authenticate(
 
     // ClientSignature := HMAC(StoredKey, AuthMessage)
     let mut mac = Hmac::<Sha256>::new_from_slice(&stored_key).map_err(Error::protocol)?;
-    mac.update(&auth_message.as_bytes());
+    mac.update(auth_message.as_bytes());
 
     let client_signature = mac.finalize().into_bytes();
 
@@ -139,7 +137,7 @@ pub(crate) async fn authenticate(
 
     // ServerSignature := HMAC(ServerKey, AuthMessage)
     let mut mac = Hmac::<Sha256>::new_from_slice(&server_key).map_err(Error::protocol)?;
-    mac.update(&auth_message.as_bytes());
+    mac.update(auth_message.as_bytes());
 
     // client-final-message = client-final-message-without-proof "," proof
     let mut client_final_message = format!("{client_final_message_wo_proof},{CLIENT_PROOF_ATTR}=");
@@ -147,7 +145,7 @@ pub(crate) async fn authenticate(
 
     stream.send(SaslResponse(&client_final_message)).await?;
 
-    let data = match stream.recv_expect(MessageFormat::Authentication).await? {
+    let data = match stream.recv_expect().await? {
         Authentication::SaslFinal(data) => data,
 
         auth => {
@@ -172,10 +170,10 @@ fn gen_nonce() -> String {
     // ;; a valid "value".
     let nonce: String = std::iter::repeat(())
         .map(|()| {
-            let mut c = rng.gen_range(0x21..0x7F) as u8;
+            let mut c = rng.gen_range(0x21u8..0x7F);
 
             while c == 0x2C {
-                c = rng.gen_range(0x21..0x7F) as u8;
+                c = rng.gen_range(0x21u8..0x7F);
             }
 
             c
@@ -192,18 +190,36 @@ fn gen_nonce() -> String {
 fn hi<'a>(s: &'a str, salt: &'a [u8], iter_count: u32) -> Result<[u8; 32], Error> {
     let mut mac = Hmac::<Sha256>::new_from_slice(s.as_bytes()).map_err(Error::protocol)?;
 
-    mac.update(&salt);
+    mac.update(salt);
     mac.update(&1u32.to_be_bytes());
 
-    let mut u = mac.finalize().into_bytes();
+    let mut u = mac.finalize_reset().into_bytes();
     let mut hi = u;
 
     for _ in 1..iter_count {
-        let mut mac = Hmac::<Sha256>::new_from_slice(s.as_bytes()).map_err(Error::protocol)?;
         mac.update(u.as_slice());
-        u = mac.finalize().into_bytes();
+        u = mac.finalize_reset().into_bytes();
         hi = hi.iter().zip(u.iter()).map(|(&a, &b)| a ^ b).collect();
     }
 
     Ok(hi.into())
+}
+
+#[cfg(all(test, not(debug_assertions)))]
+#[bench]
+fn bench_sasl_hi(b: &mut test::Bencher) {
+    use test::black_box;
+
+    let mut rng = rand::thread_rng();
+    let nonce: Vec<u8> = std::iter::repeat(())
+        .map(|()| rng.sample(rand::distributions::Alphanumeric))
+        .take(64)
+        .collect();
+    b.iter(|| {
+        let _ = hi(
+            test::black_box("secret_password"),
+            test::black_box(&nonce),
+            test::black_box(4096),
+        );
+    });
 }

@@ -1,7 +1,7 @@
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Currency, LabeledPrice, MessageEntity, ParseMode};
+use crate::types::{Currency, LabeledPrice, LinkPreviewOptions, MessageEntity, ParseMode};
 
 /// This object represents the content of a message to be sent as a result of an
 /// inline query.
@@ -18,7 +18,7 @@ pub enum InputMessageContent {
 }
 /// Represents the content of a text message to be sent as the result of an
 /// inline query.
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InputMessageContentText {
     /// Text of the message to be sent, 1-4096 characters.
@@ -36,8 +36,8 @@ pub struct InputMessageContentText {
     /// specified instead of `parse_mode`.
     pub entities: Option<Vec<MessageEntity>>,
 
-    /// Disables link previews for links in the sent message.
-    pub disable_web_page_preview: Option<bool>,
+    /// Link preview generation options for the message
+    pub link_preview_options: Option<LinkPreviewOptions>,
 }
 
 impl InputMessageContentText {
@@ -48,8 +48,8 @@ impl InputMessageContentText {
         Self {
             message_text: message_text.into(),
             parse_mode: None,
-            disable_web_page_preview: None,
             entities: None,
+            link_preview_options: None,
         }
     }
 
@@ -76,15 +76,15 @@ impl InputMessageContentText {
     }
 
     #[must_use]
-    pub fn disable_web_page_preview(mut self, val: bool) -> Self {
-        self.disable_web_page_preview = Some(val);
+    pub fn link_preview_options(mut self, val: LinkPreviewOptions) -> Self {
+        self.link_preview_options = Some(val);
         self
     }
 }
 
 /// Represents the content of a location message to be sent as the result of an
 /// inline query.
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InputMessageContentLocation {
     /// Latitude of the location in degrees.
@@ -144,7 +144,7 @@ impl InputMessageContentLocation {
 
 /// Represents the content of a venue message to be sent as the result of
 /// an inline query.
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InputMessageContentVenue {
     /// Latitude of the venue in degrees.
@@ -241,7 +241,7 @@ impl InputMessageContentVenue {
 
 /// Represents the content of a contact message to be sent as the result of
 /// an inline query.
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InputMessageContentContact {
     /// Contact's phone number.
@@ -311,7 +311,7 @@ impl InputMessageContentContact {
 /// an inline query.
 ///
 /// [content]: InputMessageContent
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InputMessageContentInvoice {
     /// Product name, 1-32 characters
@@ -583,12 +583,19 @@ mod tests {
 
     #[test]
     fn text_serialize() {
-        let expected_json = r#"{"message_text":"text"}"#;
+        let expected_json =
+            r#"{"message_text":"text","link_preview_options":{"is_disabled":true}}"#;
         let text_content = InputMessageContent::Text(InputMessageContentText {
             message_text: String::from("text"),
             parse_mode: None,
-            disable_web_page_preview: None,
             entities: None,
+            link_preview_options: Some(LinkPreviewOptions {
+                is_disabled: true,
+                url: None,
+                prefer_small_media: false,
+                prefer_large_media: false,
+                show_above_text: false,
+            }),
         });
 
         let actual_json = serde_json::to_string(&text_content).unwrap();

@@ -12,18 +12,26 @@
 [package]
 edition = "2021"
 name = "sqlx-macros"
-version = "0.7.3"
+version = "0.8.1"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
     "Chloe Ross <orangesnowfox@gmail.com>",
     "Daniel Akhterov <akhterovd@gmail.com>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Macros for SQLx, the rust SQL toolkit. Not intended to be used directly."
+readme = false
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/launchbadge/sqlx"
 
 [lib]
+name = "sqlx_macros"
+path = "src/lib.rs"
 proc-macro = true
 
 [dependencies.proc-macro2]
@@ -31,18 +39,18 @@ version = "1.0.36"
 default-features = false
 
 [dependencies.quote]
-version = "1.0.14"
+version = "1.0.26"
 default-features = false
 
 [dependencies.sqlx-core]
-version = "=0.7.3"
+version = "=0.8.1"
 features = ["any"]
 
 [dependencies.sqlx-macros-core]
-version = "=0.7.3"
+version = "=0.8.1"
 
 [dependencies.syn]
-version = "1.0.84"
+version = "2.0.52"
 features = [
     "parsing",
     "proc-macro",
@@ -53,14 +61,17 @@ default-features = false
 _rt-async-std = ["sqlx-macros-core/_rt-async-std"]
 _rt-tokio = ["sqlx-macros-core/_rt-tokio"]
 _tls-native-tls = ["sqlx-macros-core/_tls-native-tls"]
-_tls-rustls = ["sqlx-macros-core/_tls-rustls"]
+_tls-rustls-aws-lc-rs = ["sqlx-macros-core/_tls-rustls-aws-lc-rs"]
+_tls-rustls-ring = ["sqlx-macros-core/_tls-rustls-ring"]
 bigdecimal = ["sqlx-macros-core/bigdecimal"]
 bit-vec = ["sqlx-macros-core/bit-vec"]
 chrono = ["sqlx-macros-core/chrono"]
 default = []
+derive = ["sqlx-macros-core/derive"]
 ipnetwork = ["sqlx-macros-core/ipnetwork"]
 json = ["sqlx-macros-core/json"]
 mac_address = ["sqlx-macros-core/mac_address"]
+macros = ["sqlx-macros-core/macros"]
 migrate = ["sqlx-macros-core/migrate"]
 mysql = ["sqlx-macros-core/mysql"]
 postgres = ["sqlx-macros-core/postgres"]
@@ -68,3 +79,9 @@ rust_decimal = ["sqlx-macros-core/rust_decimal"]
 sqlite = ["sqlx-macros-core/sqlite"]
 time = ["sqlx-macros-core/time"]
 uuid = ["sqlx-macros-core/uuid"]
+
+[lints.clippy]
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_sign_loss = "deny"
+disallowed_methods = "deny"

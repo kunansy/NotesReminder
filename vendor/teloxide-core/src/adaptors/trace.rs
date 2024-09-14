@@ -66,20 +66,20 @@ bitflags::bitflags! {
     /// ```
     pub struct Settings: u8 {
         /// Trace requests (only request kind, e.g. `send_message`)
-        const TRACE_REQUESTS = 0b00000001;
+        const TRACE_REQUESTS = 1;
 
         /// Trace requests verbosely (with all parameters).
         ///
         /// Implies [`TRACE_REQUESTS`]
-        const TRACE_REQUESTS_VERBOSE = 0b00000011;
+        const TRACE_REQUESTS_VERBOSE = (1 << 1) | Self::TRACE_REQUESTS.bits;
 
         /// Trace responses (only request kind, e.g. `send_message`)
-        const TRACE_RESPONSES = 0b00000100;
+        const TRACE_RESPONSES = 1 << 2;
 
         /// Trace responses verbosely (with full response).
         ///
         /// Implies [`TRACE_RESPONSES`]
-        const TRACE_RESPONSES_VERBOSE = 0b00001100;
+        const TRACE_RESPONSES_VERBOSE = (1 << 3) | Self::TRACE_RESPONSES.bits;
 
         /// Trace everything.
         ///
@@ -123,7 +123,9 @@ where
         delete_webhook,
         get_webhook_info,
         forward_message,
+        forward_messages,
         copy_message,
+        copy_messages,
         send_message,
         send_photo,
         send_audio,
@@ -143,6 +145,7 @@ where
         send_poll,
         send_dice,
         send_chat_action,
+        set_message_reaction,
         get_user_profile_photos,
         get_file,
         kick_chat_member,
@@ -185,9 +188,17 @@ where
         reopen_general_forum_topic,
         hide_general_forum_topic,
         unhide_general_forum_topic,
+        unpin_all_general_forum_topic_messages,
         answer_callback_query,
+        get_user_chat_boosts,
         set_my_commands,
         get_my_commands,
+        set_my_name,
+        get_my_name,
+        set_my_description,
+        get_my_description,
+        set_my_short_description,
+        get_my_short_description,
         set_chat_menu_button,
         get_chat_menu_button,
         set_my_default_administrator_rights,
@@ -205,6 +216,7 @@ where
         edit_message_reply_markup_inline,
         stop_poll,
         delete_message,
+        delete_messages,
         send_sticker,
         get_sticker_set,
         get_custom_emoji_stickers,
@@ -213,7 +225,13 @@ where
         add_sticker_to_set,
         set_sticker_position_in_set,
         delete_sticker_from_set,
-        set_sticker_set_thumb,
+        set_sticker_set_thumbnail,
+        set_custom_emoji_sticker_set_thumbnail,
+        set_sticker_set_title,
+        delete_sticker_set,
+        set_sticker_emoji_list,
+        set_sticker_keywords,
+        set_sticker_mask_position,
         send_invoice,
         create_invoice_link,
         answer_shipping_query,
@@ -230,6 +248,7 @@ where
 }
 
 #[must_use = "Requests are lazy and do nothing unless sent"]
+#[derive(Clone)]
 pub struct TraceRequest<R> {
     inner: R,
     settings: Settings,

@@ -12,12 +12,15 @@
 [package]
 edition = "2018"
 name = "aquamarine"
-version = "0.1.12"
-authors = ["Mike Lubinets <git@mkl.dev>"]
+version = "0.5.0"
+authors = [
+    "Mike Lubinets <git@mkl.dev>",
+    "Frank Rehberger <frehberg@gmail.com>",
+]
 include = [
     "src/**/*",
     "Cargo.toml",
-    "doc/js/mermaid.min.js",
+    "doc/js/**",
 ]
 description = "A mermaid.js integration for rustdoc"
 readme = "README.md"
@@ -38,8 +41,11 @@ repository = "https://github.com/mersinvald/aquamarine"
 [lib]
 proc-macro = true
 
+[dependencies.include_dir]
+version = "0.7"
+
 [dependencies.itertools]
-version = "0.9"
+version = "0.10"
 
 [dependencies.proc-macro-error]
 version = "1"
@@ -51,7 +57,7 @@ version = "1"
 version = "1"
 
 [dependencies.syn]
-version = "1"
+version = "2"
 
 [dev-dependencies.pretty_assertions]
-version = "0.6"
+version = "1"

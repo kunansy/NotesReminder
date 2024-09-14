@@ -4,9 +4,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-use futures_intrusive::sync::{Mutex, MutexGuard};
-
 use futures_channel::oneshot;
+use futures_intrusive::sync::{Mutex, MutexGuard};
+use tracing::span::Span;
+
 use sqlx_core::describe::Describe;
 use sqlx_core::error::Error;
 use sqlx_core::transaction::{
@@ -16,8 +17,8 @@ use sqlx_core::Either;
 
 use crate::connection::describe::describe;
 use crate::connection::establish::EstablishParams;
+use crate::connection::execute;
 use crate::connection::ConnectionState;
-use crate::connection::{execute, ConnectionHandleRaw};
 use crate::{Sqlite, SqliteArguments, SqliteQueryResult, SqliteRow, SqliteStatement};
 
 // Each SQLite connection has a dedicated thread.
@@ -27,9 +28,7 @@ use crate::{Sqlite, SqliteArguments, SqliteQueryResult, SqliteRow, SqliteStateme
 //       unlikely.
 
 pub(crate) struct ConnectionWorker {
-    command_tx: flume::Sender<Command>,
-    /// The `sqlite3` pointer. NOTE: access is unsynchronized!
-    pub(crate) _handle_raw: ConnectionHandleRaw,
+    command_tx: flume::Sender<(Command, tracing::Span)>,
     /// Mutex for locking access to the database.
     pub(crate) shared: Arc<WorkerSharedState>,
 }
@@ -53,6 +52,7 @@ enum Command {
         arguments: Option<SqliteArguments<'static>>,
         persistent: bool,
         tx: flume::Sender<Result<Either<SqliteQueryResult, SqliteRow>, Error>>,
+        limit: Option<usize>,
     },
     Begin {
         tx: rendezvous_oneshot::Sender<Result<(), Error>>,
@@ -104,7 +104,6 @@ impl ConnectionWorker {
                 if establish_tx
                     .send(Ok(Self {
                         command_tx,
-                        _handle_raw: conn.handle.to_raw(),
                         shared: Arc::clone(&shared),
                     }))
                     .is_err()
@@ -117,7 +116,8 @@ impl ConnectionWorker {
                 // would rollback an already completed transaction.
                 let mut ignore_next_start_rollback = false;
 
-                for cmd in command_rx {
+                for (cmd, span) in command_rx {
+                    let _guard = span.enter();
                     match cmd {
                         Command::Prepare { query, tx } => {
                             tx.send(prepare(&mut conn, &query).map(|prepared| {
@@ -137,6 +137,7 @@ impl ConnectionWorker {
                             arguments,
                             persistent,
                             tx,
+                            limit
                         } => {
                             let iter = match execute::iter(&mut conn, &query, arguments, persistent)
                             {
@@ -147,10 +148,34 @@ impl ConnectionWorker {
                                 }
                             };
 
-                            for res in iter {
-                                if tx.send(res).is_err() {
-                                    break;
-                                }
+                            match limit {
+                                None => {
+                                    for res in iter {
+                                        if tx.send(res).is_err() {
+                                            break;
+                                        }
+                                    }
+                                },
+                                Some(limit) => {
+                                    let mut iter = iter;
+                                    let mut rows_returned = 0;
+
+                                    while let Some(res) = iter.next() {
+                                        if let Ok(ok) = &res {
+                                            if ok.is_right() {
+                                                rows_returned += 1;
+                                                if rows_returned >= limit {
+                                                    drop(iter);
+                                                    let _ = tx.send(res);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        if tx.send(res).is_err() {
+                                            break;
+                                        }
+                                    }
+                                },
                             }
 
                             update_cached_statements_size(&conn, &shared.cached_statements_size);
@@ -285,16 +310,21 @@ impl ConnectionWorker {
         args: Option<SqliteArguments<'_>>,
         chan_size: usize,
         persistent: bool,
+        limit: Option<usize>,
     ) -> Result<flume::Receiver<Result<Either<SqliteQueryResult, SqliteRow>, Error>>, Error> {
         let (tx, rx) = flume::bounded(chan_size);
 
         self.command_tx
-            .send_async(Command::Execute {
-                query: query.into(),
-                arguments: args.map(SqliteArguments::into_static),
-                persistent,
-                tx,
-            })
+            .send_async((
+                Command::Execute {
+                    query: query.into(),
+                    arguments: args.map(SqliteArguments::into_static),
+                    persistent,
+                    tx,
+                    limit,
+                },
+                Span::current(),
+            ))
             .await
             .map_err(|_| Error::WorkerCrashed)?;
 
@@ -318,7 +348,7 @@ impl ConnectionWorker {
 
     pub(crate) fn start_rollback(&mut self) -> Result<(), Error> {
         self.command_tx
-            .send(Command::Rollback { tx: None })
+            .send((Command::Rollback { tx: None }, Span::current()))
             .map_err(|_| Error::WorkerCrashed)
     }
 
@@ -333,7 +363,7 @@ impl ConnectionWorker {
         let (tx, rx) = oneshot::channel();
 
         self.command_tx
-            .send_async(command(tx))
+            .send_async((command(tx), Span::current()))
             .await
             .map_err(|_| Error::WorkerCrashed)?;
 
@@ -347,7 +377,7 @@ impl ConnectionWorker {
         let (tx, rx) = rendezvous_oneshot::channel();
 
         self.command_tx
-            .send_async(command(tx))
+            .send_async((command(tx), Span::current()))
             .await
             .map_err(|_| Error::WorkerCrashed)?;
 
@@ -362,7 +392,8 @@ impl ConnectionWorker {
         let (guard, res) = futures_util::future::join(
             // we need to join the wait queue for the lock before we send the message
             self.shared.conn.lock(),
-            self.command_tx.send_async(Command::UnlockDb),
+            self.command_tx
+                .send_async((Command::UnlockDb, Span::current())),
         )
         .await;
 
@@ -379,7 +410,7 @@ impl ConnectionWorker {
 
         let send_res = self
             .command_tx
-            .send(Command::Shutdown { tx })
+            .send((Command::Shutdown { tx }, Span::current()))
             .map_err(|_| Error::WorkerCrashed);
 
         async move {

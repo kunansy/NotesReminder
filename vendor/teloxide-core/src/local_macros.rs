@@ -124,7 +124,7 @@ macro_rules! impl_payload {
             )?
         }
     ) => {
-        #[serde_with_macros::skip_serializing_none]
+        #[serde_with::skip_serializing_none]
         #[must_use = "Requests do nothing unless sent"]
         $(
             #[ $($method_meta)* ]
@@ -372,26 +372,26 @@ macro_rules! impl_payload {
 }
 
 macro_rules! download_forward {
-    ($l:lifetime $T:ident $S:ty {$this:ident => $inner:expr}) => {
-        impl<$l, $T: $crate::net::Download<$l>> $crate::net::Download<$l> for $S {
-            type Err = <$T as $crate::net::Download<$l>>::Err;
+    ($T:ident $S:ty {$this:ident => $inner:expr}) => {
+        impl<$T: $crate::net::Download> $crate::net::Download for $S {
+            type Err<'dst> = <$T as $crate::net::Download>::Err<'dst>;
 
-            type Fut = <$T as $crate::net::Download<$l>>::Fut;
+            type Fut<'dst> = <$T as $crate::net::Download>::Fut<'dst>;
 
-            fn download_file(
+            fn download_file<'dst>(
                 &self,
                 path: &str,
-                destination: &'w mut (dyn tokio::io::AsyncWrite
-                             + core::marker::Unpin
-                             + core::marker::Send),
-            ) -> Self::Fut {
+                destination: &'dst mut (dyn tokio::io::AsyncWrite
+                               + core::marker::Unpin
+                               + core::marker::Send),
+            ) -> Self::Fut<'dst> {
                 let $this = self;
                 ($inner).download_file(path, destination)
             }
 
-            type StreamErr = <$T as $crate::net::Download<$l>>::StreamErr;
+            type StreamErr = <$T as $crate::net::Download>::StreamErr;
 
-            type Stream = <$T as $crate::net::Download<$l>>::Stream;
+            type Stream = <$T as $crate::net::Download>::Stream;
 
             fn download_file_stream(&self, path: &str) -> Self::Stream {
                 let $this = self;
@@ -487,6 +487,16 @@ macro_rules! requester_forward {
             $body!(forward_message this (chat_id: C, from_chat_id: F, message_id: MessageId))
         }
     };
+    (@method forward_messages $body:ident $ty:ident) => {
+        type ForwardMessages = $ty![ForwardMessages];
+
+        fn forward_messages<C, F, M>(&self, chat_id: C, from_chat_id: F, message_ids: M) -> Self::ForwardMessages where C: Into<Recipient>,
+        F: Into<Recipient>,
+        M: IntoIterator<Item = MessageId> {
+            let this = self;
+            $body!(forward_messages this (chat_id: C, from_chat_id: F, message_ids: M))
+        }
+    };
     (@method copy_message $body:ident $ty:ident) => {
         type CopyMessage = $ty![CopyMessage];
 
@@ -494,6 +504,16 @@ macro_rules! requester_forward {
         F: Into<Recipient> {
             let this = self;
             $body!(copy_message this (chat_id: C, from_chat_id: F, message_id: MessageId))
+        }
+    };
+    (@method copy_messages $body:ident $ty:ident) => {
+        type CopyMessages = $ty![CopyMessages];
+
+        fn copy_messages<C, F, M>(&self, chat_id: C, from_chat_id: F, message_ids: M) -> Self::CopyMessages where C: Into<Recipient>,
+        F: Into<Recipient>,
+        M: IntoIterator<Item = MessageId> {
+            let this = self;
+            $body!(copy_messages this (chat_id: C, from_chat_id: F, message_ids: M))
         }
     };
     (@method send_photo $body:ident $ty:ident) => {
@@ -588,17 +608,17 @@ macro_rules! requester_forward {
     (@method stop_message_live_location $body:ident $ty:ident) => {
         type StopMessageLiveLocation = $ty![StopMessageLiveLocation];
 
-        fn stop_message_live_location<C>(&self, chat_id: C, message_id: MessageId, latitude: f64, longitude: f64) -> Self::StopMessageLiveLocation where C: Into<Recipient> {
+        fn stop_message_live_location<C>(&self, chat_id: C, message_id: MessageId) -> Self::StopMessageLiveLocation where C: Into<Recipient> {
             let this = self;
-            $body!(stop_message_live_location this (chat_id: C, message_id: MessageId, latitude: f64, longitude: f64))
+            $body!(stop_message_live_location this (chat_id: C, message_id: MessageId))
         }
     };
     (@method stop_message_live_location_inline $body:ident $ty:ident) => {
         type StopMessageLiveLocationInline = $ty![StopMessageLiveLocationInline];
 
-        fn stop_message_live_location_inline<I>(&self, inline_message_id: I, latitude: f64, longitude: f64) -> Self::StopMessageLiveLocationInline where I: Into<String> {
+        fn stop_message_live_location_inline<I>(&self, inline_message_id: I) -> Self::StopMessageLiveLocationInline where I: Into<String> {
             let this = self;
-            $body!(stop_message_live_location_inline this (inline_message_id: I, latitude: f64, longitude: f64))
+            $body!(stop_message_live_location_inline this (inline_message_id: I))
         }
     };
     (@method send_venue $body:ident $ty:ident) => {
@@ -645,6 +665,14 @@ macro_rules! requester_forward {
         fn send_chat_action<C>(&self, chat_id: C, action: ChatAction) -> Self::SendChatAction where C: Into<Recipient> {
             let this = self;
             $body!(send_chat_action this (chat_id: C, action: ChatAction))
+        }
+    };
+    (@method set_message_reaction $body:ident $ty:ident) => {
+        type SetMessageReaction = $ty![SetMessageReaction];
+
+        fn set_message_reaction<C>(&self, chat_id: C, message_id: MessageId) -> Self::SetMessageReaction where C: Into<Recipient> {
+            let this = self;
+            $body!(set_message_reaction this (chat_id: C, message_id: MessageId))
         }
     };
     (@method get_user_profile_photos $body:ident $ty:ident) => {
@@ -931,41 +959,41 @@ macro_rules! requester_forward {
     (@method edit_forum_topic $body:ident $ty:ident) => {
         type EditForumTopic = $ty![EditForumTopic];
 
-        fn edit_forum_topic<C>(&self, chat_id: C, message_thread_id: i32) -> Self::EditForumTopic where C: Into<Recipient> {
+        fn edit_forum_topic<C>(&self, chat_id: C, message_thread_id: ThreadId) -> Self::EditForumTopic where C: Into<Recipient> {
             let this = self;
-            $body!(edit_forum_topic this (chat_id: C, message_thread_id: i32))
+            $body!(edit_forum_topic this (chat_id: C, message_thread_id: ThreadId))
         }
     };
     (@method close_forum_topic $body:ident $ty:ident) => {
         type CloseForumTopic = $ty![CloseForumTopic];
 
-        fn close_forum_topic<C>(&self, chat_id: C, message_thread_id: i32) -> Self::CloseForumTopic where C: Into<Recipient> {
+        fn close_forum_topic<C>(&self, chat_id: C, message_thread_id: ThreadId) -> Self::CloseForumTopic where C: Into<Recipient> {
             let this = self;
-            $body!(close_forum_topic this (chat_id: C, message_thread_id: i32))
+            $body!(close_forum_topic this (chat_id: C, message_thread_id: ThreadId))
         }
     };
     (@method reopen_forum_topic $body:ident $ty:ident) => {
         type ReopenForumTopic = $ty![ReopenForumTopic];
 
-        fn reopen_forum_topic<C>(&self, chat_id: C, message_thread_id: i32) -> Self::ReopenForumTopic where C: Into<Recipient> {
+        fn reopen_forum_topic<C>(&self, chat_id: C, message_thread_id: ThreadId) -> Self::ReopenForumTopic where C: Into<Recipient> {
             let this = self;
-            $body!(reopen_forum_topic this (chat_id: C, message_thread_id: i32))
+            $body!(reopen_forum_topic this (chat_id: C, message_thread_id: ThreadId))
         }
     };
     (@method delete_forum_topic $body:ident $ty:ident) => {
         type DeleteForumTopic = $ty![DeleteForumTopic];
 
-        fn delete_forum_topic<C>(&self, chat_id: C, message_thread_id: i32) -> Self::DeleteForumTopic where C: Into<Recipient> {
+        fn delete_forum_topic<C>(&self, chat_id: C, message_thread_id: ThreadId) -> Self::DeleteForumTopic where C: Into<Recipient> {
             let this = self;
-            $body!(delete_forum_topic this (chat_id: C, message_thread_id: i32))
+            $body!(delete_forum_topic this (chat_id: C, message_thread_id: ThreadId))
         }
     };
     (@method unpin_all_forum_topic_messages $body:ident $ty:ident) => {
         type UnpinAllForumTopicMessages = $ty![UnpinAllForumTopicMessages];
 
-        fn unpin_all_forum_topic_messages<C>(&self, chat_id: C, message_thread_id: i32) -> Self::UnpinAllForumTopicMessages where C: Into<Recipient> {
+        fn unpin_all_forum_topic_messages<C>(&self, chat_id: C, message_thread_id: ThreadId) -> Self::UnpinAllForumTopicMessages where C: Into<Recipient> {
             let this = self;
-            $body!(unpin_all_forum_topic_messages this (chat_id: C, message_thread_id: i32))
+            $body!(unpin_all_forum_topic_messages this (chat_id: C, message_thread_id: ThreadId))
         }
     };
     (@method edit_general_forum_topic $body:ident $ty:ident) => {
@@ -1009,12 +1037,28 @@ macro_rules! requester_forward {
             $body!(unhide_general_forum_topic this (chat_id: C))
         }
     };
+    (@method unpin_all_general_forum_topic_messages $body:ident $ty:ident) => {
+        type UnpinAllGeneralForumTopicMessages = $ty![UnpinAllGeneralForumTopicMessages];
+
+        fn unpin_all_general_forum_topic_messages<C>(&self, chat_id: C) -> Self::UnpinAllGeneralForumTopicMessages where C: Into<Recipient> {
+            let this = self;
+            $body!(unpin_all_general_forum_topic_messages this (chat_id: C))
+        }
+    };
     (@method answer_callback_query $body:ident $ty:ident) => {
         type AnswerCallbackQuery = $ty![AnswerCallbackQuery];
 
         fn answer_callback_query<C>(&self, callback_query_id: C) -> Self::AnswerCallbackQuery where C: Into<String> {
             let this = self;
             $body!(answer_callback_query this (callback_query_id: C))
+        }
+    };
+    (@method get_user_chat_boosts $body:ident $ty:ident) => {
+        type GetUserChatBoosts = $ty![GetUserChatBoosts];
+
+        fn get_user_chat_boosts<C>(&self, chat_id: C, user_id: UserId) -> Self::GetUserChatBoosts where C: Into<Recipient> {
+            let this = self;
+            $body!(get_user_chat_boosts this (chat_id: C, user_id: UserId))
         }
     };
     (@method set_my_commands $body:ident $ty:ident) => {
@@ -1031,6 +1075,54 @@ macro_rules! requester_forward {
         fn get_my_commands(&self, ) -> Self::GetMyCommands {
             let this = self;
             $body!(get_my_commands this ())
+        }
+    };
+    (@method set_my_name $body:ident $ty:ident) => {
+        type SetMyName = $ty![SetMyName];
+
+        fn set_my_name(&self, ) -> Self::SetMyName {
+            let this = self;
+            $body!(set_my_name this ())
+        }
+    };
+    (@method get_my_name $body:ident $ty:ident) => {
+        type GetMyName = $ty![GetMyName];
+
+        fn get_my_name(&self, ) -> Self::GetMyName {
+            let this = self;
+            $body!(get_my_name this ())
+        }
+    };
+    (@method set_my_description $body:ident $ty:ident) => {
+        type SetMyDescription = $ty![SetMyDescription];
+
+        fn set_my_description(&self, ) -> Self::SetMyDescription {
+            let this = self;
+            $body!(set_my_description this ())
+        }
+    };
+    (@method get_my_description $body:ident $ty:ident) => {
+        type GetMyDescription = $ty![GetMyDescription];
+
+        fn get_my_description(&self, ) -> Self::GetMyDescription {
+            let this = self;
+            $body!(get_my_description this ())
+        }
+    };
+    (@method set_my_short_description $body:ident $ty:ident) => {
+        type SetMyShortDescription = $ty![SetMyShortDescription];
+
+        fn set_my_short_description(&self, ) -> Self::SetMyShortDescription {
+            let this = self;
+            $body!(set_my_short_description this ())
+        }
+    };
+    (@method get_my_short_description $body:ident $ty:ident) => {
+        type GetMyShortDescription = $ty![GetMyShortDescription];
+
+        fn get_my_short_description(&self, ) -> Self::GetMyShortDescription {
+            let this = self;
+            $body!(get_my_short_description this ())
         }
     };
     (@method set_chat_menu_button $body:ident $ty:ident) => {
@@ -1172,6 +1264,15 @@ macro_rules! requester_forward {
             $body!(delete_message this (chat_id: C, message_id: MessageId))
         }
     };
+    (@method delete_messages $body:ident $ty:ident) => {
+        type DeleteMessages = $ty![DeleteMessages];
+
+        fn delete_messages<C, M>(&self, chat_id: C, message_ids: M) -> Self::DeleteMessages where C: Into<Recipient>,
+        M: IntoIterator<Item = MessageId> {
+            let this = self;
+            $body!(delete_messages this (chat_id: C, message_ids: M))
+        }
+    };
     (@method send_sticker $body:ident $ty:ident) => {
         type SendSticker = $ty![SendSticker];
 
@@ -1199,28 +1300,27 @@ macro_rules! requester_forward {
     (@method upload_sticker_file $body:ident $ty:ident) => {
         type UploadStickerFile = $ty![UploadStickerFile];
 
-        fn upload_sticker_file(&self, user_id: UserId, png_sticker: InputFile) -> Self::UploadStickerFile {
+        fn upload_sticker_file(&self, user_id: UserId, sticker: InputFile, sticker_format: StickerFormat) -> Self::UploadStickerFile {
             let this = self;
-            $body!(upload_sticker_file this (user_id: UserId, png_sticker: InputFile))
+            $body!(upload_sticker_file this (user_id: UserId, sticker: InputFile, sticker_format: StickerFormat))
         }
     };
     (@method create_new_sticker_set $body:ident $ty:ident) => {
         type CreateNewStickerSet = $ty![CreateNewStickerSet];
 
-        fn create_new_sticker_set<N, T, E>(&self, user_id: UserId, name: N, title: T, sticker: InputSticker, emojis: E) -> Self::CreateNewStickerSet where N: Into<String>,
+        fn create_new_sticker_set<N, T, S>(&self, user_id: UserId, name: N, title: T, stickers: S, sticker_format: StickerFormat) -> Self::CreateNewStickerSet where N: Into<String>,
         T: Into<String>,
-        E: Into<String> {
+        S: IntoIterator<Item = InputSticker> {
             let this = self;
-            $body!(create_new_sticker_set this (user_id: UserId, name: N, title: T, sticker: InputSticker, emojis: E))
+            $body!(create_new_sticker_set this (user_id: UserId, name: N, title: T, stickers: S, sticker_format: StickerFormat))
         }
     };
     (@method add_sticker_to_set $body:ident $ty:ident) => {
         type AddStickerToSet = $ty![AddStickerToSet];
 
-        fn add_sticker_to_set<N, E>(&self, user_id: UserId, name: N, sticker: InputSticker, emojis: E) -> Self::AddStickerToSet where N: Into<String>,
-        E: Into<String> {
+        fn add_sticker_to_set<N>(&self, user_id: UserId, name: N, sticker: InputSticker) -> Self::AddStickerToSet where N: Into<String> {
             let this = self;
-            $body!(add_sticker_to_set this (user_id: UserId, name: N, sticker: InputSticker, emojis: E))
+            $body!(add_sticker_to_set this (user_id: UserId, name: N, sticker: InputSticker))
         }
     };
     (@method set_sticker_position_in_set $body:ident $ty:ident) => {
@@ -1239,12 +1339,62 @@ macro_rules! requester_forward {
             $body!(delete_sticker_from_set this (sticker: S))
         }
     };
-    (@method set_sticker_set_thumb $body:ident $ty:ident) => {
-        type SetStickerSetThumb = $ty![SetStickerSetThumb];
+    (@method set_sticker_set_thumbnail $body:ident $ty:ident) => {
+        type SetStickerSetThumbnail = $ty![SetStickerSetThumbnail];
 
-        fn set_sticker_set_thumb<N>(&self, name: N, user_id: UserId) -> Self::SetStickerSetThumb where N: Into<String> {
+        fn set_sticker_set_thumbnail<N>(&self, name: N, user_id: UserId) -> Self::SetStickerSetThumbnail where N: Into<String> {
             let this = self;
-            $body!(set_sticker_set_thumb this (name: N, user_id: UserId))
+            $body!(set_sticker_set_thumbnail this (name: N, user_id: UserId))
+        }
+    };
+    (@method set_custom_emoji_sticker_set_thumbnail $body:ident $ty:ident) => {
+        type SetCustomEmojiStickerSetThumbnail = $ty![SetCustomEmojiStickerSetThumbnail];
+
+        fn set_custom_emoji_sticker_set_thumbnail<N>(&self, name: N) -> Self::SetCustomEmojiStickerSetThumbnail where N: Into<String> {
+            let this = self;
+            $body!(set_custom_emoji_sticker_set_thumbnail this (name: N))
+        }
+    };
+    (@method set_sticker_set_title $body:ident $ty:ident) => {
+        type SetStickerSetTitle = $ty![SetStickerSetTitle];
+
+        fn set_sticker_set_title<N, T>(&self, name: N, title: T) -> Self::SetStickerSetTitle where N: Into<String>,
+        T: Into<String> {
+            let this = self;
+            $body!(set_sticker_set_title this (name: N, title: T))
+        }
+    };
+    (@method delete_sticker_set $body:ident $ty:ident) => {
+        type DeleteStickerSet = $ty![DeleteStickerSet];
+
+        fn delete_sticker_set<N>(&self, name: N) -> Self::DeleteStickerSet where N: Into<String> {
+            let this = self;
+            $body!(delete_sticker_set this (name: N))
+        }
+    };
+    (@method set_sticker_emoji_list $body:ident $ty:ident) => {
+        type SetStickerEmojiList = $ty![SetStickerEmojiList];
+
+        fn set_sticker_emoji_list<S, E>(&self, sticker: S, emoji_list: E) -> Self::SetStickerEmojiList where S: Into<String>,
+        E: IntoIterator<Item = String> {
+            let this = self;
+            $body!(set_sticker_emoji_list this (sticker: S, emoji_list: E))
+        }
+    };
+    (@method set_sticker_keywords $body:ident $ty:ident) => {
+        type SetStickerKeywords = $ty![SetStickerKeywords];
+
+        fn set_sticker_keywords<S>(&self, sticker: S) -> Self::SetStickerKeywords where S: Into<String> {
+            let this = self;
+            $body!(set_sticker_keywords this (sticker: S))
+        }
+    };
+    (@method set_sticker_mask_position $body:ident $ty:ident) => {
+        type SetStickerMaskPosition = $ty![SetStickerMaskPosition];
+
+        fn set_sticker_mask_position<S>(&self, sticker: S) -> Self::SetStickerMaskPosition where S: Into<String> {
+            let this = self;
+            $body!(set_sticker_mask_position this (sticker: S))
         }
     };
     (@method send_invoice $body:ident $ty:ident) => {
@@ -1301,9 +1451,10 @@ macro_rules! requester_forward {
     (@method send_game $body:ident $ty:ident) => {
         type SendGame = $ty![SendGame];
 
-        fn send_game<G>(&self, chat_id: u32, game_short_name: G) -> Self::SendGame where G: Into<String> {
+        fn send_game<C, G>(&self, chat_id: C, game_short_name: G) -> Self::SendGame where C: Into<ChatId>,
+        G: Into<String> {
             let this = self;
-            $body!(send_game this (chat_id: u32, game_short_name: G))
+            $body!(send_game this (chat_id: C, game_short_name: G))
         }
     };
     (@method set_game_score $body:ident $ty:ident) => {
@@ -1333,6 +1484,8 @@ macro_rules! requester_forward {
 }
 
 #[test]
+// waffle: efficiency is not important here, and I don't want to rewrite this
+#[allow(clippy::format_collect)]
 fn codegen_requester_forward() {
     use crate::codegen::{
         add_hidden_preamble,

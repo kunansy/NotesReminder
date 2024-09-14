@@ -12,21 +12,19 @@ use teloxide::{prelude::*, types::ChatPermissions, utils::command::BotCommands};
 // your commands in this format:
 // %GENERAL-DESCRIPTION%
 // %PREFIX%%COMMAND% - %DESCRIPTION%
+
+/// Use commands in format /%command% %num% %unit%
 #[derive(BotCommands, Clone)]
-#[command(
-    rename_rule = "lowercase",
-    description = "Use commands in format /%command% %num% %unit%",
-    parse_with = "split"
-)]
+#[command(rename_rule = "lowercase", parse_with = "split")]
 enum Command {
-    #[command(description = "kick user from chat.")]
+    /// Kick user from chat.
     Kick,
-    #[command(description = "ban user in chat.")]
+    /// Ban user in chat.
     Ban {
         time: u64,
         unit: UnitOfTime,
     },
-    #[command(description = "mute user in chat.")]
+    /// Mute user in chat.
     Mute {
         time: u64,
         unit: UnitOfTime,
@@ -81,7 +79,7 @@ async fn kick_user(bot: Bot, msg: Message) -> ResponseResult<()> {
     match msg.reply_to_message() {
         Some(replied) => {
             // bot.unban_chat_member can also kicks a user from a group chat.
-            bot.unban_chat_member(msg.chat.id, replied.from().unwrap().id).await?;
+            bot.unban_chat_member(msg.chat.id, replied.from.as_ref().unwrap().id).await?;
         }
         None => {
             bot.send_message(msg.chat.id, "Use this command in reply to another message").await?;
@@ -96,7 +94,7 @@ async fn ban_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()> 
         Some(replied) => {
             bot.kick_chat_member(
                 msg.chat.id,
-                replied.from().expect("Must be MessageKind::Common").id,
+                replied.from.as_ref().expect("Must be MessageKind::Common").id,
             )
             .until_date(msg.date + time)
             .await?;
@@ -115,7 +113,7 @@ async fn mute_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()>
         Some(replied) => {
             bot.restrict_chat_member(
                 msg.chat.id,
-                replied.from().expect("Must be MessageKind::Common").id,
+                replied.from.as_ref().expect("Must be MessageKind::Common").id,
                 ChatPermissions::empty(),
             )
             .until_date(msg.date + time)
@@ -131,9 +129,11 @@ async fn mute_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()>
 
 // Calculates time of user restriction.
 fn calc_restrict_time(time: u64, unit: UnitOfTime) -> Duration {
+    // FIXME: actually handle the case of too big integers correctly, instead of
+    // unwrapping
     match unit {
-        UnitOfTime::Hours => Duration::hours(time as i64),
-        UnitOfTime::Minutes => Duration::minutes(time as i64),
-        UnitOfTime::Seconds => Duration::seconds(time as i64),
+        UnitOfTime::Hours => Duration::try_hours(time as i64).unwrap(),
+        UnitOfTime::Minutes => Duration::try_minutes(time as i64).unwrap(),
+        UnitOfTime::Seconds => Duration::try_seconds(time as i64).unwrap(),
     }
 }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{FileMeta, PhotoSize};
+use crate::types::{FileMeta, PhotoSize, Seconds};
 
 /// This object represents a [video message] (available in Telegram apps as of
 /// [v.4.0]).
@@ -9,7 +9,7 @@ use crate::types::{FileMeta, PhotoSize};
 ///
 /// [video message]: https://telegram.org/blog/video-messages-and-telescope
 /// [v4.0]: https://telegram.org/blog/video-messages-and-telescope
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct VideoNote {
     /// Metadata of the video note file.
@@ -21,8 +21,8 @@ pub struct VideoNote {
     pub length: u32,
 
     /// Duration of the video in seconds as defined by sender.
-    pub duration: u32,
+    pub duration: Seconds,
 
     /// Video thumbnail.
-    pub thumb: Option<PhotoSize>,
+    pub thumbnail: Option<PhotoSize>,
 }

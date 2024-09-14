@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, ParseMode};
+use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, ParseMode, Seconds};
 
 /// Represents a link to an MP3 audio file. By default, this audio file will be
 /// sent by the user.
@@ -9,7 +9,7 @@ use crate::types::{InlineKeyboardMarkup, InputMessageContent, MessageEntity, Par
 /// the specified content instead of the audio.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#inlinequeryresultaudio).
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InlineQueryResultAudio {
     /// Unique identifier for this result, 1-64 bytes.
@@ -40,7 +40,7 @@ pub struct InlineQueryResultAudio {
     pub performer: Option<String>,
 
     /// Audio duration in seconds.
-    pub audio_duration: Option<String>,
+    pub audio_duration: Option<Seconds>,
 
     /// [Inline keyboard] attached to the message.
     ///
@@ -123,11 +123,8 @@ impl InlineQueryResultAudio {
         self
     }
 
-    pub fn audio_duration<S>(mut self, val: S) -> Self
-    where
-        S: Into<String>,
-    {
-        self.audio_duration = Some(val.into());
+    pub fn audio_duration(mut self, val: Seconds) -> Self {
+        self.audio_duration = Some(val);
         self
     }
 

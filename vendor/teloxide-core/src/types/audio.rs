@@ -1,13 +1,13 @@
 use mime::Mime;
 use serde::{Deserialize, Serialize};
 
-use crate::types::{FileMeta, PhotoSize};
+use crate::types::{FileMeta, PhotoSize, Seconds};
 
 /// This object represents an audio file to be treated as music by the Telegram
 /// clients.
 ///
 /// [The official docs](https://core.telegram.org/bots/api#audio).
-#[serde_with_macros::skip_serializing_none]
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Audio {
     /// Metadata of the audio file.
@@ -15,7 +15,7 @@ pub struct Audio {
     pub file: FileMeta,
 
     /// A duration of the audio in seconds as defined by a sender.
-    pub duration: u32,
+    pub duration: Seconds,
 
     /// A performer of the audio as defined by a sender or by audio tags.
     pub performer: Option<String>,
@@ -31,13 +31,11 @@ pub struct Audio {
     pub mime_type: Option<Mime>,
 
     /// A thumbnail of the album cover to which the music file belongs.
-    pub thumb: Option<PhotoSize>,
+    pub thumbnail: Option<PhotoSize>,
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::types::FileMeta;
-
     use super::*;
 
     #[test]
@@ -50,7 +48,7 @@ mod tests {
             "title":"Title",
             "mime_type":"application/zip",
             "file_size":123456,
-            "thumb":{
+            "thumbnail":{
                 "file_id":"id",
                 "file_unique_id":"",
                 "width":320,
@@ -60,11 +58,11 @@ mod tests {
         }"#;
         let expected = Audio {
             file: FileMeta { id: "id".to_string(), unique_id: "".to_string(), size: 123_456 },
-            duration: 60,
+            duration: Seconds::from_seconds(60),
             performer: Some("Performer".to_string()),
             title: Some("Title".to_string()),
             mime_type: Some("application/zip".parse().unwrap()),
-            thumb: Some(PhotoSize {
+            thumbnail: Some(PhotoSize {
                 file: FileMeta { id: "id".to_owned(), unique_id: "".to_owned(), size: 3452 },
                 width: 320,
                 height: 320,

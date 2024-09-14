@@ -7,6 +7,285 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## unreleased
 
+## 0.10.1 - 2024-08-17
+
+### Fixed
+- Issue, when using `ReplyParameters` and multipart-requests involving file-sending it failed with `unimplemented error` ([#1136][pr1136], issue [#1135][issue1135])
+
+[pr1136]: https://github.com/teloxide/teloxide/pull/1136
+[issue1135]: https://github.com/teloxide/teloxide/issues/1135
+
+## 0.10.0 - 2024-08-16
+
+### Added
+
+- `ChatPermission::can_*` helper functions ([#851][pr851])
+- `mentioned_users` functions for `CallbackQuery`, `Chat`, `ChatJoinRequest`, `ChatMemberUpdated`, `Game`, `Message`, `Poll`, `Update` which return all contained `User` instances ([#850][pr850])
+- `Message::video_chat_participants_invited` ([#850][pr850])
+- `Update::from`, a replacement for `Update::user` ([#850][pr850])
+- `Seconds` type, which represents a duration is seconds ([#859][pr859])
+- `VideoChatEnded::duration` field that was previously missed ([#859][pr859])
+- `ThreadId` newtype over `MessageId`, used for identifying reply threads ([#887][pr887])
+- `ChatId::as_user` ([#905][pr905])
+- Implement `PartialEq<ChatId> for UserId` and `PartialEq<UserId> for ChatId` ([#905][pr905])
+- `ChatId::{MIN, MAX}` ([#905][pr905])
+- Missing `Message` getters ([#982][pr982]): 
+  - `message_auto_delete_timer_changed`
+  - `write_access_allowed`
+  - `forum_topic_created`
+  - `forum_topic_edited`
+  - `forum_topic_closed`
+  - `forum_topic_reopened`
+  - `general_forum_topic_hidden`
+  - `general_forum_topic_unhidden`
+  - `video_chat_scheduled`
+  - `video_chat_started`
+  - `video_chat_ended`
+  - `web_app_data` 
+- `is_delete_chat_photo`, `is_group_chat_created`, `is_super_group_chat_created`, `is_channel_chat_created` functions to `Message` ([#982][pr982])
+- Support for TBA 6.5  ([#954][pr954])
+  - Add `can_send_audios`, `can_send_documents`, `can_send_photos`, `can_send_videos`, `can_send_video_notes`, and `can_send_voice_notes` to `ChatPermissions` and `Restricted`
+  - Add `use_independent_chat_permissions` optional parameter to `restrict_chat_member` and `set_chat_permissions`
+  - Add `user_chat_id` field to `ChatJoinRequest`
+  - Add `KeyboardButtonRequestChat` and `ChatShared` types
+  - Add `RequestChat` variant to `ButtonRequest`
+  - Add `ChatShared` variant to `MessageKind`
+  - Add `shared_chat` method to `Message`
+  - Add `KeyboardButtonRequestUser` and `UserShared` types
+  - Add `RequestUser` variant to `ButtonRequest`
+  - Add `UserShared` variant to `MessageKind`
+  - Add `shared_user` method to `Message`
+- Support for TBA 6.6 ([#1040](pr1040))
+  - Add methods for working with bot's description:
+    - `set_my_description`
+    - `get_my_description`
+    - `set_my_short_description`
+    - `get_my_short_description`
+  - Add methods for working with sticker sets:
+    - `set_custom_emoji_sticker_set_thumbnail`
+    - `set_sticker_set_title`
+    - `delete_sticker_set`
+    - `set_sticker_emoji_list`
+    - `set_sticker_keywords`
+    - `set_sticker_mask_position`
+  - Add parameter `emoji` to the `send_sticker` method to specify an emoji for just uploaded stickers
+  - Add support for the creation of custom emoji sticker sets in `create_new_sticker_set`
+  - Add parameter `needs_repainting` to the `create_new_sticker_set` methodto automatically change the color of emoji based on context (e.g., use text color in messages, accent color in statuses, etc.)
+  - Add field `needs_repainting` to the `Sticker` struct 
+  - Add support for the creation of sticker sets with multiple initial stickers in `create_new_sticker_set` by replacing the parameters `sticker`, `emojis` and `mask_position` with the parameters `stickers` and `sticker_format`.
+  - Add support for .WEBP files in `create_new_sticker_set` and `add_sticker_to_set`
+  - Add support for .WEBP, .TGS, and .WEBM files in `upload_sticker_file` by replacing the parameter `png_sticker` with the parameters `sticker` and `sticker_format`
+  - Add the ability to specify search keywords for stickers added to sticker sets
+  - Add new type `StickerFormatFlags` with fields `is_animated` and `is_video`
+  - Add new method `Sticker::format` which returns the format of the sticker, the format is determined by the `StickerFormatFlags` of the `Sticker`
+  - Add missing fields `{InlineQueryResultGif, InlineQueryResultMpeg4Gif}::thumbnail_mime_type`
+- Support for TBA 6.7 ([#1086](pr1086))
+  - Add support for launching [Web Apps](https://core.telegram.org/bots/webapps) from inline query results by replacing the parameters `switch_pm_text` and `switch_pm_parameter` of the method `answer_inline_query` with the parameter `button` of type `InlineQueryResultsButton`
+  - Add new fields:
+    - `web_app_name` to `WriteAccessAllowed`
+    - `switch_inline_query_chosen_chat` of the type `SwitchInlineQueryChosenChat` to `InlineKeyboardButton`
+    - `via_chat_folder_invite_link` to `ChatMemberUpdated`
+  - Add methods for working with bot's name:
+    - `set_my_name`
+    - `get_my_name`
+  - Add the ability to specify custom emoji entities using `HTML` and `MarkdownV2` formatting options for bots that purchased additional usernames on [Fragment](https://fragment.com/)
+- Support for TBA 6.8 ([#1087](pr1087))
+  - Add the `MediaKind::Story`
+  - Add new fields
+    - `PollAnswer::voter` to support anonymous poll answers in chats
+    - `emoji_status_expiration_date` to `Chat` as part of the future `ChatFullInfo` type TBA type
+  - Add the `unpin_all_general_forum_topic_messages` method
+- Support for TBA 6.9 ([#1095](pr1095))
+  - Add `can_post_stories`, `can_edit_stories` and `can_delete_stories` fields to `ChatMemberKind::Administrator`, `ChatAdministratorRights` and `PromoteChatMember`
+  - Add `from_request` and `from_attachment_menu` fields to `WriteAccessAllowed`
+- Support for TBA 7.0 ([#1101](pr1101))
+  - Reactions:
+    - Add `ReactionType` enum
+    - Add `MessageReactionUpdated` and `MessageReactionCountUpdated` structs
+    - Add `MessageReaction` and `MessageReactionCount` variants to `UpdateKind` enum
+    - Add `filter_message_reaction_updated` and `filter_message_reaction_count_updated` filters to `UpdateFilterExt` trait
+    - Add `set_message_reaction` TBA method to `Requester` trait
+    - Add `available_reactions` field to `Chat` struct
+  - Replies 2.0
+    - Add the fields `MessageCommon::{external_reply, quote}` of types `ExternalReplyInfo` and `TextQuote` respectively
+  - Link Preview Customization
+    - `disable_web_page_preview` replaced with `link_preview_options`:
+      - Remove `disable_web_page_preview` field from `send_message` and `send_message` TBA methods and `InputMessageContentText` struct
+      - Add `LinkPreviewOptions` struct
+      - Add `link_preview_options` field to `InputMessageContentText` and `Message` structs
+      - Add `link_preview_options` field to `send_message` and `send_message` TBA methods
+  - Multiple Message Actions
+    - Add TBA methods `delete_messages`, `forward_messages` and `copy_messages` to `Requester` trait
+  - Chat Boost
+    - Add `ChatBoostSource` enum
+    - Add `ChatBoost`, `ChatBoostUpdated`, `ChatBoostRemoved` and `UserChatBoosts` structs
+    - Add `ChatBoost` and `RemovedChatBoost` variants to `UpdateKind` enum
+    - Add `filter_chat_boost` and `filter_removed_chat_boost` filters to `UpdateFilterExt` trait
+    - Add `get_user_chat_boosts` TBA method to `Requester` trait
+  - Giveaway:
+    - Add `Giveaway`, `GiveawayCreated`, `GiveawayWinners` and `GiveawayCompleted` structs
+    - Add `Giveaway`, `GiveawayCreated`, `GiveawayWinners` and `GiveawayCompleted` variants to `MessageKind` enum
+    - Add `giveaway`, `giveaway_created`, `giveaway_winners` and `giveaway_completed` getters to `Message` 
+  - Other Changes
+    - Add fields `ChafFullInfo::{has_visible_history, accent_color_id, background_custom_emoji_id, profile_accent_color_id, profile_background_custom_emoji_id}`
+  - Add `RequestId` type
+  - Add `CallbackQuery::regular_message` getter
+
+[pr851]: https://github.com/teloxide/teloxide/pull/851
+[pr887]: https://github.com/teloxide/teloxide/pull/887
+[pr905]: https://github.com/teloxide/teloxide/pull/905
+[pr982]: https://github.com/teloxide/teloxide/pull/982
+[pr1040]: https://github.com/teloxide/teloxide/pull/1040
+[pr1086]: https://github.com/teloxide/teloxide/pull/1086
+[pr1087]: https://github.com/teloxide/teloxide/pull/1087
+[pr1095]: https://github.com/teloxide/teloxide/pull/1095
+[pr1101]: https://github.com/teloxide/teloxide/pull/1101
+
+### Fixed
+
+- Return types of `edit_message_live_location_inline`, `stop_message_live_location_inline`, and `set_game_score_inline`: `Message` => `True` ([#854][pr854])
+- Remove `latitude` and `longitude` parameters from `stop_message_live_location` and `stop_message_live_location_inline` ([#854][pr854])
+- Fix the type of `photo_size`,`photo_width` and `photo_height` in the `send_invoice` method ([#936][pr936])
+- Fix roundtrip de/serialization of `InlineQueryResult` ([#990][pr990])
+- Deserialization of `ApiError::CantParseEntities` ([#839][pr839])
+- Deserialization of empty (content-less) messages that can sometimes appear as a part of callback query ([#850][pr850], issue [#873][issue873])
+- Type of `chat_id` in `send_game`: `u32` => `ChatId` ([#1066][pr1066])
+- `Requester::Err` was bounded to the `AsResponseParameters`. In case of `RetryAfter(..)` errors the polling is paused for the specified delay instead of falling into the backoff strategy ([#1113][pr1113])
+- `SendPoll` documentation ([#1101][pr1101], issue [#1058][issue1058])
+- `from`, `sender_chat` and `is_topic_message` are moved into the `Message` from the `MessageCommon` ([#1101][pr1101], issue [#945][issue945]). Initially [#946][pr946]
+- Add support for `blockquote` entity in received messages + in `MarkdownV2` and `HTML` ([#1101][pr1101], issue [#1062][issue1062])
+
+[pr839]: https://github.com/teloxide/teloxide/pull/839
+[pr879]: https://github.com/teloxide/teloxide/pull/879
+[issue873]: https://github.com/teloxide/teloxide/issues/873
+[pr854]: https://github.com/teloxide/teloxide/pull/854
+[pr936]: https://github.com/teloxide/teloxide/pull/936
+[pr990]: https://github.com/teloxide/teloxide/pull/990
+[pr990]: https://github.com/teloxide/teloxide/pull/990
+[pr1066]: https://github.com/teloxide/teloxide/pull/1066
+[pr1113]: https://github.com/teloxide/teloxide/pull/1113
+
+### Changed
+
+- Types of `Option<bool>` fields of `KeyboardMarkup`, `KeyboardRemove` and `ForceReply` to `bool` ([#853][pr853])
+- Type of `KeyboardMarkup::input_field_placeholder`: `Option<String>` => `String` ([#853][pr853])
+- The following fields now use `Seconds` type instead of `u32`, `u16` or `Duration` ([#859][pr859])
+  - `Animation::duration`
+  - `Audio::duration`
+  - `Chat::message_auto_delete_time`
+  - `Chat::slow_mode_delay`
+  - `InlineQueryResultLocation::live_period`
+  - `Location::live_period`
+  - `MessageAutoDeleteTimerChanged::message_auto_delete_time`
+  - `Poll::open_period` 
+  - `Video::duration`
+  - `VideoNote::duration`
+  - `Voice::duration`
+- `RequestError::MigrateToChatId` single fields type to `ChatId` ([#859][pr859])
+- `RequestError::RetryAfter` single fields type to `Seconds` ([#859][pr859])
+- `CallbackGame`, `ForumTopicClosed`, `ForumTopicReopened`, `GeneralForumTopicHidden`, `GeneralForumTopicUnhidden` and `WriteAccessAllowed` structures
+  are now defined as named (`struct S {}`) instead of unit (`struct S;`) in order to fix their deserialization ([#876][pr876])
+- `Download` now uses GAT feature on the `Fut` and `Err` associated types, instead of a lifetime on the whole trait ([#885][pr885])
+- Renamed `ForumTopic::message_thread_id` into `thread_id` ([#887][pr887])
+- `ForumTopic::thread_id` and `Message::thread_id` now use `ThreadId` instead of `i32` ([#887][pr887])
+- `message_thread_id` method parameters now use `ThreadId` instead of `i32` ([#887][pr887])
+- `DiceEmoji` variant order ([#887][pr887])
+- `Dice::value` now use `u8`, instead of `i32` ([#887][pr887])
+- `Invoice::total_amount`, `LabeledPrice::amount`, `PreCheckoutQuery::total_amount`, `SuccessfulPayment::total_amount` now use `u32`, instead of `i32` ([#887][pr887])
+- `Forward::message_id` and `Message::forward_from_message_id` now use `MessageId` instead of `i32` ([#887][pr887])
+- `Poll::total_voter_count` and `PollOption::voter_count` now use `u32` instead of `i32` ([#887][pr887])
+- `PollAnswer::option_ids` now use `u8` instead of `i32` ([#887][pr887])
+- Use `u32` for sizes and `Seconds` for timespans in `InlineQueryResult*` ([#887][pr887])
+- `SendGame::reply_to_message_id`, `SendSticker::reply_to_message_id` and `SendInvoice::reply_to_message_id` now use `MessageId` instead of `i32` ([#887][pr887])
+- Use `UpdateId` for `Update::id` ([#892][pr892])
+- MSRV (Minimal Supported Rust Version) was bumped from `1.64.0` to `1.68.0` ([#950][pr950])
+- Add proper support for `edit_message_caption_inline`, `copy_message`, `answer_inline_query`, `answer_web_app_query`, `send_media_group`, `edit_message_media`, and `edit_message_media_inline` to `DefaultParseMode` adaptor ([#961][pr961])
+  - Note that now `DefaultParseMode` sets the default on `send`, instead of request creation
+  - `DefaultParseMode` now also requires that the supported requests implement `Clone` (as a user you should not notice anything changing)
+- Methods of the Message type: `delete_chat_photo`, `group_chat_created`, `super_group_chat_created`, `channel_chat_created`, `chat_migration`, `migrate_to_chat_id`, `migrate_from_chat_id` now return shared reference instead of owned value inside `Option` ([#982][pr982])
+- Methods `delete_chat_photo`, `group_chat_created`, `super_group_chat_created`, `channel_chat_created` now return appropriate structs not `Option<True>` ([#982][pr982])
+- MSRV (Minimal Supported Rust Version) was bumped from `1.68.0` to `1.70.0` ([#996][pr996])
+- Changes in the existing API to support TBA6.6 ([#1040](pr1040))
+  - `InputSticker` was changed from enum to the struct
+  - `{Animation, Audio, Document, Sticker, Video, VideoNote, InputMediaAnimation, InputMediaAudio, InputMediaDocument, InputMediaVideo, StickerSet}::thumb` has been renamed to `thumbnail`
+  - `{SendAnimation, SendAudio, SendDocument, SendSticker,  SendVideo, SendVideoNote}::thumb` has been renamed to`thumbnail`
+  - Now `StickerFormat` is defined as the enum with the variants: `Static`, `Video`, `Animated`, so the previous variant `Raster` has been renamed to `Static`
+  - Method `StickerFormat::is_raster` has been renamed to `StickerFormat::is_static`
+  - Methods `StickerSet::{format, is_static, is_animated, is_video}` are deprecated now, due to the breaking change in TBA 7.2 API (which removes `StickerFormatFlags::{is_video, is_animated}` from the `StickerSet` class)
+  - Method `set_sticker_set_thumb` and it's parameter `thumb` have been renamed to `set_sticker_set_thumbnail` and `thumbnail` respectively
+  - Fields `{InlineQueryResultArticle, InlineQueryResultContact, InlineQueryResultDocument, InlineQueryResultLocation, InlineQueryResultVenue}::{thumb_url, thumb_width, thumb_height}` have been renamed to `{thumbnail_url, thumbnail_width, thumbnail_height}` respectively
+  - Field `{InlineQueryResultPhoto, InlineQueryResultVideo, InlineQueryResultGif, InlineQueryResultMpeg4Gif}::thumb_url` has been renamed to `thumbnail_url`
+- Support for TBA 7.0 ([#1101](pr1101))
+  - Replies 2.0
+    - Parameter `reply_parameters` of type `ReplyParameters` replaces parameters `reply_to_message_id` and `allow_sending_without_reply` in the methods:
+      - `copy_message`
+      - `send_message`
+      - `send_photo`
+      - `send_video`
+      - `send_animation`
+      - `send_audio`
+      - `send_document`
+      - `send_sticker`
+      - `send_video_note`
+      - `send_voice`
+      - `send_location`
+      - `send_venue`
+      - `send_contact`
+      - `send_poll`
+      - `send_dice`
+      - `send_invoice`
+      - `send_game`
+      - `send_media_group`
+  - Request for multiple users
+    - Struct `KeyboardButtonRequestUser` was renamed to `KeyboardButtonRequestUsers` + added field `max_quantity` to it
+    - Field `KeyboardButton::request_user` was renamed to `request_users`
+    - `MessageUserShared` was renamed to `MessageUsersShared`
+  - Other Changes 
+    - `Message::pinned_message` and `CallbackQuery::message` now have `MaybeInaccessibleMessage` type
+    - Field `emoji_status_custom_emoji_id` is allowed in non-private chats (moved to the `ChatFullInfo`)
+    - Struct `Forward` was replaced by `MessageOrigin` in `MessageCommon`
+  - `RequestId` replaces `i32` in `ChatShared` and `KeyboardButtonRequestChat` structs
+    
+
+[pr852]: https://github.com/teloxide/teloxide/pull/853
+[pr859]: https://github.com/teloxide/teloxide/pull/859
+[pr876]: https://github.com/teloxide/teloxide/pull/876
+[pr885]: https://github.com/teloxide/teloxide/pull/885
+[pr892]: https://github.com/teloxide/teloxide/pull/892
+[pr950]: https://github.com/teloxide/teloxide/pull/950
+[pr961]: https://github.com/teloxide/teloxide/pull/961
+[pr996]: https://github.com/teloxide/teloxide/pull/996
+
+### Deprecated
+
+- `Update::user`, use `Update::from` instead ([#850][pr850])
+- `Message::from()` and `Message::sender_chat()` in favour of fields with the same name([initially #946][pr946][#1101][pr1101])
+
+[pr850]: https://github.com/teloxide/teloxide/pull/850
+[pr946]: https://github.com/teloxide/teloxide/pull/946
+
+### Removed
+
+- Remove `can_send_media_messages` from `ChatPermissions` ([#954][pr954])
+- Remove `can_send_media_messages` field from `Restricted` ([#954][pr954])
+- Previously deprecated items ([#1013][pr1013])
+  - `AutoSend` bot adaptor
+  - `ChatMemberKind::is_kicked` (use `is_banned` instead)
+  - `ChatMemberKind::is_creator` (use `is_owner` instead)
+  - `ChatMemberKind::{can_change_info, can_pin_messages, can_invite_users, can_manage_topics, can_send_polls, can_add_web_page_previews, can_send_other_messages, can_send_media_messages, can_send_messages}` (match on `ChatMemberKind` yourself)
+  - `ChatMemberStatus::is_present` (use `ChatMemberKind::is_present` instead)
+  - `InlineKeyboardButton::{text, kind}`
+  `teloxide::dispatching::{update_listeners, repls}` (use `reloxide::{update_listeners, repls}` instead)
+  - `Dispatcher::setup_ctrlc_handler` (use `enable_ctrlc_handler` on the builder instead)
+  - `BotCommands::ty` and `repls::{commands_repl, commands_repl_with_listener}` (use `CommandsRepl::{repl, repl_with_listener}` instead)
+  - `Message::chat_id` (use `.chat.id`)
+  - `Update::user` (use `Update::from`)
+  - `update_listeners::polling` (use `Polling::builder` instead)
+
+[pr954]: https://github.com/teloxide/teloxide/pull/954
+[pr1013]: https://github.com/teloxide/teloxide/pull/1013
+
+
 ## 0.9.1 - 2023-02-15
 
 ### Fixed 
@@ -39,6 +318,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `can_edit_messages`
   - `can_pin_messages`
   - `can_manage_topics`
+- `ApiError::NotFound` is replaced with `ApiError::InvalidToken` which correctly parses all currently known errors caused by invalid bot tokens ([#998][pr998])
+
+[pr998]: https://github.com/teloxide/teloxide/pull/998
 
 ### Added
 
@@ -257,7 +539,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `user.id` now uses `UserId` type, `ChatId` now represents only _chat id_, not channel username, all `chat_id` function parameters now accept `Recipient` [**BC**]
-- Improve `Throttling` adoptor ([#130][pr130])
+- Improve `Throttling` adaptor ([#130][pr130])
   - Freeze when getting `RetryAfter(_)` error
   - Retry requests that previously returned `RetryAfter(_)` error
 - `RequestError::RetryAfter` now has a `Duration` field instead of `i32`
@@ -383,7 +665,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mark `ApiError` as `non_exhaustive` ([#125][pr125])
 - `InputFile` and related structures now do **not** implement `PartialEq`, `Eq` and `Hash` ([#133][pr133])
 - How forwarded messages are represented ([#151][pr151])
-- `RequestError::InvalidJson` now has a `raw` field with raw json for easier debugability ([#150][pr150])
+- `RequestError::InvalidJson` now has a `raw` field with raw json for easier debuggability ([#150][pr150])
 - `ChatPermissions` is now bitflags ([#157][pr157])
 - Type of `WebhookInfo::ip_address` from `Option<String>` to `Option<std::net::IpAddr>` ([#172][pr172])
 - Type of `WebhookInfo::allowed_updates` from `Option<Vec<String>>` to `Option<Vec<AllowedUpdate>>` ([#174][pr174])
@@ -461,7 +743,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `impl Clone` for {`CacheMe`, `DefaultParseMode`, `Throttle`} ([#76][pr76])
 - `DefaultParseMode::parse_mode` which allows to get currently used default parse mode ([#77][pr77])
-- `Thrrotle::{limits,set_limits}` functions ([#77][pr77])
+- `Throttle::{limits,set_limits}` functions ([#77][pr77])
 - `Throttle::{with_settings,spawn_with_settings}` and `throttle::Settings` ([#96][pr96])
 - Getters for fields nested in `Chat` ([#80][pr80])
 - API errors: `ApiError::NotEnoughRightsToManagePins`, `ApiError::BotKickedFromSupergroup` ([#84][pr84])
@@ -538,7 +820,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refactor `ReplyMarkup` ([#pr65][pr65]) (**BC**)
   - Rename `ReplyMarkup::{InlineKeyboardMarkup => InlineKeyboard, ReplyKeyboardMarkup => Keyboard, ReplyKeyboardRemove => KeyboardRemove}`
-  - Add `inline_kb`, `keyboad`, `kb_remove` and `force_reply` `ReplyMarkup` consructors
+  - Add `inline_kb`, `keyboad`, `kb_remove` and `force_reply` `ReplyMarkup` constructors
   - Rename `ReplyKeyboardMarkup` => `KeyboardMarkup`
   - Rename `ReplyKeyboardRemove` => `KeyboardRemove`
   - Remove useless generic param from `ReplyKeyboardMarkup::new` and `InlineKeyboardMarkup::new`
@@ -552,7 +834,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `GetUpdatesFaultTolerant` - fault toletant version of `GetUpdates` ([#58][pr58]) (**BC**)
+- `GetUpdatesFaultTolerant` - fault tolerant version of `GetUpdates` ([#58][pr58]) (**BC**)
 - Derive `Clone` for `AutoSend`.
 
 [pr58]: https://github.com/teloxide/teloxide-core/pull/58
@@ -654,7 +936,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Make `net::{TELEGRAM_API_URL, download_file{,_stream}}` pub
 - Refactor `Bot` ([#29][pr29]):
   - Move default parse mode to an adaptor (`DefaultParseMode`)
-  - Remove bot builder (it's not usefull anymore, since parse_mode is moved away)
+  - Remove bot builder (it's not useful anymore, since parse_mode is moved away)
   - Undeprecate bot constructors (`Bot::{new, with_client, from_env_with_client}`)
 - Rename `StickerType` => `InputSticker`, `{CreateNewStickerSet,AddStickerToSet}::sticker_type}` => `sticker` ([#23][pr23], [#43][pr43])
 - Use `_: IntoIterator<Item = T>` bound instead of `_: Into<Vec<T>>` in telegram methods which accept collections ([#21][pr21])
@@ -682,7 +964,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- `unstable-stream` feature (now `Bot::download_file_stream` is accesable by default)
+- `unstable-stream` feature (now `Bot::download_file_stream` is accessible by default)
 - old `Request` trait
 - `RequestWithFile`, now multipart requests use `Request`
 - Remove all `#[non_exhaustive]` annotations ([#4][pr4])

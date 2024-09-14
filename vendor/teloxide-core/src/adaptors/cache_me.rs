@@ -12,7 +12,7 @@ use url::Url;
 use crate::{
     payloads::GetMe,
     requests::{HasPayload, Request, Requester},
-    types::{Me, Recipient, *},
+    types::*,
 };
 
 /// `get_me` cache.
@@ -94,7 +94,9 @@ where
         delete_webhook,
         get_webhook_info,
         forward_message,
+        forward_messages,
         copy_message,
+        copy_messages,
         send_message,
         send_photo,
         send_audio,
@@ -114,6 +116,7 @@ where
         send_poll,
         send_dice,
         send_chat_action,
+        set_message_reaction,
         get_user_profile_photos,
         get_file,
         kick_chat_member,
@@ -156,9 +159,17 @@ where
         reopen_general_forum_topic,
         hide_general_forum_topic,
         unhide_general_forum_topic,
+        unpin_all_general_forum_topic_messages,
         answer_callback_query,
+        get_user_chat_boosts,
         set_my_commands,
         get_my_commands,
+        set_my_name,
+        get_my_name,
+        set_my_description,
+        get_my_description,
+        set_my_short_description,
+        get_my_short_description,
         set_chat_menu_button,
         get_chat_menu_button,
         set_my_default_administrator_rights,
@@ -176,6 +187,7 @@ where
         edit_message_reply_markup_inline,
         stop_poll,
         delete_message,
+        delete_messages,
         send_sticker,
         get_sticker_set,
         get_custom_emoji_stickers,
@@ -184,7 +196,13 @@ where
         add_sticker_to_set,
         set_sticker_position_in_set,
         delete_sticker_from_set,
-        set_sticker_set_thumb,
+        set_sticker_set_thumbnail,
+        set_custom_emoji_sticker_set_thumbnail,
+        set_sticker_set_title,
+        delete_sticker_set,
+        set_sticker_emoji_list,
+        set_sticker_keywords,
+        set_sticker_mask_position,
         send_invoice,
         create_invoice_link,
         answer_shipping_query,
@@ -201,7 +219,6 @@ where
 }
 
 download_forward! {
-    'w
     B
     CacheMe<B>
     { this => this.inner() }

@@ -4,11 +4,11 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 use crate::types::{
-    Message, MessageEntity, MessageId, ParseMode, PollType, Recipient, ReplyMarkup,
+    Message, MessageEntity, ParseMode, PollType, Recipient, ReplyMarkup, ReplyParameters, ThreadId,
 };
 
 impl_payload! {
-    /// Use this method to send phone contacts. On success, the sent [`Message`] is returned.
+    /// Use this method to send a native poll. On success, the sent [`Message`] is returned.
     ///
     /// [`Message`]: crate::types::Message
     #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize)]
@@ -23,7 +23,7 @@ impl_payload! {
         }
         optional {
             /// Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
-            pub message_thread_id: i32,
+            pub message_thread_id: ThreadId,
             /// True, if the poll needs to be anonymous, defaults to True
             pub is_anonymous: bool,
             /// Poll type, “quiz” or “regular”, defaults to “regular”
@@ -54,11 +54,8 @@ impl_payload! {
             pub disable_notification: bool,
             /// Protects the contents of sent messages from forwarding and saving
             pub protect_content: bool,
-            /// If the message is a reply, ID of the original message
-            #[serde(serialize_with = "crate::types::serialize_reply_to_message_id")]
-            pub reply_to_message_id: MessageId,
-            /// Pass _True_, if the message should be sent even if the specified replied-to message is not found
-            pub allow_sending_without_reply: bool,
+            /// Description of the message to reply to
+            pub reply_parameters: ReplyParameters,
             /// Additional interface options. A JSON-serialized object for an [inline keyboard], [custom reply keyboard], instructions to remove reply keyboard or to force a reply from the user.
             ///
             /// [inline keyboard]: https://core.telegram.org/bots#inline-keyboards-and-on-the-fly-updating
