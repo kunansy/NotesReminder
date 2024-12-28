@@ -30,6 +30,36 @@ pub struct SpanReport {
     repeat_materials_count: i32
 }
 
+
+impl SpanReport {
+    pub fn format(&self) -> String {
+        let mut lines: Vec<String> = Vec::with_capacity(20);
+
+        lines.push("# Completed materials\n\n".into());
+        lines.push(format!("Total {} materials have been read!", self.total_materials_completed));
+
+        for (material_type, count) in self.read_items.iter() {
+            lines.push(format!("{} items of {}!", count, material_type));
+        }
+
+        lines.push("\n\n# Reading \n\n".into());
+        for (stat, value) in self.reading.iter() {
+            lines.push(format!("{}: {}", stat, value));
+        }
+
+        lines.push("\n\n# Notes\n\n".into());
+        for (stat, value) in self.notes.iter() {
+            lines.push(format!("{}: {}", stat, value));
+        }
+
+        lines.push("\n\n# Repeating\n\n".into());
+        lines.push(format!("{} repeats total!", self.repeats_total));
+        lines.push(format!("{} unique materials have been repeated!", self.repeat_materials_count));
+
+        lines.join("\n")
+    }
+}
+
 pub async fn get_repeat_queue(tracker_url: &str) -> Result<Vec<RepeatItem>, String> {
     let url = format!("{}/materials/repeat-queue", tracker_url).parse()
         .map_err(|e: uri::InvalidUri| e.to_string())?;
