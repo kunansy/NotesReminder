@@ -76,8 +76,7 @@ pub mod db {
         }
 
         pub fn content_html(&self) -> String {
-            let mut d = demark::Demark::from(self.content.clone());
-            d.demark()
+            demark::Demark::from(self.content.clone()).demark()
         }
 
         pub fn note_id(&self) -> &Uuid {
@@ -282,10 +281,6 @@ pub mod db {
         }
 
         impl Demark {
-            pub fn new() -> Self {
-                Demark { content: String::new() }
-            }
-
             pub fn from<T: ToString>(content: T) -> Self {
                 Demark { content: content.to_string() }
             }
@@ -461,7 +456,7 @@ pub mod db {
             #[test]
             fn test_demark() {
                 let mut res = Demark::from("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
-                let mut res2 = Demark::from("aksdflsk sdkfja:
+                let res2 = Demark::from("aksdflsk sdkfja:
 * **sdfsdf** (*dfsdf*) — asda
 * **adfsdj** (*dfsjdk*) — asdas!");
 
