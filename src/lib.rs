@@ -446,83 +446,83 @@ pub mod db {
 
         #[cfg(test)]
         mod test_demark {
-            use crate::db::demark;
+            use crate::db::demark::Demark;
 
             #[test]
             fn test_demark_sup() {
-                let res1 = demark::demark_sup("some content <sup>some sup</sup> some end");
-                let res2 = demark::demark_sup("some content <sup>some123</sup> some end");
+                let mut res1 = Demark::from("some content <sup>some sup</sup> some end");
+                let mut res2 = Demark::from("some content <sup>some123</sup> some end");
 
-                assert_eq!(res1, "some content ^(some sup) some end");
-                assert_eq!(res2, "some content ^(some123) some end");
+                assert_eq!(res1.demark_sup().content, "some content ^(some sup) some end");
+                assert_eq!(res2.demark_sup().content, "some content ^(some123) some end");
             }
 
             #[test]
             fn test_demark_sub() {
-                let res1 = demark::demark_sub("some content <sub>some sub</sub> some end");
-                let res2 = demark::demark_sub("some content <sub>some123</sub> some end");
+                let mut res1 = Demark::from("some content <sub>some sub</sub> some end");
+                let mut res2 = Demark::from("some content <sub>some123</sub> some end");
 
-                assert_eq!(res1, "some content _(some sub) some end");
-                assert_eq!(res2, "some content _(some123) some end");
+                assert_eq!(res1.demark_sub().content, "some content _(some sub) some end");
+                assert_eq!(res2.demark_sub().content, "some content _(some123) some end");
             }
 
             #[test]
             fn test_demark_bold() {
-                let res1 = demark::demark_bold("some content **some bold** some end");
-                let res2 = demark::demark_bold("some content **some123** some end");
-                let res3 = demark::demark_bold("**some123**");
-                let res4 = demark::demark_bold("some content **some123**");
-                let res5 = demark::demark_bold("**some123** some end");
+                let mut res1 = Demark::from("some content **some bold** some end");
+                let mut res2 = Demark::from("some content **some123** some end");
+                let mut res3 = Demark::from("**some123**");
+                let mut res4 = Demark::from("some content **some123**");
+                let mut res5 = Demark::from("**some123** some end");
 
-                assert_eq!(res1, "some content <b>some bold</b> some end");
-                assert_eq!(res2, "some content <b>some123</b> some end");
-                assert_eq!(res3, "<b>some123</b>");
-                assert_eq!(res4, "some content <b>some123</b>");
-                assert_eq!(res5, "<b>some123</b> some end");
+                assert_eq!(res1.demark_bold().content, "some content <b>some bold</b> some end");
+                assert_eq!(res2.demark_bold().content, "some content <b>some123</b> some end");
+                assert_eq!(res3.demark_bold().content, "<b>some123</b>");
+                assert_eq!(res4.demark_bold().content, "some content <b>some123</b>");
+                assert_eq!(res5.demark_bold().content, "<b>some123</b> some end");
             }
 
             #[test]
             fn test_demark_italic() {
-                let res1 = demark::demark_italic("some content *some italic* some end");
-                let res2 = demark::demark_italic("some content *some123* some end");
-                let res3 = demark::demark_italic("*some123*");
-                let res4 = demark::demark_italic("some content *some123*");
-                let res5 = demark::demark_italic("*some123* some end");
-                let res6 = demark::demark_italic("(*zero flag*)");
-                let res7 = demark::demark_italic("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
+                let mut res1 = Demark::from("some content *some italic* some end");
+                let mut res2 = Demark::from("some content *some123* some end");
+                let mut res3 = Demark::from("*some123*");
+                let mut res4 = Demark::from("some content *some123*");
+                let mut res5 = Demark::from("*some123* some end");
+                let mut res6 = Demark::from("(*zero flag*)");
+                let mut res7 = Demark::from("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
                 
-                assert_eq!(res1, "some content <i>some italic</i> some end");
-                assert_eq!(res2, "some content <i>some123</i> some end");
-                assert_eq!(res3, "<i>some123</i>");
-                assert_eq!(res4, "some content <i>some123</i>");
-                assert_eq!(res5, "<i>some123</i> some end");
-                assert_eq!(res6, "(<i>zero flag</i>)");
-                assert_eq!(res7, "Комментарий @ava: <i>«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»</i>.");
+                assert_eq!(res1.demark_italic().content, "some content <i>some italic</i> some end");
+                assert_eq!(res2.demark_italic().content, "some content <i>some123</i> some end");
+                assert_eq!(res3.demark_italic().content, "<i>some123</i>");
+                assert_eq!(res4.demark_italic().content, "some content <i>some123</i>");
+                assert_eq!(res5.demark_italic().content, "<i>some123</i> some end");
+                assert_eq!(res6.demark_italic().content, "(<i>zero flag</i>)");
+                assert_eq!(res7.demark_italic().content, "Комментарий @ava: <i>«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»</i>.");
             }
 
             #[test]
             fn test_demark_code_block() {
-                let res = demark::demark_code_block("``` { 'type': 'http', 'asgi': {'version': '3.0', spec_version: '2.4'}, 'http_version': '1.1', 'server': ('127.0.0.1' 5000), 'client': ('127.0.0.1', 50422), 'scheme': 'http', 'method': 'GET', 'root_path': '', 'path': '/some/path/', 'raw_path': b'/some/path/', 'query_string': b'q=123', 'headers': [ (b'host', b'127.0.0.1:5000'), (b'user-agent', b'curl/7.81.0'), (b'accept', b'*/*') ] 'state': {} } ```");
+                let mut res = Demark::from("``` { 'type': 'http', 'asgi': {'version': '3.0', spec_version: '2.4'}, 'http_version': '1.1', 'server': ('127.0.0.1' 5000), 'client': ('127.0.0.1', 50422), 'scheme': 'http', 'method': 'GET', 'root_path': '', 'path': '/some/path/', 'raw_path': b'/some/path/', 'query_string': b'q=123', 'headers': [ (b'host', b'127.0.0.1:5000'), (b'user-agent', b'curl/7.81.0'), (b'accept', b'*/*') ] 'state': {} } ```");
 
-                assert_eq!(res, "<pre> { 'type': 'http', 'asgi': {'version': '3.0', spec_version: '2.4'}, 'http_version': '1.1', 'server': ('127.0.0.1' 5000), 'client': ('127.0.0.1', 50422), 'scheme': 'http', 'method': 'GET', 'root_path': '', 'path': '/some/path/', 'raw_path': b'/some/path/', 'query_string': b'q=123', 'headers': [ (b'host', b'127.0.0.1:5000'), (b'user-agent', b'curl/7.81.0'), (b'accept', b'*/*') ] 'state': {} } </pre>")
+                assert_eq!(res.demark_code_block().content, "<pre> { 'type': 'http', 'asgi': {'version': '3.0', spec_version: '2.4'}, 'http_version': '1.1', 'server': ('127.0.0.1' 5000), 'client': ('127.0.0.1', 50422), 'scheme': 'http', 'method': 'GET', 'root_path': '', 'path': '/some/path/', 'raw_path': b'/some/path/', 'query_string': b'q=123', 'headers': [ (b'host', b'127.0.0.1:5000'), (b'user-agent', b'curl/7.81.0'), (b'accept', b'*/*') ] 'state': {} } </pre>")
             }
 
             #[test]
             fn test_demark_code_block_with_language() {
-                let res = demark::demark_code_block("```python async def application(scope, receive: Callable, send: Callable): ```");
+                let mut res = Demark::from("```python async def application(scope, receive: Callable, send: Callable): ```");
 
-                assert_eq!(res, "<pre> async def application(scope, receive: Callable, send: Callable): </pre>")
+                assert_eq!(res.demark_code_block().content, "<pre> async def application(scope, receive: Callable, send: Callable): </pre>")
             }
 
             #[test]
             fn test_demark() {
-                let res = demark::demark_italic("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
-                let res2 = demark::demark("aksdflsk sdkfja:
+                let mut res = Demark::from("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
+                let mut res2 = Demark::from("aksdflsk sdkfja:
 * **sdfsdf** (*dfsdf*) — asda
 * **adfsdj** (*dfsjdk*) — asdas!");
 
-                assert_eq!(res, "Комментарий @ava: <i>«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»</i>.");
-                assert_eq!(res2, "aksdflsk sdkfja:\n* <b>sdfsdf</b> (<i>dfsdf</i>) — asda\n* <b>adfsdj</b> (<i>dfsjdk</i>) — asdas!");
+                assert_eq!(res.demark_italic().content, "Комментарий @ava: <i>«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»</i>.");
+                assert_eq!(res2.demark(), "aksdflsk sdkfja:\n* <b>sdfsdf</b> (<i>dfsdf</i>) — asda\n* <b>adfsdj</b> (<i>dfsjdk</i>) — asdas!");
             }
         }
     }
