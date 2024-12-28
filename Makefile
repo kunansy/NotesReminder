@@ -1,5 +1,5 @@
 patch:
-	@bumpversion --commit --tag patch
+	@bumpversion --commit --tag version
 
 build-status:
 	@curl -L \
