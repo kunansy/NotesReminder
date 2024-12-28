@@ -275,6 +275,112 @@ pub mod db {
     mod demark {
         use regex::{Captures, Regex};
 
+        #[derive(Debug)]
+        pub struct Demark {
+            content: String
+        }
+
+        impl Demark {
+            pub fn new() -> Self {
+                Demark { content: String::new() }
+            }
+
+            pub fn from<T: ToString>(content: T) -> Self {
+                Demark { content: content.to_string() }
+            }
+
+            fn demark_bold(&mut self) -> &mut Self {
+                let demark_bold_pattern = Regex::new(r#"\*{2}(.*?)\*{2}"#).unwrap();
+                self.content = demark_bold_pattern.replace_all(&self.content, |r: &Captures| {
+                    format!("<b>{}</b>", &r[1])
+                }).to_string();
+
+                self
+            }
+
+            fn demark_italic(&mut self) -> &mut Self {
+                // to allow unordered lists the first symbol should be not space
+                let demark_italic_pattern = Regex::new(r#"\*(\S.*?)\*"#).unwrap();
+                self.content = demark_italic_pattern.replace_all(&self.content, |r: &Captures| {
+                    format!("<i>{}</i>", &r[1])
+                }).to_string();
+
+                self
+            }
+
+            fn demark_code(&mut self) -> &mut Self {
+                let demark_code_pattern = Regex::new(r#"`(.*?)`"#).unwrap();
+                self.content = demark_code_pattern.replace_all(&self.content, |r: &Captures| {
+                    format!("<code>{}</code>", &r[1])
+                }).to_string();
+
+                self
+            }
+
+            fn demark_code_block(&mut self) -> &mut Self {
+                let demark_code_pattern = Regex::new(r#"```\w*(.*?)```"#).unwrap();
+                self.content = demark_code_pattern.replace_all(&self.content, |r: &Captures| {
+                    format!("<pre>{}</pre>", &r[1])
+                }).to_string();
+
+                self
+            }
+
+            fn demark_lt(&mut self) -> &mut Self {
+                self.content = self.content.replace(" < ", " &lt; ");
+                self
+            }
+
+            fn demark_gt(&mut self) -> &mut Self {
+                self.content = self.content.replace(" > ", " &gt; ");
+                self
+            }
+
+            fn demark_sup(&mut self) -> &mut Self {
+                let demark_code_pattern = Regex::new(r#"<sup>(.*?)</sup>"#).unwrap();
+                self.content = demark_code_pattern.replace_all(&self.content, |r: &Captures| {
+                    format!("^({})", &r[1])
+                }).to_string();
+
+                self
+            }
+
+            fn demark_sub(&mut self) -> &mut Self {
+                let demark_code_pattern = Regex::new(r#"<sub>(.*?)</sub>"#).unwrap();
+                self.content = demark_code_pattern.replace_all(&self.content, |r: &Captures| {
+                    format!("_({})", &r[1])
+                }).to_string();
+
+                self
+            }
+
+            fn demark_link(&mut self) -> &mut Self{
+                let link_pattern = Regex::new(r#"\[([\w]*)\]\(([\w\d\.:\/-]*)\)"#).unwrap();
+
+                self.content = link_pattern.replace_all(&self.content, |r: &Captures| {
+                    format!("<a href='{}'>{}</a>", &r[2], &r[1])
+                }).to_string();
+
+                self
+            }
+
+            pub fn demark(mut self) -> String {
+                self.demark_bold()
+                    .demark_italic()
+                    .demark_code_block()
+                    .demark_code()
+                    .demark_gt()
+                    .demark_lt()
+                    .demark_sub()
+                    .demark_sup()
+                    .demark_link();
+
+                self.content
+            }
+
+        }
+
+
         pub fn demark(content: &str) -> String {
             demark_sub(&demark_sup(&demark_lt(&demark_gt(&demark_code(&demark_code_block(&demark_italic(&demark_bold(content)))))))).to_string()
         }
