@@ -1,4 +1,5 @@
-use hyper::{Client, body::Buf, http::uri};
+use hyper::{Client, body::Buf, http::uri, Request, Body, Method};
+use chrono::NaiveDate;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -45,5 +46,42 @@ pub async fn get_repeat_queue(tracker_url: &str) -> Result<Vec<RepeatItem>, Stri
         .map_err(|e| format!("Could not parse json: {}", e.to_string()))?;
 
     log::debug!("{} queue items found", &json.len());
+    Ok(json)
+}
+
+
+async fn get_span_report(tracker_url: &str, begin: &NaiveDate, end: &NaiveDate) -> Result<SpanReport, String> {
+    let url: uri::Uri = format!("{}/system/report", tracker_url).parse()
+        .map_err(|e: uri::InvalidUri| e.to_string())?;
+
+    log::debug!("Getting report from {} to {}", begin, end);
+
+    let client = Client::new();
+
+    let _body = HashMap::from([
+        ("start".to_string(), begin.format("%Y-%m-%d").to_string()),
+        ("stop".to_string(), end.format("%Y-%m-%d").to_string())
+    ]);
+    let req_body = serde_json::to_string(&_body)
+        .map_err(|e| e.to_string())?;
+
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri(url.to_string())
+        .body(Body::from(req_body))
+        .map_err(|e| e.to_string())?;
+
+    let resp = client.request(req)
+        .await
+        .map_err(|e| format!("POST to {} with {:?} fails: {}", url, &_body, e.to_string()))?;
+
+    let resp_body = hyper::body::aggregate(resp)
+        .await.map_err(|e| e.to_string())?;
+
+    let json: SpanReport = serde_json::from_reader(resp_body.reader())
+        .map_err(|e| format!("Could not parse json: {}", e.to_string()))?;
+
+    log::debug!("{:?} span report found", &json);
+
     Ok(json)
 }
