@@ -2,6 +2,7 @@ use hyper::{Client, body::Buf, http::uri, Request, Body, Method};
 use chrono::{prelude::*, NaiveDate};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
+use capitalize::Capitalize;
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -35,31 +36,31 @@ impl SpanReport {
     pub fn format(&self) -> String {
         let mut lines: Vec<String> = Vec::with_capacity(20);
 
-        lines.push("# Completed materials\n\n".into());
-        lines.push(format!("Total {} materials have been read!", self.total_materials_completed));
+        lines.push("<b>Completed materials</b>".into());
+        lines.push(format!("Total <i>{}</i> materials have been read!\n", self.total_materials_completed));
 
         for (material_type, count) in self.completed_materials.iter() {
-            lines.push(format!("{} items of {}!", count, material_type));
+            lines.push(format!("<b>{}</b>: {} items!", material_type.capitalize(), count));
         }
 
-        lines.push("#\n\nRead items\n\n".into());
+        lines.push("\n<b>Read items</b>".into());
         for (material_type, count) in self.read_items.iter() {
-            lines.push(format!("{} items of {}!", count, material_type));
+            lines.push(format!("<b>{}</b>: {} items!", material_type.capitalize(), count));
         }
 
-        lines.push("\n\n# Reading \n\n".into());
+        lines.push("\n<b>Reading</b>".into());
         for (stat, value) in self.reading.iter() {
-            lines.push(format!("{}: {}", stat, value));
+            lines.push(format!("<i>{}</i>: {}", stat.replace("_", " ").capitalize(), value));
         }
 
-        lines.push("\n\n# Notes\n\n".into());
+        lines.push("\n<b>Notes</b>".into());
         for (stat, value) in self.notes.iter() {
-            lines.push(format!("{}: {}", stat, value));
+            lines.push(format!("<i>{}</i>: {}", stat.replace("_", " ").capitalize(), value));
         }
 
-        lines.push("\n\n# Repeating\n\n".into());
-        lines.push(format!("{} repeats total!", self.repeats_total));
-        lines.push(format!("{} unique materials have been repeated!", self.repeat_materials_count));
+        lines.push("\n<b>Repeating</b>".into());
+        lines.push(format!("{} <b>repeats</b> total!", self.repeats_total));
+        lines.push(format!("{} <b>unique materials</b> have been repeated!", self.repeat_materials_count));
 
         lines.join("\n")
     }
