@@ -22,6 +22,7 @@ log = "0.4"
 env_logger = "0.11"
 hyper = { version = "0.14", default-features=false, features = [ "client", "http1" ]}
 signal-hook = "0.3"
+capitalize = "0.3"
 
 [[bin]]
 name = "app"
