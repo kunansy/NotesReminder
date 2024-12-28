@@ -116,7 +116,7 @@ async fn get_span_report(tracker_url: &str, begin: &NaiveDate, end: &NaiveDate) 
     let json: SpanReport = serde_json::from_reader(resp_body.reader())
         .map_err(|e| format!("Could not parse json: {}", e.to_string()))?;
 
-    log::debug!("{:?} span report found", &json);
+    log::debug!("Span report got");
 
     Ok(json)
 }
