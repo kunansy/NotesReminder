@@ -38,6 +38,11 @@ impl SpanReport {
         lines.push("# Completed materials\n\n".into());
         lines.push(format!("Total {} materials have been read!", self.total_materials_completed));
 
+        for (material_type, count) in self.completed_materials.iter() {
+            lines.push(format!("{} items of {}!", count, material_type));
+        }
+
+        lines.push("#\n\nRead items\n\n".into());
         for (material_type, count) in self.read_items.iter() {
             lines.push(format!("{} items of {}!", count, material_type));
         }
