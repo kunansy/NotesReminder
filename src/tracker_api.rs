@@ -1,5 +1,5 @@
 use hyper::{Client, body::Buf, http::uri, Request, Body, Method};
-use chrono::NaiveDate;
+use chrono::{prelude::*, NaiveDate};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -84,4 +84,15 @@ async fn get_span_report(tracker_url: &str, begin: &NaiveDate, end: &NaiveDate) 
     log::debug!("{:?} span report found", &json);
 
     Ok(json)
+}
+
+pub async fn get_year_report(tracker_url: &str) -> Result<SpanReport, String> {
+    let year = Local::now().year();
+
+    let begin = NaiveDate::from_ymd_opt(year, 1, 1).unwrap();
+    let end = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
+
+    let report = get_span_report(tracker_url, &begin, &end).await?;
+
+    Ok(report)
 }
