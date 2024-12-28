@@ -116,15 +116,15 @@ async fn answer<T>(bot: &T,
 
     match msg.text() {
         Some("/start") => {
-            log::info!("[{}]: User starts the bot", cfg.chat_id);
+            log::info!("[{}]: Start the bot", cfg.chat_id);
             bot.send_message(ChatId(cfg.chat_id), "/remind to remind the note").await?;
         },
         Some("/remind") => {
-            log::info!("[{}]: User reminds a note", cfg.chat_id);
+            log::info!("[{}]: Remind a note", cfg.chat_id);
             remind_note(bot, &cfg, &pool).await;
         },
         Some("/repeat") => {
-            log::info!("Remind to repeat");
+            log::info!("[{}]: Remind to repeat", cfg.chat_id);
             remind_repeat(bot, cfg.chat_id, &cfg.tracker_url, &cfg.tracker_web_url).await?;
         },
         _ => {
