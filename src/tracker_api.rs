@@ -1,5 +1,6 @@
 use hyper::{Client, body::Buf, http::uri};
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -15,6 +16,17 @@ pub struct RepeatItem {
     last_repeated_at: Option<String>,
     priority_days: i32,
     pub priority_months: f32
+}
+
+#[derive(Deserialize, Debug)]
+pub struct SpanReport {
+    completed_materials: HashMap<String, i32>,
+    total_materials_completed: i32,
+    read_items: HashMap<String, i32>,
+    reading: HashMap<String, f32>,
+    notes: HashMap<String, f32>,
+    repeats_total: i32,
+    repeat_materials_count: i32
 }
 
 pub async fn get_repeat_queue(tracker_url: &str) -> Result<Vec<RepeatItem>, String> {
