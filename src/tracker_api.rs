@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter};
 use std::collections::{BTreeMap, HashMap};
 
+use crate::db;
+
 use hyper::{Client, body::Buf, http::uri, Request, Body, Method};
 use chrono::{prelude::*, NaiveDate};
 use serde::Deserialize;
@@ -24,9 +26,9 @@ pub struct RepeatItem {
 
 #[derive(Deserialize, Debug)]
 pub struct SpanReport {
-    completed_materials: BTreeMap<String, i32>,
+    completed_materials: BTreeMap<db::MaterialTypes, i32>,
     total_materials_completed: i32,
-    read_items: BTreeMap<String, i32>,
+    read_items: BTreeMap<db::MaterialTypes, i32>,
     reading: BTreeMap<String, f32>,
     notes: BTreeMap<String, f32>,
     repeats_total: i32,
@@ -42,12 +44,12 @@ impl Display for SpanReport {
         lines.push(format!("Total <i>{}</i> materials have been read!\n", self.total_materials_completed));
 
         for (material_type, count) in self.completed_materials.iter() {
-            lines.push(format!("<b>{}</b>: {} items!", material_type.capitalize(), count));
+            lines.push(format!("<b>{}s</b>: {} items!", material_type, count));
         }
 
         lines.push("\n<b>Read items</b>".into());
         for (material_type, count) in self.read_items.iter() {
-            lines.push(format!("<b>{}</b>: {} items!", material_type.capitalize(), count));
+            lines.push(format!("<b>{}s</b>: {} {}s!", material_type, count, material_type.as_page().to_lowercase()));
         }
 
         lines.push("\n<b>Reading</b>".into());
