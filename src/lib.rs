@@ -394,6 +394,13 @@ pub mod db {
             }
 
             #[test]
+            fn test_demark_code_block_with_language() {
+                let res = demark::demark_code_block("```python async def application(scope, receive: Callable, send: Callable): ```");
+
+                assert_eq!(res, "<pre> async def application(scope, receive: Callable, send: Callable): </pre>")
+            }
+
+            #[test]
             fn test_demark() {
                 let res = demark::demark_italic("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
                 let res2 = demark::demark("aksdflsk sdkfja:
