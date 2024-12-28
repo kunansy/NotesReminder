@@ -166,8 +166,7 @@ async fn report_year<T>(bot: &T, chat_id: i64, tracker_url: &str) -> Result<(), 
 {
     let report_year = tracker_api::get_year_report(tracker_url)
         .await.expect("Could not get year report");
-    let msg = report_year.format();
-    bot.send_message(ChatId(chat_id), msg).await?;
+    bot.send_message(ChatId(chat_id), &report_year.to_string()).await?;
 
     Ok(())
 }

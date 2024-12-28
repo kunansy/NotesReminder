@@ -1,7 +1,9 @@
+use std::fmt::{Display, Formatter};
+use std::collections::{BTreeMap, HashMap};
+
 use hyper::{Client, body::Buf, http::uri, Request, Body, Method};
 use chrono::{prelude::*, NaiveDate};
 use serde::Deserialize;
-use std::collections::{BTreeMap, HashMap};
 use capitalize::Capitalize;
 
 #[allow(dead_code)]
@@ -32,8 +34,8 @@ pub struct SpanReport {
 }
 
 
-impl SpanReport {
-    pub fn format(&self) -> String {
+impl Display for SpanReport {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut lines: Vec<String> = Vec::with_capacity(20);
 
         lines.push("<b>Completed materials</b>".into());
@@ -62,7 +64,7 @@ impl SpanReport {
         lines.push(format!("{} <b>repeats</b> total!", self.repeats_total));
         lines.push(format!("{} <b>unique materials</b> have been repeated!", self.repeat_materials_count));
 
-        lines.join("\n")
+        write!(f, "{}", lines.join("\n"))
     }
 }
 
