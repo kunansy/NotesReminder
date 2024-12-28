@@ -302,7 +302,7 @@ pub mod db {
         }
 
         fn demark_code_block(content: &str) -> String {
-            let demark_code_pattern = Regex::new(r#"```(.*?)```"#).unwrap();
+            let demark_code_pattern = Regex::new(r#"```\w*(.*?)```"#).unwrap();
             demark_code_pattern.replace_all(content, |r: &Captures| {
                 format!("<pre>{}</pre>", &r[1])
             }).to_string()
