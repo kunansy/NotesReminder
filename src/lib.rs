@@ -76,7 +76,8 @@ pub mod db {
         }
 
         pub fn content_html(&self) -> String {
-            demark::demark(&self.content)
+            let mut d = demark::Demark::from(self.content.clone());
+            d.demark()
         }
 
         pub fn note_id(&self) -> &Uuid {
