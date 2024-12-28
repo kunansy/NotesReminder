@@ -8,9 +8,10 @@ pub mod db {
     use uuid::Uuid;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Deserialize, Serialize)]
+    #[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq, sqlx::Type, Deserialize, Serialize)]
     #[sqlx(type_name = "materialtypesenum", rename_all = "lowercase")]
-    enum MaterialTypes {
+    #[serde(rename_all = "lowercase")]
+    pub enum MaterialTypes {
         Book,
         Article,
         Lecture,
@@ -32,6 +33,12 @@ pub mod db {
                 MaterialTypes::Lecture | MaterialTypes::Audiobook => "Minute",
                 MaterialTypes::Course => "Lecture",
             }
+        }
+    }
+
+    impl Display for MaterialTypes {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{:?}", self)
         }
     }
 
