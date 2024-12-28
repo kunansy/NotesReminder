@@ -515,6 +515,13 @@ pub mod db {
             }
 
             #[test]
+            fn test_demark_link() {
+                let mut res = Demark::from("[ссылка](https://www.radware.com/blog/applicationdelivery/wpo/2014/11/real-cost-slow-time-vs-downtime-slides/), [ссылка](https://blog.research.google/2009/06/speed-matters.html)");
+
+                assert_eq!(res.demark_link().content, "<a href='https://www.radware.com/blog/applicationdelivery/wpo/2014/11/real-cost-slow-time-vs-downtime-slides/'>ссылка</a>, <a href='https://blog.research.google/2009/06/speed-matters.html'>ссылка</a>")
+            }
+
+            #[test]
             fn test_demark() {
                 let mut res = Demark::from("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
                 let mut res2 = Demark::from("aksdflsk sdkfja:
