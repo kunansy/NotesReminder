@@ -1,7 +1,7 @@
 use hyper::{Client, body::Buf, http::uri, Request, Body, Method};
 use chrono::{prelude::*, NaiveDate};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -21,11 +21,11 @@ pub struct RepeatItem {
 
 #[derive(Deserialize, Debug)]
 pub struct SpanReport {
-    completed_materials: HashMap<String, i32>,
+    completed_materials: BTreeMap<String, i32>,
     total_materials_completed: i32,
-    read_items: HashMap<String, i32>,
-    reading: HashMap<String, f32>,
-    notes: HashMap<String, f32>,
+    read_items: BTreeMap<String, i32>,
+    reading: BTreeMap<String, f32>,
+    notes: BTreeMap<String, f32>,
     repeats_total: i32,
     repeat_materials_count: i32
 }
