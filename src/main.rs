@@ -127,6 +127,10 @@ async fn answer<T>(bot: &T,
             log::info!("[{}]: Remind to repeat", cfg.chat_id);
             remind_repeat(bot, cfg.chat_id, &cfg.tracker_url, &cfg.tracker_web_url).await?;
         },
+        Some("/report_year") => {
+            log::info!("[{}]: Report year", cfg.chat_id);
+            report_year(bot, cfg.chat_id, &cfg.tracker_url).await?;
+        },
         _ => {
            bot.send_message(ChatId(cfg.chat_id), "Command not found").await?;
         }
@@ -152,6 +156,17 @@ async fn remind_repeat<T>(bot: &T, chat_id: i64, tracker_url: &str, tracker_web_
                       repeat_q.iter().map(|r| r.priority_months).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(0.0),
                       tracker_web_url);
 
+    bot.send_message(ChatId(chat_id), msg).await?;
+
+    Ok(())
+}
+
+async fn report_year<T>(bot: &T, chat_id: i64, tracker_url: &str) -> Result<(), T::Err>
+    where T: Requester
+{
+    let report_year = tracker_api::get_year_report(tracker_url)
+        .await.expect("Could not get year report");
+    let msg = report_year.format();
     bot.send_message(ChatId(chat_id), msg).await?;
 
     Ok(())
