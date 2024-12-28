@@ -387,6 +387,13 @@ pub mod db {
             }
 
             #[test]
+            fn test_demark_code_block() {
+                let res = demark::demark_code_block("``` { 'type': 'http', 'asgi': {'version': '3.0', spec_version: '2.4'}, 'http_version': '1.1', 'server': ('127.0.0.1' 5000), 'client': ('127.0.0.1', 50422), 'scheme': 'http', 'method': 'GET', 'root_path': '', 'path': '/some/path/', 'raw_path': b'/some/path/', 'query_string': b'q=123', 'headers': [ (b'host', b'127.0.0.1:5000'), (b'user-agent', b'curl/7.81.0'), (b'accept', b'*/*') ] 'state': {} } ```");
+
+                assert_eq!(res, "<pre> { 'type': 'http', 'asgi': {'version': '3.0', spec_version: '2.4'}, 'http_version': '1.1', 'server': ('127.0.0.1' 5000), 'client': ('127.0.0.1', 50422), 'scheme': 'http', 'method': 'GET', 'root_path': '', 'path': '/some/path/', 'raw_path': b'/some/path/', 'query_string': b'q=123', 'headers': [ (b'host', b'127.0.0.1:5000'), (b'user-agent', b'curl/7.81.0'), (b'accept', b'*/*') ] 'state': {} } </pre>")
+            }
+
+            #[test]
             fn test_demark() {
                 let res = demark::demark_italic("Комментарий @ava: *«kasdjfksj lasdj la asdklfjalsdk . asdfs: — asdjfks вы нам!»*.");
                 let res2 = demark::demark("aksdflsk sdkfja:
