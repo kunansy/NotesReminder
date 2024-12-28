@@ -330,6 +330,14 @@ pub mod db {
             }).to_string()
         }
 
+        fn demark_link(content: &str) -> String {
+            let link_pattern = Regex::new(r#"\[([\w]*)\]\(([\w\d\.:\/-]*)\)"#).unwrap();
+
+            link_pattern.replace_all(content, |r: &Captures| {
+                format!("<a href='{}'>{}</a>", &r[2], &r[1])
+            }).to_string()
+        }
+
         #[cfg(test)]
         mod test_demark {
             use crate::db::demark;
