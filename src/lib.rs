@@ -449,8 +449,12 @@ pub mod db {
             #[test]
             fn test_demark_link() {
                 let mut res = Demark::from("[ссылка](https://www.radware.com/blog/applicationdelivery/wpo/2014/11/real-cost-slow-time-vs-downtime-slides/), [ссылка](https://blog.research.google/2009/06/speed-matters.html)");
+                let mut res2 = Demark::from("Классический алгоритм регаллока — [graph coloring allocation](https://en.wikipedia.org/wiki/Register_allocation#Graph-coloring_allocation), немного рассказано про него, про спилы в память.");
+                let mut res3 = Demark::from("Алгоритмов регаллока 30 штук ([3](https://compilers.cs.ucla.edu/fernando/projects/soc/llvm_doc/regAlloc.html#regAlloc_builtIn) ??), их можно выбирать, тонко настраивая ход и результат компиляции.");
 
-                assert_eq!(res.demark_link().content, "<a href='https://www.radware.com/blog/applicationdelivery/wpo/2014/11/real-cost-slow-time-vs-downtime-slides/'>ссылка</a>, <a href='https://blog.research.google/2009/06/speed-matters.html'>ссылка</a>")
+                assert_eq!(res.demark_link().content, "<a href='https://www.radware.com/blog/applicationdelivery/wpo/2014/11/real-cost-slow-time-vs-downtime-slides/'>ссылка</a>, <a href='https://blog.research.google/2009/06/speed-matters.html'>ссылка</a>");
+                assert_eq!(res2.demark_link().content, "Классический алгоритм регаллока — <a href='https://en.wikipedia.org/wiki/Register_allocation#Graph-coloring_allocation'>graph coloring allocation</a>, немного рассказано про него, про спилы в память.");
+                assert_eq!(res3.demark_link().content, "Алгоритмов регаллока 30 штук (<a href='https://compilers.cs.ucla.edu/fernando/projects/soc/llvm_doc/regAlloc.html#regAlloc_builtIn'>3</a> ??), их можно выбирать, тонко настраивая ход и результат компиляции.");
             }
 
             #[test]
