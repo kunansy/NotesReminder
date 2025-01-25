@@ -351,7 +351,7 @@ pub mod db {
             }
 
             fn demark_link(&mut self) -> &mut Self{
-                let link_pattern = Regex::new(r#"\[([\w]*)\]\(([\w\d\.:\/-]*)\)"#).unwrap();
+                let link_pattern = Regex::new(r#"\[([\w ]*)\]\(([\w\d\#\.:\/-]*)\)"#).unwrap();
 
                 self.content = link_pattern.replace_all(&self.content, |r: &Captures| {
                     format!("<a href='{}'>{}</a>", &r[2], &r[1])
